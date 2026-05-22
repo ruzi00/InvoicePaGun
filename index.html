@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pembuat Invoice Otomatis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="ambient"></div>
+  <main class="container">
+    <section class="panel panel-kontrol">
+      <h1>Pembuat Invoice Les (2 Mode)</h1>
+      <p class="sub">Payment in Front dan Payment After dalam satu workflow, plus sumber data dari Google Sheet.</p>
+
+      <div class="mode-switch">
+        <label><input type="radio" name="modePembayaran" value="front" checked /> Payment in Front</label>
+        <label><input type="radio" name="modePembayaran" value="after" /> Payment After</label>
+      </div>
+
+      <div id="runtimeNotice" class="runtime-notice hidden"></div>
+
+      <section id="autoLoadSection" class="auto-load-section hidden">
+        <h3>Auto Load</h3>
+        <p class="sub">Khusus mode offline. App akan mencoba auto-load file standar dari folder yang sama dengan index.html.</p>
+        <div class="grid-1">
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnAutoLoadFolder" type="button" class="btn">Auto Load Sekarang (Folder Saat Ini)</button>
+          </div>
+          <label class="field">
+            <span>Pilih beberapa file sekaligus (REKAP, tarif, diskon, bank, hari_libur, absensi)</span>
+            <input id="packageFiles" type="file" multiple accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+          </label>
+        </div>
+      </section>
+
+      <details class="collapsible-tools">
+        <summary>Informasi File & Sumber Data (Opsional)</summary>
+
+        <h3>Sumber Data Siswa</h3>
+        <div class="grid-2">
+          <label class="field">
+            <span>URL Google Sheet Siswa</span>
+            <input id="studentSheetUrl" type="text" value="https://docs.google.com/spreadsheets/d/1Zo-DRqXGDyzY9J7ee-xwh_XDhoHcniOv2o70T6tdQdA/edit?usp=sharing" />
+          </label>
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnMuatSiswaSheet" type="button" class="btn">Muat Siswa dari Google Sheet</button>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <label class="field">
+            <span>File Master Siswa (opsional)</span>
+            <input id="studentFile" type="file" accept=".csv,text/csv" />
+          </label>
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnSiswaContoh" type="button" class="btn sekund">Gunakan REKAP DATA SISWA.csv</button>
+          </div>
+        </div>
+
+        <h3>Parameter Tarif & Diskon</h3>
+        <div class="grid-3">
+          <label class="field">
+            <span>File Tarif (CSV)</span>
+            <input id="pricingFile" type="file" accept=".csv,text/csv" />
+          </label>
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnTarifContoh" type="button" class="btn sekund">Gunakan tarif.csv</button>
+          </div>
+          <div class="field"></div>
+        </div>
+
+        <div class="grid-3">
+          <label class="field">
+            <span>File Diskon Durasi (CSV)</span>
+            <input id="discountFile" type="file" accept=".csv,text/csv" />
+          </label>
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnDiskonContoh" type="button" class="btn sekund">Gunakan diskon_durasi.csv</button>
+          </div>
+          <div class="field"></div>
+        </div>
+
+        <div class="grid-3">
+          <label class="field">
+            <span>File Rekening Guru (CSV/XLSX)</span>
+            <input id="bankFile" type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+          </label>
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnBankContoh" type="button" class="btn sekund">Gunakan bank_guru.csv</button>
+          </div>
+          <div class="field"></div>
+        </div>
+
+        <div class="grid-1">
+          <h3>Libur Nasional (CSV)</h3>
+          <div class="grid-3">
+            <label class="field">
+              <span>File Hari Libur (CSV)</span>
+              <input id="holidayFile" type="file" accept=".csv,text/csv" />
+            </label>
+            <div class="field actions-inline">
+              <span>&nbsp;</span>
+              <button id="btnHolidayContoh" type="button" class="btn sekund">Gunakan hari_libur.csv</button>
+            </div>
+            <div class="field"></div>
+          </div>
+          <label class="field">
+            <span>Tanggal Libur Nasional (YYYY-MM-DD, pisahkan koma/baris baru)</span>
+            <textarea id="holidayDates" rows="4" placeholder="Tanggal akan terisi dari file hari_libur.csv, tetap bisa diedit manual."></textarea>
+          </label>
+        </div>
+      </details>
+
+      <section class="firebase-section">
+        <div class="firebase-header">
+          <div>
+            <h3>Firebase Sync</h3>
+            <p class="sub">Opsional. Simpan sumber data dan invoice terakhir ke Firebase supaya app tetap ringan di GitHub Pages.</p>
+          </div>
+          <div id="firebaseStatus" class="firebase-status neutral">Firebase belum dihubungkan.</div>
+        </div>
+
+        <div class="grid-2">
+          <label class="field">
+            <span>API Key</span>
+            <input id="firebaseApiKey" type="text" placeholder="AIza..." autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Auth Domain</span>
+            <input id="firebaseAuthDomain" type="text" placeholder="project-id.firebaseapp.com" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Project ID</span>
+            <input id="firebaseProjectId" type="text" placeholder="invoice-app" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>App ID</span>
+            <input id="firebaseAppId" type="text" placeholder="1:123:web:abc123" autocomplete="off" />
+          </label>
+        </div>
+
+        <div class="grid-1">
+          <label class="field">
+            <span>Measurement ID (opsional)</span>
+            <input id="firebaseMeasurementId" type="text" placeholder="G-XXXXXXXXXX" autocomplete="off" />
+          </label>
+          <p class="sub firebase-note">Aktifkan Anonymous Authentication dan Firestore di Firebase Console. Konfigurasi ini disimpan lokal di browser.</p>
+        </div>
+
+        <div class="toolbar firebase-toolbar">
+          <button id="btnFirebaseSaveConfig" type="button" class="btn sekund">Simpan Konfig</button>
+          <button id="btnFirebaseConnect" type="button" class="btn">Hubungkan Firebase</button>
+          <button id="btnFirebaseLoadSources" type="button" class="btn" disabled>Muat Data dari Firebase</button>
+          <button id="btnFirebaseSaveSources" type="button" class="btn" disabled>Simpan Data ke Firebase</button>
+          <button id="btnFirebaseSaveInvoice" type="button" class="btn" disabled>Simpan Invoice Terakhir</button>
+        </div>
+      </section>
+
+      <h3>Informasi Invoice</h3>
+      <div class="grid-2">
+        <label class="field">
+          <span>Judul Invoice</span>
+          <input id="invoiceTitle" type="text" value="INVOICE LES" />
+        </label>
+        <label class="field">
+          <span>Tanggal Invoice</span>
+          <input id="invoiceDate" type="date" />
+        </label>
+        <label class="field">
+          <span>Nama Panggilan Siswa</span>
+          <input id="studentSelect" type="text" list="studentOptions" placeholder="Ketik nama siswa..." autocomplete="off" />
+          <datalist id="studentOptions"></datalist>
+        </label>
+      </div>
+
+      <div class="grid-1">
+        <label class="field readonly">
+          <span>Total Tagihan Terpilih</span>
+          <input id="totalTagihan" type="text" readonly value="Rp0" />
+        </label>
+      </div>
+
+      <div id="studentDetail" class="student-detail">Detail siswa akan muncul di sini.</div>
+
+      <section id="frontSection" class="mode-section">
+        <h3>Pengaturan Payment in Front (Mingguan)</h3>
+        <div class="grid-4">
+          <label class="field">
+            <span>Tanggal Awal Minggu</span>
+            <input id="frontStartDate" type="date" />
+          </label>
+          <label class="field">
+            <span>Jumlah Minggu</span>
+            <input id="frontWeeks" type="number" min="1" value="1" />
+          </label>
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnGenerateMingguan" type="button" class="btn">Generate Jadwal</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table id="frontWeekTable">
+            <thead>
+              <tr>
+                <th>Aktif</th>
+                <th>Hari</th>
+                <th>Pengajar</th>
+                <th>Jumlah Peserta</th>
+                <th>Jam Mulai</th>
+                <th>Jam Selesai</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><input type="checkbox" data-day="Senin" checked /></td><td>Senin</td><td><select data-teacher="Senin" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Senin" /></td><td><input type="time" data-start="Senin" value="19:30" /></td><td><input type="time" data-end="Senin" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Selasa" /></td><td>Selasa</td><td><select data-teacher="Selasa" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Selasa" /></td><td><input type="time" data-start="Selasa" value="19:30" /></td><td><input type="time" data-end="Selasa" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Rabu" /></td><td>Rabu</td><td><select data-teacher="Rabu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Rabu" /></td><td><input type="time" data-start="Rabu" value="19:30" /></td><td><input type="time" data-end="Rabu" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Kamis" /></td><td>Kamis</td><td><select data-teacher="Kamis" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Kamis" /></td><td><input type="time" data-start="Kamis" value="19:30" /></td><td><input type="time" data-end="Kamis" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Jumat" /></td><td>Jumat</td><td><select data-teacher="Jumat" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Jumat" /></td><td><input type="time" data-start="Jumat" value="19:30" /></td><td><input type="time" data-end="Jumat" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Sabtu" /></td><td>Sabtu</td><td><select data-teacher="Sabtu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Sabtu" /></td><td><input type="time" data-start="Sabtu" value="09:00" /></td><td><input type="time" data-end="Sabtu" value="10:30" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Minggu" /></td><td>Minggu</td><td><select data-teacher="Minggu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Minggu" /></td><td><input type="time" data-start="Minggu" value="09:00" /></td><td><input type="time" data-end="Minggu" value="10:30" /></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="sub">Jam menggunakan format 24 jam (military time).</p>
+      </section>
+
+      <section id="afterSection" class="mode-section hidden">
+        <h3>Sumber Absensi Payment After</h3>
+        <div class="grid-1">
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnDownloadAfterTemplate" type="button" class="btn sekund">Download Template Payment After (CSV)</button>
+          </div>
+        </div>
+        <div class="grid-2">
+          <label class="field">
+            <span>File CSV Absensi</span>
+            <input id="csvFile" type="file" accept=".csv,text/csv" />
+          </label>
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnContoh" type="button" class="btn sekund">Info Absensi</button>
+          </div>
+        </div>
+        <div class="grid-2">
+          <label class="field">
+            <span>URL Google Sheet Absensi</span>
+            <input id="sheetUrl" type="text" placeholder="Tempel URL Google Sheet absensi" />
+          </label>
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnMuatSheet" type="button" class="btn">Muat Absensi dari Google Sheet</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="toolbar">
+        <button id="btnGenerate" type="button" class="btn utama">Generate Invoice</button>
+        <button id="btnDownloadPng" type="button" class="btn" disabled>Download PNG</button>
+      </div>
+    </section>
+
+    <section class="panel panel-data">
+      <h2 id="sessionsTitle">Daftar Sesi Tagihan</h2>
+      <p class="sub">Pratinjau mayoritas read-only. Centang baris dan edit kolom catatan bila perlu.</p>
+      <div class="table-wrap">
+        <table id="sessionsTable">
+          <thead>
+            <tr>
+              <th>Pilih</th>
+              <th>Hari</th>
+              <th>Tanggal</th>
+              <th>Jam</th>
+              <th>Pengajar</th>
+              <th>Topik/Mapel</th>
+              <th>Durasi</th>
+              <th>Tarif/Jam</th>
+              <th>Total Jumlah Peserta</th>
+              <th>Subtotal</th>
+              <th>Catatan</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="11" class="empty">Belum ada sesi. Muat data terlebih dahulu.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel panel-invoice">
+      <h2>Pratinjau Invoice</h2>
+      <div id="invoicePreview" class="invoice-preview">
+        <div class="placeholder">Pratinjau invoice akan muncul di sini.</div>
+      </div>
+      <div class="preview-actions">
+        <button id="btnPreviewPng" type="button" class="btn" disabled>Download PNG</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="html2canvas.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

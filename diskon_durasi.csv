@@ -1,0 +1,5 @@
+min_durasi,max_durasi,diskon_persen
+0,7.99,0
+8,15.99,5
+16,23.99,10
+24,72,15
