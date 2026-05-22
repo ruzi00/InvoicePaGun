@@ -86,6 +86,8 @@ const el = {
   btnDownloadAfterTemplate: document.getElementById("btnDownloadAfterTemplate"),
   sheetUrl: document.getElementById("sheetUrl"),
   btnMuatSheet: document.getElementById("btnMuatSheet"),
+  afterInvoiceDateSelect: document.getElementById("afterInvoiceDateSelect"),
+  btnApplyAfterInvoiceDate: document.getElementById("btnApplyAfterInvoiceDate"),
 
   sessionsTitle: document.getElementById("sessionsTitle"),
   tableBody: document.querySelector("#sessionsTable tbody"),
@@ -348,6 +350,16 @@ function bindEvents() {
     } catch (err) {
       alert(err.message);
     }
+  });
+
+  el.btnApplyAfterInvoiceDate?.addEventListener("click", () => {
+    if (!el.afterInvoiceDateSelect?.value) return;
+    el.invoiceDate.value = el.afterInvoiceDateSelect.value;
+  });
+
+  el.afterInvoiceDateSelect?.addEventListener("change", () => {
+    if (!el.afterInvoiceDateSelect.value) return;
+    el.invoiceDate.value = el.afterInvoiceDateSelect.value;
   });
 
   el.studentSelect.addEventListener("change", () => {
@@ -732,6 +744,10 @@ function applyModeUI() {
   el.afterSection.classList.toggle("hidden", isFront);
   el.sessionsTitle.textContent = isFront ? "Daftar Sesi Mingguan (Payment in Front)" : "Daftar Sesi Unpaid (Payment After)";
 
+  if (!isFront) {
+    updateAfterInvoiceDateOptions();
+  }
+
   if (isFront) {
     state.sessions = [];
     renderSessionsTable();
@@ -917,6 +933,7 @@ function hydrateAfterSessionsForSelectedStudent() {
   const simple = buildAfterSessionsFromSimpleCsv(headers, rows, studentName);
   if (simple.length > 0) {
     state.sessions = simple.sort((a, b) => a.tanggal - b.tanggal);
+    updateAfterInvoiceDateOptions(state.sessions);
     renderSessionsTable();
     updateTotal();
     return;
@@ -982,8 +999,30 @@ function hydrateAfterSessionsForSelectedStudent() {
   }
 
   state.sessions = sessions.sort((a, b) => a.tanggal - b.tanggal);
+  updateAfterInvoiceDateOptions(state.sessions);
   renderSessionsTable(sessions.length === 0 ? "Tidak ada sesi absensi untuk siswa ini." : undefined);
   updateTotal();
+}
+
+function updateAfterInvoiceDateOptions(sourceSessions = null) {
+  if (!el.afterInvoiceDateSelect) return;
+  const sessions = Array.isArray(sourceSessions) ? sourceSessions : state.sessions;
+  const isoDates = [...new Set((sessions || [])
+    .map((s) => (s?.tanggal instanceof Date ? toLocalDateInputValue(s.tanggal) : ""))
+    .filter(Boolean))].sort();
+
+  if (isoDates.length === 0) {
+    el.afterInvoiceDateSelect.innerHTML = '<option value="">Belum ada tanggal dari CSV</option>';
+    return;
+  }
+
+  el.afterInvoiceDateSelect.innerHTML = isoDates
+    .map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(formatTanggal(new Date(d)))}</option>`)
+    .join("");
+
+  const preferred = isoDates[isoDates.length - 1];
+  el.afterInvoiceDateSelect.value = preferred;
+  el.invoiceDate.value = preferred;
 }
 
 function buildSession({ date, hari, jamMulai, jamSelesai, pengajar, pesertaCount, durasiOverride, topik, catatan, source }) {
@@ -1334,9 +1373,9 @@ function sanitizeFileName(name) {
 
 function downloadAfterTemplateCsv() {
   const csv = [
-    "nama_siswa,tanggal,hari,jam_mulai,jam_selesai,durasi,pengajar,jumlah_peserta,topik,catatan",
-    "Budi,2026-05-20,Rabu,19:30,21:00,,Rensie,1,Matematika - Integral,Pembahasan latihan UTBK",
-    "Budi,2026-05-22,Jumat,,,1.5,Trias,1,Fisika - Kinematika,Durasi manual",
+    "nama_siswa,tanggal,hari,jam_mulai,jam_selesai,pengajar,jumlah_peserta,topik,catatan",
+    "Budi,2026-05-20,Rabu,19:30,21:00,Rensie,1,Matematika - Integral,Pembahasan latihan UTBK",
+    "Budi,2026-05-22,Jumat,19:30,21:00,Trias,1,Fisika - Kinematika,Bahas soal rutin",
   ].join("\n");
 
   const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
@@ -1355,7 +1394,6 @@ function buildAfterSessionsFromSimpleCsv(headers, rows, studentName) {
   const idxHari = findHeaderIndex(headers, ["hari"]);
   const idxMulai = findHeaderIndex(headers, ["jam_mulai", "jam mulai"]);
   const idxSelesai = findHeaderIndex(headers, ["jam_selesai", "jam selesai"]);
-  const idxDurasi = findHeaderIndex(headers, ["durasi"]);
   const idxPengajar = findHeaderIndex(headers, ["pengajar", "guru"]);
   const idxPeserta = findHeaderIndex(headers, ["jumlah peserta", "total peserta", "peserta"]);
   const idxTopik = findHeaderIndex(headers, ["topik", "mata pelajaran", "subject", "mapel"]);
@@ -1377,7 +1415,8 @@ function buildAfterSessionsFromSimpleCsv(headers, rows, studentName) {
     const hari = hariCsv || HARI[tanggal.getDay()];
     const jamMulai = String(idxMulai >= 0 ? row[idxMulai] || "" : "").trim() || "-";
     const jamSelesai = String(idxSelesai >= 0 ? row[idxSelesai] || "" : "").trim() || "-";
-    const durasiOverride = Number.parseFloat(String(idxDurasi >= 0 ? row[idxDurasi] || "0" : "0").replace(",", ".")) || undefined;
+    const durasiOverride = calculateDuration(jamMulai, jamSelesai);
+    if (durasiOverride <= 0) continue;
     const peserta = Math.max(1, parseIntFromText(idxPeserta >= 0 ? row[idxPeserta] || "1" : "1") || 1);
 
     out.push(

@@ -1,3 +1,3 @@
-nama_siswa,tanggal,hari,jam_mulai,jam_selesai,durasi,pengajar,jumlah_peserta,topik,catatan
-Budi,2026-05-20,Rabu,19:30,21:00,,Rensie,1,Matematika - Integral,Pembahasan latihan UTBK
-Budi,2026-05-22,Jumat,,,1.5,Trias,1,Fisika - Kinematika,Durasi manual
+nama_siswa,tanggal,hari,jam_mulai,jam_selesai,pengajar,jumlah_peserta,topik,catatan
+Budi,2026-05-20,Rabu,19:30,21:00,Rensie,1,Matematika - Integral,Pembahasan latihan UTBK
+Budi,2026-05-22,Jumat,19:30,21:00,Trias,1,Fisika - Kinematika,Bahas soal rutin
