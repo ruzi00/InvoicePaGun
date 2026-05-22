@@ -1257,7 +1257,7 @@ function generateInvoice() {
   const totals = calculateInvoiceTotals(selected);
   const teacherPortions = calculateTeacherPortions(selected, totals);
   const invoiceDate = parseDateInput(el.invoiceDate.value) || new Date();
-  const paymentDeadline = toLocalDateInputValue(invoiceDate);
+  const paymentDeadline = toLocalDateTimeInputValue(addHours(new Date(), 24));
   const invoiceNo = `INV-${invoiceDate.getFullYear()}${String(invoiceDate.getMonth() + 1).padStart(2, "0")}${String(
     invoiceDate.getDate()
   ).padStart(2, "0")}-${student.replace(/\s+/g, "").slice(0, 6).toUpperCase()}`;
@@ -1355,7 +1355,7 @@ function generateInvoice() {
           ${renderAllBankRows(bankList)}
           <label class="deadline-field">
             <span>Deadline Pembayaran</span>
-            <input id="invoiceDeadline" type="date" value="${paymentDeadline}" />
+            <input id="invoiceDeadline" type="datetime-local" step="1" value="${paymentDeadline}" />
           </label>
         </div>
 
@@ -1382,7 +1382,7 @@ function generateInvoice() {
     deadlineInput.addEventListener("input", () => {
       deadlineInput.dataset.userEdited = "true";
       if (state.lastInvoiceRecord) {
-        state.lastInvoiceRecord.paymentDeadline = String(deadlineInput.value || "").trim() || state.lastInvoiceRecord.invoiceDate;
+        state.lastInvoiceRecord.paymentDeadline = String(deadlineInput.value || "").trim() || toLocalDateTimeInputValue(addHours(new Date(), 24));
         if (state.firebase.ready) {
           void saveInvoiceRecordToFirebase({ silent: true }).catch(() => {
             // ignore background autosave failures; manual save button remains available
@@ -2065,6 +2065,18 @@ function formatTanggalPanjang(date) {
   return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "long", year: "numeric" }).format(date);
 }
 
+function formatTanggalWaktu(date) {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 function formatRupiah(num) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -2102,6 +2114,10 @@ function parseDateInput(value) {
 
 function addDays(date, days) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+function addHours(date, hours) {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
 
 function dedupeByNickname(list) {
@@ -2187,6 +2203,16 @@ function escapeHtml(str) {
 function toLocalDateInputValue(date) {
   const tzOffsetMs = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - tzOffsetMs).toISOString().slice(0, 10);
+}
+
+function toLocalDateTimeInputValue(date) {
+  const tzOffsetMs = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - tzOffsetMs).toISOString().slice(0, 19);
+}
+
+function toDateTimeLocalInputOrEmpty(value) {
+  const parsed = parseDateInput(value);
+  return parsed ? toLocalDateTimeInputValue(parsed) : "";
 }
 
 function isFileProtocol() {
@@ -2815,13 +2841,13 @@ function renderInvoiceHistoryTable() {
   el.invoiceHistoryTableBody.innerHTML = state.invoiceHistory
     .map((item) => {
       const grandTotal = Number(item?.totals?.grandTotal || 0);
-      const invoiceDate = item.invoiceDate && isValidIsoDate(item.invoiceDate) ? item.invoiceDate : "-";
-      const paymentDeadline = item.paymentDeadline && isValidIsoDate(item.paymentDeadline) ? item.paymentDeadline : "-";
+      const invoiceDate = parseDateInput(item.invoiceDate || "");
+      const paymentDeadline = parseDateInput(item.paymentDeadline || "");
       return `
       <tr>
         <td>${escapeHtml(item.invoiceNo || "-")}</td>
-        <td>${invoiceDate === "-" ? "-" : escapeHtml(formatTanggal(new Date(invoiceDate)))}</td>
-        <td>${paymentDeadline === "-" ? "-" : escapeHtml(formatTanggal(new Date(paymentDeadline)))}</td>
+        <td>${invoiceDate ? escapeHtml(formatTanggal(invoiceDate)) : "-"}</td>
+        <td>${paymentDeadline ? escapeHtml(formatTanggalWaktu(paymentDeadline)) : "-"}</td>
         <td>${escapeHtml(item.student || "-")}</td>
         <td>${escapeHtml(item.mode || "-")}</td>
         <td>${formatRupiah(grandTotal)}</td>
@@ -2854,13 +2880,15 @@ function showInvoiceHistoryPreview(item) {
   const teacherPortionLines = teacherPortions
     .map((row) => `${row.teacher}: ${formatRupiah(Number(row.net || 0))}`)
     .join(" | ");
+  const paymentDeadlineDate = parseDateInput(item.paymentDeadline || item.invoiceDate || "");
+  const paymentDeadlineText = paymentDeadlineDate ? formatTanggalWaktu(paymentDeadlineDate) : (item.paymentDeadline || item.invoiceDate || "-");
 
   el.invoiceHistoryPreview.classList.remove("hidden");
   el.invoiceHistoryPreview.innerHTML = `
     <h4>${escapeHtml(item.invoiceNo || "Invoice")}</h4>
     <div><strong>Siswa:</strong> ${escapeHtml(item.student || "-")}</div>
     <div><strong>Tanggal:</strong> ${escapeHtml(item.invoiceDate || "-")}</div>
-    <div><strong>Deadline Pembayaran:</strong> ${escapeHtml(item.paymentDeadline || item.invoiceDate || "-")}</div>
+    <div><strong>Deadline Pembayaran:</strong> ${escapeHtml(paymentDeadlineText)}</div>
     <div><strong>Mode:</strong> ${escapeHtml(item.mode || "-")}</div>
     <div><strong>Pengajar:</strong> ${escapeHtml(teacherList || "-")}</div>
     <div><strong>Porsi Pengajar:</strong> ${escapeHtml(teacherPortionLines || "-")}</div>
@@ -2878,7 +2906,7 @@ function redownloadInvoiceFromHistory(item) {
   const teacherPortions = Array.isArray(item.teacherPortions)
     ? item.teacherPortions
     : calculateTeacherPortions(items, totals);
-  const paymentDeadline = String(item.paymentDeadline || item.invoiceDate || "").trim();
+  const paymentDeadline = toDateTimeLocalInputOrEmpty(String(item.paymentDeadline || item.invoiceDate || "").trim());
   const bankList = getBankListForInvoice(teachers);
 
   const rowsHtml = items
@@ -2990,7 +3018,7 @@ function redownloadInvoiceFromHistory(item) {
           ${renderAllBankRows(bankList)}
           <label class="deadline-field">
             <span>Deadline Pembayaran</span>
-            <input id="invoiceDeadline" type="date" value="${escapeHtml(paymentDeadline)}" disabled />
+            <input id="invoiceDeadline" type="datetime-local" step="1" value="${escapeHtml(paymentDeadline)}" disabled />
           </label>
         </div>
 
