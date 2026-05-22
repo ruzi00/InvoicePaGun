@@ -343,8 +343,29 @@
       </div>
 
       <h3>Riwayat Invoice (Firebase)</h3>
-      <div class="preview-actions">
+      <div class="grid-3">
+        <label class="field">
+          <span>Filter Nama Siswa</span>
+          <input id="invoiceHistoryStudentFilter" type="text" placeholder="Kosongkan untuk semua siswa" />
+        </label>
+        <label class="field">
+          <span>Ukuran Halaman</span>
+          <select id="invoiceHistoryPageSize">
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+          </select>
+        </label>
+        <div class="field actions-inline">
+          <span>&nbsp;</span>
+          <button id="btnApplyInvoiceHistoryFilter" type="button" class="btn">Terapkan Filter</button>
+        </div>
+      </div>
+      <div class="preview-actions history-pagination-actions">
         <button id="btnRefreshInvoiceHistory" type="button" class="btn" disabled>Muat Riwayat Invoice</button>
+        <button id="btnInvoiceHistoryPrev" type="button" class="btn" disabled>Sebelumnya</button>
+        <button id="btnInvoiceHistoryNext" type="button" class="btn" disabled>Berikutnya</button>
+        <span id="invoiceHistoryPageInfo" class="sub history-page-info">Halaman 1</span>
       </div>
       <div id="invoiceHistoryStatus" class="sub">Hubungkan Firebase untuk melihat riwayat invoice.</div>
       <div class="table-wrap">

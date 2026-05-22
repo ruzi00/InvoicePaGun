@@ -465,6 +465,16 @@ td .mini {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.history-pagination-actions {
+  align-items: center;
+}
+
+.history-page-info {
+  margin: 0;
+  font-size: 0.88rem;
 }
 
 .history-preview {

@@ -41,6 +41,14 @@ const state = {
   },
   lastInvoiceRecord: null,
   invoiceHistory: [],
+  invoiceHistoryQuery: {
+    pageSize: 20,
+    studentFilter: "",
+    cursorStack: [],
+    hasNext: false,
+    lastVisibleDoc: null,
+    currentPage: 1,
+  },
   firebase: {
     app: null,
     auth: null,
@@ -107,6 +115,12 @@ const el = {
   btnPreviewPng: document.getElementById("btnPreviewPng"),
   preview: document.getElementById("invoicePreview"),
   btnRefreshInvoiceHistory: document.getElementById("btnRefreshInvoiceHistory"),
+  btnInvoiceHistoryPrev: document.getElementById("btnInvoiceHistoryPrev"),
+  btnInvoiceHistoryNext: document.getElementById("btnInvoiceHistoryNext"),
+  btnApplyInvoiceHistoryFilter: document.getElementById("btnApplyInvoiceHistoryFilter"),
+  invoiceHistoryStudentFilter: document.getElementById("invoiceHistoryStudentFilter"),
+  invoiceHistoryPageSize: document.getElementById("invoiceHistoryPageSize"),
+  invoiceHistoryPageInfo: document.getElementById("invoiceHistoryPageInfo"),
   invoiceHistoryStatus: document.getElementById("invoiceHistoryStatus"),
   invoiceHistoryTableBody: document.querySelector("#invoiceHistoryTable tbody"),
   invoiceHistoryPreview: document.getElementById("invoiceHistoryPreview"),
@@ -414,9 +428,56 @@ function bindEvents() {
   if (el.btnPreviewPng) el.btnPreviewPng.addEventListener("click", downloadPng);
   el.btnRefreshInvoiceHistory?.addEventListener("click", async () => {
     try {
-      await loadInvoiceHistory();
+      await loadInvoiceHistory({ direction: "reset" });
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal memuat riwayat invoice.", "error");
+      alert(err.message);
+    }
+  });
+
+  el.btnInvoiceHistoryPrev?.addEventListener("click", async () => {
+    try {
+      await loadInvoiceHistory({ direction: "prev" });
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal memuat halaman sebelumnya.", "error");
+      alert(err.message);
+    }
+  });
+
+  el.btnInvoiceHistoryNext?.addEventListener("click", async () => {
+    try {
+      await loadInvoiceHistory({ direction: "next" });
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal memuat halaman berikutnya.", "error");
+      alert(err.message);
+    }
+  });
+
+  el.btnApplyInvoiceHistoryFilter?.addEventListener("click", async () => {
+    try {
+      await applyInvoiceHistoryFilterAndReload();
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal menerapkan filter riwayat.", "error");
+      alert(err.message);
+    }
+  });
+
+  el.invoiceHistoryStudentFilter?.addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    try {
+      await applyInvoiceHistoryFilterAndReload();
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal menerapkan filter riwayat.", "error");
+      alert(err.message);
+    }
+  });
+
+  el.invoiceHistoryPageSize?.addEventListener("change", async () => {
+    try {
+      await applyInvoiceHistoryFilterAndReload();
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal mengubah ukuran halaman.", "error");
       alert(err.message);
     }
   });
@@ -2330,6 +2391,11 @@ function refreshFirebaseButtons() {
   if (el.btnFirebaseSaveSources) el.btnFirebaseSaveSources.disabled = !ready;
   if (el.btnFirebaseSaveInvoice) el.btnFirebaseSaveInvoice.disabled = !ready || !state.lastInvoiceRecord;
   if (el.btnRefreshInvoiceHistory) el.btnRefreshInvoiceHistory.disabled = !ready;
+  if (el.btnApplyInvoiceHistoryFilter) el.btnApplyInvoiceHistoryFilter.disabled = !ready;
+  if (el.invoiceHistoryStudentFilter) el.invoiceHistoryStudentFilter.disabled = !ready;
+  if (el.invoiceHistoryPageSize) el.invoiceHistoryPageSize.disabled = !ready;
+  if (el.btnInvoiceHistoryPrev) el.btnInvoiceHistoryPrev.disabled = !ready || state.invoiceHistoryQuery.cursorStack.length === 0;
+  if (el.btnInvoiceHistoryNext) el.btnInvoiceHistoryNext.disabled = !ready || !state.invoiceHistoryQuery.hasNext;
   const saveButtons = [
     el.btnCsvSaveStudents,
     el.btnCsvSavePricing,
@@ -2342,6 +2408,32 @@ function refreshFirebaseButtons() {
   saveButtons.forEach((btn) => {
     if (btn) btn.disabled = !ready;
   });
+  renderInvoiceHistoryPaginationInfo();
+}
+
+function applyInvoiceHistoryFilterFromInputs() {
+  const nextFilter = String(el.invoiceHistoryStudentFilter?.value || "").trim();
+  const nextPageSizeRaw = Number.parseInt(String(el.invoiceHistoryPageSize?.value || "20"), 10);
+  const nextPageSize = Number.isFinite(nextPageSizeRaw) ? Math.min(50, Math.max(1, nextPageSizeRaw)) : 20;
+
+  state.invoiceHistoryQuery.studentFilter = nextFilter;
+  state.invoiceHistoryQuery.pageSize = nextPageSize;
+  state.invoiceHistoryQuery.cursorStack = [];
+  state.invoiceHistoryQuery.currentPage = 1;
+  state.invoiceHistoryQuery.lastVisibleDoc = null;
+  state.invoiceHistoryQuery.hasNext = false;
+}
+
+async function applyInvoiceHistoryFilterAndReload() {
+  applyInvoiceHistoryFilterFromInputs();
+  await loadInvoiceHistory({ direction: "reset" });
+}
+
+function renderInvoiceHistoryPaginationInfo() {
+  if (!el.invoiceHistoryPageInfo) return;
+  const { currentPage, hasNext } = state.invoiceHistoryQuery;
+  const nextHint = hasNext ? " | ada halaman berikutnya" : " | halaman terakhir";
+  el.invoiceHistoryPageInfo.textContent = `Halaman ${currentPage}${nextHint}`;
 }
 
 async function bootstrapFirebaseFromStorage({ silent = true, forceServer = false } = {}) {
@@ -2600,7 +2692,7 @@ async function saveInvoiceRecordToFirebase({ silent = false } = {}) {
   if (!silent) setFirebaseStatus(`Invoice ${state.lastInvoiceRecord.invoiceNo} tersimpan ke Firebase.`, "ok");
 }
 
-async function loadInvoiceHistory({ silent = false, forceServer = false } = {}) {
+async function loadInvoiceHistory({ silent = false, forceServer = false, direction = "reset" } = {}) {
   if (!state.firebase.ready || !state.firebase.db) {
     throw new Error("Firebase belum terhubung.");
   }
@@ -2608,37 +2700,64 @@ async function loadInvoiceHistory({ silent = false, forceServer = false } = {}) 
   const uid = state.firebase.user?.uid;
   if (!uid) throw new Error("User Firebase belum siap.");
 
-  let snapshot;
-  try {
-    snapshot = await firestoreGet(
-      state.firebase.db
-        .collection(FIREBASE_INVOICE_COLLECTION)
-        .where("ownerUid", "==", uid)
-        .orderBy("updatedAt", "desc")
-        .limit(50),
-      { forceServer }
-    );
-  } catch {
-    snapshot = await firestoreGet(
-      state.firebase.db
-        .collection(FIREBASE_INVOICE_COLLECTION)
-        .where("ownerUid", "==", uid)
-        .orderBy("createdAt", "desc")
-        .limit(50),
-      { forceServer }
-    );
+  const queryState = state.invoiceHistoryQuery;
+  if (direction === "reset") {
+    queryState.cursorStack = [];
+    queryState.currentPage = 1;
+    queryState.lastVisibleDoc = null;
+    queryState.hasNext = false;
+  } else if (direction === "next") {
+    if (!queryState.hasNext || !queryState.lastVisibleDoc) return;
+    queryState.cursorStack.push(queryState.lastVisibleDoc);
+    queryState.currentPage = queryState.cursorStack.length + 1;
+  } else if (direction === "prev") {
+    if (queryState.cursorStack.length > 0) {
+      queryState.cursorStack.pop();
+    }
+    queryState.currentPage = queryState.cursorStack.length + 1;
   }
 
-  state.invoiceHistory = snapshot.docs.map((doc) => ({
+  const startAfterDoc = queryState.cursorStack.length > 0 ? queryState.cursorStack[queryState.cursorStack.length - 1] : null;
+  const studentFilter = String(queryState.studentFilter || "").trim();
+  const pageSize = Number(queryState.pageSize || 20);
+
+  const buildBaseQuery = (orderField) => {
+    let q = state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).where("ownerUid", "==", uid);
+    if (studentFilter) {
+      q = q.where("student", "==", studentFilter);
+    }
+    q = q.orderBy(orderField, "desc").limit(pageSize + 1);
+    if (startAfterDoc) {
+      q = q.startAfter(startAfterDoc);
+    }
+    return q;
+  };
+
+  let snapshot;
+  try {
+    snapshot = await firestoreGet(buildBaseQuery("updatedAt"), { forceServer });
+  } catch {
+    snapshot = await firestoreGet(buildBaseQuery("createdAt"), { forceServer });
+  }
+
+  const docs = snapshot.docs || [];
+  const hasNext = docs.length > pageSize;
+  const pageDocs = hasNext ? docs.slice(0, pageSize) : docs;
+  queryState.hasNext = hasNext;
+  queryState.lastVisibleDoc = pageDocs.length > 0 ? pageDocs[pageDocs.length - 1] : null;
+
+  state.invoiceHistory = pageDocs.map((doc) => ({
     historyId: doc.id,
     invoiceNo: doc.data()?.invoiceNo || doc.id,
     ...doc.data(),
   }));
 
   renderInvoiceHistoryTable();
+  renderInvoiceHistoryPaginationInfo();
+  refreshFirebaseButtons();
   if (el.invoiceHistoryStatus) {
     el.invoiceHistoryStatus.textContent = state.invoiceHistory.length
-      ? `Menampilkan ${state.invoiceHistory.length} invoice terbaru.`
+      ? `Menampilkan ${state.invoiceHistory.length} invoice (halaman ${queryState.currentPage}).`
       : "Belum ada riwayat invoice di Firebase untuk akun ini.";
   }
 
