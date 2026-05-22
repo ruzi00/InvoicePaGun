@@ -3,6 +3,14 @@ const FIREBASE_CONFIG_STORAGE_KEY = "invoice-firebase-config";
 const FIREBASE_SOURCE_COLLECTION = "invoice_sources";
 const FIREBASE_INVOICE_COLLECTION = "invoice_records";
 const FIREBASE_SOURCE_KINDS = ["students", "pricing", "discount", "bank", "holiday", "attendance", "template_after"];
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: "",
+};
 
 const state = {
   mode: "front",
@@ -167,14 +175,23 @@ function initialize() {
   applyRuntimeModeHints();
   hydrateFirebaseConfigInputs();
   parseHolidaySetFromInput();
-  preloadDefaults();
-  if (isFileProtocol()) autoLoadFromCurrentFolder(true);
   applyModeUI();
   refreshWeeklyTeacherOptions();
   refreshFirebaseButtons();
   syncCsvEditorsFromState();
   renderInvoiceHistoryTable();
-  void bootstrapFirebaseFromStorage();
+  void initializeDataSources();
+}
+
+async function initializeDataSources() {
+  if (isFileProtocol()) {
+    await autoLoadFromCurrentFolder(true);
+  }
+
+  const firebaseReady = await bootstrapFirebaseFromStorage({ silent: true, forceServer: true });
+  if (!firebaseReady) {
+    await preloadDefaults();
+  }
 }
 
 function bindEvents() {
@@ -1510,9 +1527,8 @@ function getBankListForInvoice(collaboratedTeachers) {
 
 function isCollaboratedAccountRow(row) {
   const nama = normalizeName(row.namaPengajar);
-  const atas = normalizeName(row.atasNama);
   const label = normalizeName(row.label);
-  return nama.includes("bimbel pa gun") || atas.includes("bimbel pa gun") || label.includes("kolaborasi");
+  return nama.includes("kolaborasi") || label.includes("kolaborasi");
 }
 
 function renderAllBankRows(bankList) {
@@ -1968,7 +1984,7 @@ function clearPreview() {
 }
 
 function hydrateFirebaseConfigInputs() {
-  const config = loadFirebaseConfigFromStorage();
+  const config = getPreferredFirebaseConfig();
   if (!config) return;
 
   el.firebaseApiKey.value = config.apiKey || "";
@@ -1990,15 +2006,28 @@ function loadFirebaseConfigFromStorage() {
   }
 }
 
+function getPreferredFirebaseConfig() {
+  const stored = loadFirebaseConfigFromStorage();
+  if (!stored) return { ...DEFAULT_FIREBASE_CONFIG };
+  return {
+    ...DEFAULT_FIREBASE_CONFIG,
+    ...stored,
+  };
+}
+
 function getFirebaseConfigFromInputs(silent = false) {
+  const preferred = getPreferredFirebaseConfig();
   const config = {
-    apiKey: String(el.firebaseApiKey.value || "").trim(),
-    authDomain: String(el.firebaseAuthDomain.value || "").trim(),
-    projectId: String(el.firebaseProjectId.value || "").trim(),
-    appId: String(el.firebaseAppId.value || "").trim(),
+    apiKey: String(el.firebaseApiKey.value || preferred.apiKey || "").trim(),
+    authDomain: String(el.firebaseAuthDomain.value || preferred.authDomain || "").trim(),
+    projectId: String(el.firebaseProjectId.value || preferred.projectId || "").trim(),
+    appId: String(el.firebaseAppId.value || preferred.appId || "").trim(),
   };
 
-  const measurementId = String(el.firebaseMeasurementId.value || "").trim();
+  if (preferred.storageBucket) config.storageBucket = preferred.storageBucket;
+  if (preferred.messagingSenderId) config.messagingSenderId = preferred.messagingSenderId;
+
+  const measurementId = String(el.firebaseMeasurementId.value || preferred.measurementId || "").trim();
   if (measurementId) config.measurementId = measurementId;
 
   const missing = ["apiKey", "authDomain", "projectId", "appId"].filter((key) => !config[key]);
@@ -2163,26 +2192,29 @@ function refreshFirebaseButtons() {
   });
 }
 
-async function bootstrapFirebaseFromStorage() {
-  const config = loadFirebaseConfigFromStorage();
-  if (!config) {
+async function bootstrapFirebaseFromStorage({ silent = true, forceServer = false } = {}) {
+  const config = getPreferredFirebaseConfig();
+  const missing = ["apiKey", "authDomain", "projectId", "appId"].filter((key) => !String(config?.[key] || "").trim());
+  if (missing.length > 0) {
     setFirebaseStatus("Firebase belum dihubungkan.", "neutral");
     setCloudReadyMode(false);
     refreshFirebaseButtons();
-    return;
+    return false;
   }
 
   hydrateFirebaseConfigInputs();
   try {
-    await connectFirebase({ saveConfig: false, loadSources: true, silent: true });
+    await connectFirebase({ saveConfig: true, loadSources: true, silent, forceServer });
+    return true;
   } catch (err) {
     setFirebaseStatus(`Konfigurasi Firebase tersimpan, tetapi koneksi gagal: ${err.message}`, "warn");
     setCloudReadyMode(false);
     refreshFirebaseButtons();
+    return false;
   }
 }
 
-async function connectFirebase({ saveConfig = false, loadSources = false, silent = false } = {}) {
+async function connectFirebase({ saveConfig = false, loadSources = false, silent = false, forceServer = false } = {}) {
   const config = getFirebaseConfigFromInputs(silent);
   if (!config) throw new Error("Konfigurasi Firebase belum lengkap.");
 
@@ -2226,10 +2258,10 @@ async function connectFirebase({ saveConfig = false, loadSources = false, silent
   refreshFirebaseButtons();
 
   if (loadSources) {
-    await loadSourcesFromFirebase({ silent: true });
+    await loadSourcesFromFirebase({ silent: true, forceServer });
   }
 
-  await loadInvoiceHistory({ silent: true });
+  await loadInvoiceHistory({ silent: true, forceServer });
 }
 
 function collectFirebaseSourcePayloads() {
@@ -2244,7 +2276,16 @@ function collectFirebaseSourcePayloads() {
   }).filter((item) => String(item.csvText || "").trim().length > 0);
 }
 
-async function loadSourcesFromFirebase({ silent = false } = {}) {
+async function firestoreGet(queryRef, { forceServer = false } = {}) {
+  if (!forceServer) return queryRef.get();
+  try {
+    return await queryRef.get({ source: "server" });
+  } catch {
+    return queryRef.get();
+  }
+}
+
+async function loadSourcesFromFirebase({ silent = false, forceServer = false } = {}) {
   if (!state.firebase.ready || !state.firebase.db) {
     throw new Error("Firebase belum terhubung.");
   }
@@ -2252,7 +2293,10 @@ async function loadSourcesFromFirebase({ silent = false } = {}) {
   const uid = state.firebase.user?.uid;
   if (!uid) throw new Error("User Firebase belum siap.");
 
-  const snapshot = await state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).where("ownerUid", "==", uid).get();
+  const snapshot = await firestoreGet(
+    state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).where("ownerUid", "==", uid),
+    { forceServer }
+  );
   if (snapshot.empty) {
     const fallbackLoaded = await loadBundledFallbackSources();
     if (fallbackLoaded.length > 0) {
@@ -2404,7 +2448,7 @@ async function saveInvoiceRecordToFirebase({ silent = false } = {}) {
   if (!silent) setFirebaseStatus(`Invoice ${state.lastInvoiceRecord.invoiceNo} tersimpan ke Firebase.`, "ok");
 }
 
-async function loadInvoiceHistory({ silent = false } = {}) {
+async function loadInvoiceHistory({ silent = false, forceServer = false } = {}) {
   if (!state.firebase.ready || !state.firebase.db) {
     throw new Error("Firebase belum terhubung.");
   }
@@ -2414,19 +2458,23 @@ async function loadInvoiceHistory({ silent = false } = {}) {
 
   let snapshot;
   try {
-    snapshot = await state.firebase.db
-      .collection(FIREBASE_INVOICE_COLLECTION)
-      .where("ownerUid", "==", uid)
-      .orderBy("updatedAt", "desc")
-      .limit(50)
-      .get();
+    snapshot = await firestoreGet(
+      state.firebase.db
+        .collection(FIREBASE_INVOICE_COLLECTION)
+        .where("ownerUid", "==", uid)
+        .orderBy("updatedAt", "desc")
+        .limit(50),
+      { forceServer }
+    );
   } catch {
-    snapshot = await state.firebase.db
-      .collection(FIREBASE_INVOICE_COLLECTION)
-      .where("ownerUid", "==", uid)
-      .orderBy("createdAt", "desc")
-      .limit(50)
-      .get();
+    snapshot = await firestoreGet(
+      state.firebase.db
+        .collection(FIREBASE_INVOICE_COLLECTION)
+        .where("ownerUid", "==", uid)
+        .orderBy("createdAt", "desc")
+        .limit(50),
+      { forceServer }
+    );
   }
 
   state.invoiceHistory = snapshot.docs.map((doc) => ({
