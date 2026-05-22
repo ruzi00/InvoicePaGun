@@ -1272,20 +1272,6 @@ function generateInvoice() {
       </table>
 
       <div class="invoice-footer-grid">
-        <div class="bank-box">
-          <h4>Informasi Pembayaran</h4>
-          ${renderAllBankRows(bankList)}
-          <label class="deadline-field">
-            <span>Deadline Pembayaran</span>
-            <input id="invoiceDeadline" type="date" value="${paymentDeadline}" />
-          </label>
-        </div>
-        <div class="total-box">
-          <div><span>Total Durasi</span><span>${totals.totalDurasi.toFixed(2)} jam</span></div>
-          <div><span>Subtotal</span><span>${formatRupiah(totals.baseTotal)}</span></div>
-          <div><span>Diskon Invoice</span><span>${totals.diskonPersen}% (${formatRupiah(totals.diskonNominal)})</span></div>
-          <div><span>Total Tagihan</span><span>${formatRupiah(totals.grandTotal)}</span></div>
-        </div>
         <div class="portion-box">
           <h4>Porsi Pembayaran per Pengajar</h4>
           <table class="portion-table">
@@ -1299,6 +1285,22 @@ function generateInvoice() {
             </thead>
             <tbody>${renderTeacherPortionRows(teacherPortions)}</tbody>
           </table>
+        </div>
+
+        <div class="bank-box">
+          <h4>Informasi Pembayaran</h4>
+          ${renderAllBankRows(bankList)}
+          <label class="deadline-field">
+            <span>Deadline Pembayaran</span>
+            <input id="invoiceDeadline" type="date" value="${paymentDeadline}" />
+          </label>
+        </div>
+
+        <div class="total-box">
+          <div><span>Total Durasi</span><span>${totals.totalDurasi.toFixed(2)} jam</span></div>
+          <div><span>Subtotal</span><span>${formatRupiah(totals.baseTotal)}</span></div>
+          <div><span>Diskon Invoice</span><span>${totals.diskonPersen}% (${formatRupiah(totals.diskonNominal)})</span></div>
+          <div><span>Total Tagihan</span><span>${formatRupiah(totals.grandTotal)}</span></div>
         </div>
       </div>
 
@@ -2810,20 +2812,6 @@ function redownloadInvoiceFromHistory(item) {
       </table>
 
       <div class="invoice-footer-grid">
-        <div class="bank-box">
-          <h4>Informasi Pembayaran</h4>
-          ${renderAllBankRows(bankList)}
-          <label class="deadline-field">
-            <span>Deadline Pembayaran</span>
-            <input id="invoiceDeadline" type="date" value="${escapeHtml(paymentDeadline)}" disabled />
-          </label>
-        </div>
-        <div class="total-box">
-          <div><span>Total Durasi</span><span>${Number(totals.totalDurasi || 0).toFixed(2)} jam</span></div>
-          <div><span>Subtotal</span><span>${formatRupiah(Number(totals.baseTotal || 0))}</span></div>
-          <div><span>Diskon Invoice</span><span>${Number(totals.diskonPersen || 0)}% (${formatRupiah(Number(totals.diskonNominal || 0))})</span></div>
-          <div><span>Total Tagihan</span><span>${formatRupiah(Number(totals.grandTotal || 0))}</span></div>
-        </div>
         <div class="portion-box">
           <h4>Porsi Pembayaran per Pengajar</h4>
           <table class="portion-table">
@@ -2837,6 +2825,22 @@ function redownloadInvoiceFromHistory(item) {
             </thead>
             <tbody>${renderTeacherPortionRows(teacherPortions)}</tbody>
           </table>
+        </div>
+
+        <div class="bank-box">
+          <h4>Informasi Pembayaran</h4>
+          ${renderAllBankRows(bankList)}
+          <label class="deadline-field">
+            <span>Deadline Pembayaran</span>
+            <input id="invoiceDeadline" type="date" value="${escapeHtml(paymentDeadline)}" disabled />
+          </label>
+        </div>
+
+        <div class="total-box">
+          <div><span>Total Durasi</span><span>${Number(totals.totalDurasi || 0).toFixed(2)} jam</span></div>
+          <div><span>Subtotal</span><span>${formatRupiah(Number(totals.baseTotal || 0))}</span></div>
+          <div><span>Diskon Invoice</span><span>${Number(totals.diskonPersen || 0)}% (${formatRupiah(Number(totals.diskonNominal || 0))})</span></div>
+          <div><span>Total Tagihan</span><span>${formatRupiah(Number(totals.grandTotal || 0))}</span></div>
         </div>
       </div>
 

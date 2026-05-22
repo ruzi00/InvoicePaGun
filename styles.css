@@ -703,7 +703,7 @@ td .mini {
 .invoice-footer-grid {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: minmax(0, 33.333%) minmax(0, 66.667%);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
   align-items: start;
 }
@@ -789,14 +789,14 @@ td .mini {
   background: rgba(255, 255, 255, 0.82);
 }
 
-.bank-box {
-  grid-column: 1;
-  grid-row: 1 / span 2;
+.portion-box {
+  grid-column: 1 / -1;
+  grid-row: 1;
 }
 
-.portion-box {
-  grid-column: 2;
-  grid-row: 1;
+.bank-box {
+  grid-column: 1;
+  grid-row: 2;
 }
 
 .total-box {
