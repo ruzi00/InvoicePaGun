@@ -2,7 +2,7 @@ const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const FIREBASE_CONFIG_STORAGE_KEY = "invoice-firebase-config";
 const FIREBASE_SOURCE_COLLECTION = "invoice_sources";
 const FIREBASE_INVOICE_COLLECTION = "invoice_records";
-const FIREBASE_SOURCE_KINDS = ["students", "pricing", "discount", "bank", "holiday", "attendance"];
+const FIREBASE_SOURCE_KINDS = ["students", "pricing", "discount", "bank", "holiday", "attendance", "template_after"];
 
 const state = {
   mode: "front",
@@ -28,6 +28,7 @@ const state = {
     bank: "",
     holiday: "",
     attendance: "",
+    template_after: "",
   },
   lastInvoiceRecord: null,
   invoiceHistory: [],
@@ -106,6 +107,28 @@ const el = {
   btnFirebaseLoadSources: document.getElementById("btnFirebaseLoadSources"),
   btnFirebaseSaveSources: document.getElementById("btnFirebaseSaveSources"),
   btnFirebaseSaveInvoice: document.getElementById("btnFirebaseSaveInvoice"),
+
+  csvEditorStudents: document.getElementById("csvEditorStudents"),
+  csvEditorPricing: document.getElementById("csvEditorPricing"),
+  csvEditorDiscount: document.getElementById("csvEditorDiscount"),
+  csvEditorBank: document.getElementById("csvEditorBank"),
+  csvEditorHoliday: document.getElementById("csvEditorHoliday"),
+  csvEditorAttendance: document.getElementById("csvEditorAttendance"),
+  csvEditorTemplateAfter: document.getElementById("csvEditorTemplateAfter"),
+  btnCsvApplyStudents: document.getElementById("btnCsvApplyStudents"),
+  btnCsvSaveStudents: document.getElementById("btnCsvSaveStudents"),
+  btnCsvApplyPricing: document.getElementById("btnCsvApplyPricing"),
+  btnCsvSavePricing: document.getElementById("btnCsvSavePricing"),
+  btnCsvApplyDiscount: document.getElementById("btnCsvApplyDiscount"),
+  btnCsvSaveDiscount: document.getElementById("btnCsvSaveDiscount"),
+  btnCsvApplyBank: document.getElementById("btnCsvApplyBank"),
+  btnCsvSaveBank: document.getElementById("btnCsvSaveBank"),
+  btnCsvApplyHoliday: document.getElementById("btnCsvApplyHoliday"),
+  btnCsvSaveHoliday: document.getElementById("btnCsvSaveHoliday"),
+  btnCsvApplyAttendance: document.getElementById("btnCsvApplyAttendance"),
+  btnCsvSaveAttendance: document.getElementById("btnCsvSaveAttendance"),
+  btnCsvApplyTemplateAfter: document.getElementById("btnCsvApplyTemplateAfter"),
+  btnCsvSaveTemplateAfter: document.getElementById("btnCsvSaveTemplateAfter"),
 };
 
 initialize();
@@ -124,6 +147,7 @@ function initialize() {
   applyModeUI();
   refreshWeeklyTeacherOptions();
   refreshFirebaseButtons();
+  syncCsvEditorsFromState();
   renderInvoiceHistoryTable();
   void bootstrapFirebaseFromStorage();
 }
@@ -292,6 +316,8 @@ function bindEvents() {
     }
   });
 
+  bindCsvEditorActions();
+
   el.btnMuatSheet.addEventListener("click", async () => {
     try {
       const url = toGoogleSheetCsvUrl((el.sheetUrl.value || "").trim());
@@ -339,6 +365,37 @@ function bindEvents() {
   });
 }
 
+function bindCsvEditorActions() {
+  const pairs = [
+    [el.btnCsvApplyStudents, () => applyCsvFromEditor("students")],
+    [el.btnCsvApplyPricing, () => applyCsvFromEditor("pricing")],
+    [el.btnCsvApplyDiscount, () => applyCsvFromEditor("discount")],
+    [el.btnCsvApplyBank, () => applyCsvFromEditor("bank")],
+    [el.btnCsvApplyHoliday, () => applyCsvFromEditor("holiday")],
+    [el.btnCsvApplyAttendance, () => applyCsvFromEditor("attendance")],
+    [el.btnCsvApplyTemplateAfter, () => applyCsvFromEditor("template_after")],
+    [el.btnCsvSaveStudents, () => saveSingleSourceToFirebase("students")],
+    [el.btnCsvSavePricing, () => saveSingleSourceToFirebase("pricing")],
+    [el.btnCsvSaveDiscount, () => saveSingleSourceToFirebase("discount")],
+    [el.btnCsvSaveBank, () => saveSingleSourceToFirebase("bank")],
+    [el.btnCsvSaveHoliday, () => saveSingleSourceToFirebase("holiday")],
+    [el.btnCsvSaveAttendance, () => saveSingleSourceToFirebase("attendance")],
+    [el.btnCsvSaveTemplateAfter, () => saveSingleSourceToFirebase("template_after")],
+  ];
+
+  pairs.forEach(([btn, handler]) => {
+    if (!btn) return;
+    btn.addEventListener("click", async () => {
+      try {
+        await handler();
+      } catch (err) {
+        setFirebaseStatus(err.message || "Gagal memproses CSV editor.", "error");
+        alert(err.message);
+      }
+    });
+  });
+}
+
 async function preloadDefaults() {
   if (isFileProtocol()) return;
 
@@ -373,6 +430,14 @@ async function preloadDefaults() {
   } catch {
     // ignore
   }
+
+  try {
+    state.sourceTexts.template_after = await fetchCsv("template_payment_after.csv", "");
+  } catch {
+    // ignore
+  }
+
+  syncCsvEditorsFromState();
 }
 
 async function autoLoadFromCurrentFolder(silent) {
@@ -385,6 +450,7 @@ async function autoLoadFromCurrentFolder(silent) {
     { file: "diskon_durasi.csv", kind: "diskon", run: async (text) => applyDiscountCsv(text, false) },
     { file: "bank_guru.csv", kind: "rekening", run: async (text) => applyBankRows(parseCsv(text), false, text) },
     { file: "hari_libur.csv", kind: "libur", run: async (text) => applyHolidayCsv(text, false) },
+    { file: "template_payment_after.csv", kind: "template_after", run: async (text) => { state.sourceTexts.template_after = text; } },
   ];
 
   const loaded = [];
@@ -399,6 +465,7 @@ async function autoLoadFromCurrentFolder(silent) {
   }
 
   if (loaded.length > 0 && !silent) {
+    syncCsvEditorsFromState();
     alert(`Auto Load selesai. Terbaca: ${loaded.join(", ")}`);
     return;
   }
@@ -492,6 +559,12 @@ async function importPackageFiles(files) {
       if (kind === "attendance") {
         loadAbsensiCsv(await file.text());
         loaded.push(`${file.name} -> absensi`);
+        continue;
+      }
+
+      if (kind === "template_after") {
+        state.sourceTexts.template_after = await file.text();
+        loaded.push(`${file.name} -> template payment after`);
       }
     } catch {
       skipped.push(file.name);
@@ -504,6 +577,7 @@ async function importPackageFiles(files) {
   }
 
   const skippedText = skipped.length > 0 ? `\n\nDilewati: ${skipped.join(", ")}` : "";
+  syncCsvEditorsFromState();
   alert(`Setup cepat selesai.\n${loaded.join("\n")}${skippedText}`);
 }
 
@@ -514,6 +588,7 @@ function detectFileKind(fileName) {
   if (n.includes("diskon") || n.includes("discount")) return "discount";
   if (n.includes("bank") || n.includes("rekening")) return "bank";
   if (n.includes("libur") || n.includes("holiday")) return "holiday";
+  if (n.includes("template_payment_after")) return "template_after";
   if (n.includes("payment_after") || n.includes("after_invoice")) return "attendance";
   if (n.includes("absensi") || n.includes("attendance") || n.includes("jadwal")) return "attendance";
   return null;
@@ -1133,6 +1208,8 @@ function downloadAfterTemplateCsv() {
   ].join("\n");
 
   const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+  state.sourceTexts.template_after = csv;
+  syncCsvEditorsFromState();
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = "template_payment_after.csv";
@@ -1792,12 +1869,80 @@ function setCloudReadyMode(ready) {
   el.cloudReadyNotice.innerHTML = "";
 }
 
+function getCsvEditorElement(kind) {
+  const map = {
+    students: el.csvEditorStudents,
+    pricing: el.csvEditorPricing,
+    discount: el.csvEditorDiscount,
+    bank: el.csvEditorBank,
+    holiday: el.csvEditorHoliday,
+    attendance: el.csvEditorAttendance,
+    template_after: el.csvEditorTemplateAfter,
+  };
+  return map[kind] || null;
+}
+
+function syncCsvEditorsFromState() {
+  FIREBASE_SOURCE_KINDS.forEach((kind) => {
+    const editor = getCsvEditorElement(kind);
+    if (editor) editor.value = state.sourceTexts[kind] || "";
+  });
+}
+
+function applyCsvFromEditor(kind) {
+  const editor = getCsvEditorElement(kind);
+  if (!editor) return;
+  const csvText = String(editor.value || "").trim();
+  if (!csvText) throw new Error("CSV kosong. Isi data terlebih dahulu.");
+
+  if (kind === "students") {
+    loadMasterStudentsCsv(csvText);
+    return;
+  }
+  if (kind === "pricing") {
+    applyPricingCsv(csvText, false);
+    return;
+  }
+  if (kind === "discount") {
+    applyDiscountCsv(csvText, false);
+    return;
+  }
+  if (kind === "bank") {
+    applyBankRows(parseCsv(csvText), false, csvText);
+    return;
+  }
+  if (kind === "holiday") {
+    applyHolidayCsv(csvText, false);
+    return;
+  }
+  if (kind === "attendance") {
+    loadAbsensiCsv(csvText);
+    return;
+  }
+  if (kind === "template_after") {
+    state.sourceTexts.template_after = csvText;
+    return;
+  }
+}
+
 function refreshFirebaseButtons() {
   const ready = Boolean(state.firebase.ready && state.firebase.db);
   if (el.btnFirebaseLoadSources) el.btnFirebaseLoadSources.disabled = !ready;
   if (el.btnFirebaseSaveSources) el.btnFirebaseSaveSources.disabled = !ready;
   if (el.btnFirebaseSaveInvoice) el.btnFirebaseSaveInvoice.disabled = !ready || !state.lastInvoiceRecord;
   if (el.btnRefreshInvoiceHistory) el.btnRefreshInvoiceHistory.disabled = !ready;
+  const saveButtons = [
+    el.btnCsvSaveStudents,
+    el.btnCsvSavePricing,
+    el.btnCsvSaveDiscount,
+    el.btnCsvSaveBank,
+    el.btnCsvSaveHoliday,
+    el.btnCsvSaveAttendance,
+    el.btnCsvSaveTemplateAfter,
+  ];
+  saveButtons.forEach((btn) => {
+    if (btn) btn.disabled = !ready;
+  });
 }
 
 async function bootstrapFirebaseFromStorage() {
@@ -1870,14 +2015,15 @@ async function connectFirebase({ saveConfig = false, loadSources = false, silent
 }
 
 function collectFirebaseSourcePayloads() {
-  return [
-    { kind: "students", csvText: state.sourceTexts.students || "" },
-    { kind: "pricing", csvText: state.sourceTexts.pricing || "" },
-    { kind: "discount", csvText: state.sourceTexts.discount || "" },
-    { kind: "bank", csvText: state.sourceTexts.bank || serializeRowsToCsv(bankGuruToRows(state.bankGuru)) },
-    { kind: "holiday", csvText: state.sourceTexts.holiday || String(el.holidayDates.value || "") },
-    { kind: "attendance", csvText: state.sourceTexts.attendance || "" },
-  ].filter((item) => String(item.csvText || "").trim().length > 0);
+  return FIREBASE_SOURCE_KINDS.map((kind) => {
+    if (kind === "bank") {
+      return { kind, csvText: state.sourceTexts.bank || serializeRowsToCsv(bankGuruToRows(state.bankGuru)) };
+    }
+    if (kind === "holiday") {
+      return { kind, csvText: state.sourceTexts.holiday || String(el.holidayDates.value || "") };
+    }
+    return { kind, csvText: state.sourceTexts[kind] || "" };
+  }).filter((item) => String(item.csvText || "").trim().length > 0);
 }
 
 async function loadSourcesFromFirebase({ silent = false } = {}) {
@@ -1926,6 +2072,12 @@ async function loadSourcesFromFirebase({ silent = false } = {}) {
     loadAbsensiCsv(docs.attendance.csvText);
     loaded.push("absensi");
   }
+  if (docs.template_after?.csvText) {
+    state.sourceTexts.template_after = docs.template_after.csvText;
+    loaded.push("template payment after");
+  }
+
+  syncCsvEditorsFromState();
 
   if (loaded.length === 0) {
     setFirebaseStatus("Data Firebase terbaca, tetapi tidak ada source CSV yang valid.", "warn");
@@ -1968,6 +2120,35 @@ async function saveSourcesToFirebase() {
   await batch.commit();
   setFirebaseStatus(`Source data tersimpan ke Firebase: ${payloads.map((x) => x.kind).join(", ")}.`, "ok");
   refreshFirebaseButtons();
+}
+
+async function saveSingleSourceToFirebase(kind) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    throw new Error("Firebase belum terhubung.");
+  }
+  if (!FIREBASE_SOURCE_KINDS.includes(kind)) {
+    throw new Error("Jenis CSV tidak valid.");
+  }
+
+  applyCsvFromEditor(kind);
+  const uid = state.firebase.user?.uid;
+  if (!uid) throw new Error("User Firebase belum siap.");
+
+  const csvText = String(state.sourceTexts[kind] || "").trim();
+  if (!csvText) throw new Error("CSV kosong. Isi data terlebih dahulu.");
+
+  const ref = state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).doc(`${uid}__${kind}`);
+  await ref.set(
+    {
+      kind,
+      csvText,
+      ownerUid: uid,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  setFirebaseStatus(`CSV ${kind} berhasil diupdate ke Firebase.`, "ok");
 }
 
 async function saveInvoiceRecordToFirebase({ silent = false } = {}) {

@@ -14,6 +14,7 @@ Sumber data utama:
 Mode cloud:
 - GitHub Pages: app ini bisa dipublish sebagai static site tanpa backend.
 - Firebase: sumber data, riwayat invoice, dan auto-load startup bisa memakai Firestore.
+- Semua source disimpan sebagai text CSV (`csvText`), bukan JSON rows.
 
 Cara pakai ringkas:
 1. Buka index.html dari local server (disarankan Live Server).
@@ -72,6 +73,7 @@ Setup GitHub Pages + Firebase:
 5. Klik Hubungkan Firebase, lalu Simpan Data ke Firebase.
 6. Saat Firebase sudah siap, kontrol CSV lokal otomatis disembunyikan (cloud-ready mode).
 7. Gunakan tombol "Muat Riwayat Invoice" untuk melihat invoice terdahulu.
+8. Gunakan "CSV Cloud Editor" untuk update setiap source CSV langsung, lalu simpan ke Firestore.
 
 Deploy Firestore Rules:
 1. Install Firebase CLI: npm install -g firebase-tools
@@ -81,4 +83,5 @@ Deploy Firestore Rules:
 
 Koleksi Firebase yang dipakai:
 - invoice_sources: menyimpan CSV sumber data per jenis (students, pricing, discount, bank, holiday, attendance), scoped per owner UID.
+- invoice_sources juga menyimpan `template_after` (template_payment_after.csv).
 - invoice_records: menyimpan riwayat invoice yang digenerate dari browser, scoped per owner UID.

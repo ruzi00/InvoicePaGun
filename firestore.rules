@@ -18,7 +18,7 @@ service cloud.firestore {
     }
 
     function validSourceKind() {
-      return request.resource.data.kind in ["students", "pricing", "discount", "bank", "holiday", "attendance"];
+      return request.resource.data.kind in ["students", "pricing", "discount", "bank", "holiday", "attendance", "template_after"];
     }
 
     function validSourceDoc() {
