@@ -109,6 +109,31 @@ h2 {
   padding: 12px;
 }
 
+.firebase-section > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #5b4a33;
+  list-style: none;
+}
+
+.firebase-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.firebase-section > summary::before {
+  content: "+";
+  margin-right: 8px;
+  font-weight: 800;
+}
+
+.firebase-section[open] > summary::before {
+  content: "-";
+}
+
+.firebase-section > *:not(summary) {
+  margin-top: 10px;
+}
+
 .firebase-header {
   display: flex;
   gap: 12px;

@@ -23,6 +23,7 @@
 
       <div id="runtimeNotice" class="runtime-notice hidden"></div>
       <div id="cloudReadyNotice" class="runtime-notice hidden"></div>
+      <textarea id="holidayDates" class="hidden-input"></textarea>
 
       <section id="autoLoadSection" class="auto-load-section hidden csv-control-group">
         <h3>Auto Load</h3>
@@ -39,93 +40,10 @@
         </div>
       </section>
 
-      <details id="localSourceControls" class="collapsible-tools csv-control-group">
-        <summary>Informasi File & Sumber Data (Opsional)</summary>
-
-        <h3>Sumber Data Siswa</h3>
-        <div class="grid-2">
-          <label class="field">
-            <span>URL Google Sheet Siswa</span>
-            <input id="studentSheetUrl" type="text" value="https://docs.google.com/spreadsheets/d/1Zo-DRqXGDyzY9J7ee-xwh_XDhoHcniOv2o70T6tdQdA/edit?usp=sharing" />
-          </label>
-          <div class="field actions-inline">
-            <span>&nbsp;</span>
-            <button id="btnMuatSiswaSheet" type="button" class="btn">Muat Siswa dari Google Sheet</button>
-          </div>
-        </div>
-
-        <div class="grid-2">
-          <label class="field">
-            <span>File Master Siswa (opsional)</span>
-            <input id="studentFile" type="file" accept=".csv,text/csv" />
-          </label>
-          <div class="field actions-inline">
-            <span>&nbsp;</span>
-            <button id="btnSiswaContoh" type="button" class="btn sekund">Gunakan REKAP DATA SISWA.csv</button>
-          </div>
-        </div>
-
-        <h3>Parameter Tarif & Diskon</h3>
-        <div class="grid-3">
-          <label class="field">
-            <span>File Tarif (CSV)</span>
-            <input id="pricingFile" type="file" accept=".csv,text/csv" />
-          </label>
-          <div class="field actions-inline">
-            <span>&nbsp;</span>
-            <button id="btnTarifContoh" type="button" class="btn sekund">Gunakan tarif.csv</button>
-          </div>
-          <div class="field"></div>
-        </div>
-
-        <div class="grid-3">
-          <label class="field">
-            <span>File Diskon Durasi (CSV)</span>
-            <input id="discountFile" type="file" accept=".csv,text/csv" />
-          </label>
-          <div class="field actions-inline">
-            <span>&nbsp;</span>
-            <button id="btnDiskonContoh" type="button" class="btn sekund">Gunakan diskon_durasi.csv</button>
-          </div>
-          <div class="field"></div>
-        </div>
-
-        <div class="grid-3">
-          <label class="field">
-            <span>File Rekening Guru (CSV/XLSX)</span>
-            <input id="bankFile" type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
-          </label>
-          <div class="field actions-inline">
-            <span>&nbsp;</span>
-            <button id="btnBankContoh" type="button" class="btn sekund">Gunakan bank_guru.csv</button>
-          </div>
-          <div class="field"></div>
-        </div>
-
-        <div class="grid-1">
-          <h3>Libur Nasional (CSV)</h3>
-          <div class="grid-3">
-            <label class="field">
-              <span>File Hari Libur (CSV)</span>
-              <input id="holidayFile" type="file" accept=".csv,text/csv" />
-            </label>
-            <div class="field actions-inline">
-              <span>&nbsp;</span>
-              <button id="btnHolidayContoh" type="button" class="btn sekund">Gunakan hari_libur.csv</button>
-            </div>
-            <div class="field"></div>
-          </div>
-          <label class="field">
-            <span>Tanggal Libur Nasional (YYYY-MM-DD, pisahkan koma/baris baru)</span>
-            <textarea id="holidayDates" rows="4" placeholder="Tanggal akan terisi dari file hari_libur.csv, tetap bisa diedit manual."></textarea>
-          </label>
-        </div>
-      </details>
-
-      <section class="firebase-section">
+      <details id="firebaseSyncSection" class="firebase-section">
+        <summary>Firebase Sync</summary>
         <div class="firebase-header">
           <div>
-            <h3>Firebase Sync</h3>
             <p class="sub">Opsional. Simpan sumber data dan invoice terakhir ke Firebase supaya app tetap ringan di GitHub Pages.</p>
           </div>
           <div id="firebaseStatus" class="firebase-status neutral">Firebase belum dihubungkan.</div>
@@ -256,7 +174,7 @@
             </label>
           </div>
         </details>
-      </section>
+      </details>
 
       <h3>Informasi Invoice</h3>
       <div class="grid-2">

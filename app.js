@@ -47,6 +47,7 @@ const el = {
   runtimeNotice: document.getElementById("runtimeNotice"),
   cloudReadyNotice: document.getElementById("cloudReadyNotice"),
   autoLoadSection: document.getElementById("autoLoadSection"),
+  firebaseSyncSection: document.getElementById("firebaseSyncSection"),
   localSourceControls: document.getElementById("localSourceControls"),
   firebaseCsvEditor: document.getElementById("firebaseCsvEditor"),
   packageFiles: document.getElementById("packageFiles"),
@@ -194,7 +195,7 @@ function bindEvents() {
     await autoLoadFromCurrentFolder(false);
   });
 
-  el.btnMuatSiswaSheet.addEventListener("click", async () => {
+  el.btnMuatSiswaSheet?.addEventListener("click", async () => {
     try {
       const url = toGoogleSheetCsvUrlBySheetName((el.studentSheetUrl.value || "").trim(), "Aktif");
       const text = await fetchCsv(url, "Gagal mengambil data siswa dari Google Sheet.");
@@ -204,13 +205,13 @@ function bindEvents() {
     }
   });
 
-  el.studentFile.addEventListener("change", async (event) => {
+  el.studentFile?.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     loadMasterStudentsCsv(await file.text());
   });
 
-  el.btnSiswaContoh.addEventListener("click", async () => {
+  el.btnSiswaContoh?.addEventListener("click", async () => {
     try {
       loadMasterStudentsCsv(await fetchCsv("REKAP DATA SISWA.csv", "Tidak bisa memuat REKAP DATA SISWA.csv"));
     } catch (err) {
@@ -218,13 +219,13 @@ function bindEvents() {
     }
   });
 
-  el.pricingFile.addEventListener("change", async (event) => {
+  el.pricingFile?.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     applyPricingCsv(await file.text());
   });
 
-  el.btnTarifContoh.addEventListener("click", async () => {
+  el.btnTarifContoh?.addEventListener("click", async () => {
     try {
       applyPricingCsv(await fetchCsv("tarif.csv", "Tidak bisa memuat tarif.csv"));
     } catch (err) {
@@ -232,13 +233,13 @@ function bindEvents() {
     }
   });
 
-  el.discountFile.addEventListener("change", async (event) => {
+  el.discountFile?.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     applyDiscountCsv(await file.text());
   });
 
-  el.btnDiskonContoh.addEventListener("click", async () => {
+  el.btnDiskonContoh?.addEventListener("click", async () => {
     try {
       applyDiscountCsv(await fetchCsv("diskon_durasi.csv", "Tidak bisa memuat diskon_durasi.csv"));
     } catch (err) {
@@ -246,7 +247,7 @@ function bindEvents() {
     }
   });
 
-  el.bankFile.addEventListener("change", async (event) => {
+  el.bankFile?.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const rows = await readAnyTableFile(file);
@@ -254,7 +255,7 @@ function bindEvents() {
     applyBankRows(rows, true, rawText);
   });
 
-  el.btnBankContoh.addEventListener("click", async () => {
+  el.btnBankContoh?.addEventListener("click", async () => {
     try {
       const text = await fetchCsv("bank_guru.csv", "Tidak bisa memuat bank_guru.csv");
       applyBankRows(parseCsv(text), true, text);
@@ -263,13 +264,13 @@ function bindEvents() {
     }
   });
 
-  el.holidayFile.addEventListener("change", async (event) => {
+  el.holidayFile?.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     applyHolidayCsv(await file.text());
   });
 
-  el.btnHolidayContoh.addEventListener("click", async () => {
+  el.btnHolidayContoh?.addEventListener("click", async () => {
     try {
       const text = await fetchCsv("hari_libur.csv", "Tidak bisa memuat hari_libur.csv");
       applyHolidayCsv(text);
@@ -278,7 +279,7 @@ function bindEvents() {
     }
   });
 
-  el.holidayDates.addEventListener("input", () => {
+  el.holidayDates?.addEventListener("input", () => {
     parseHolidaySetFromInput();
     recalcSessions();
   });
@@ -1922,12 +1923,13 @@ function setCloudReadyMode(ready) {
   document.body.classList.toggle("cloud-ready", Boolean(ready));
   if (ready) {
     if (el.localSourceControls) el.localSourceControls.open = false;
+    if (el.firebaseSyncSection) el.firebaseSyncSection.open = false;
     if (el.firebaseCsvEditor) el.firebaseCsvEditor.open = false;
   }
   if (!el.cloudReadyNotice) return;
   if (ready) {
     el.cloudReadyNotice.classList.remove("hidden");
-    el.cloudReadyNotice.innerHTML = "<strong>Cloud Mode Aktif</strong><br/>Kontrol CSV lokal disembunyikan karena Firebase sudah siap.";
+    el.cloudReadyNotice.innerHTML = "<strong>Cloud Mode Aktif</strong><br/>Data utama sekarang dari Firebase. CSV lokal tetap tersedia sebagai fallback file bawaan.";
     return;
   }
   el.cloudReadyNotice.classList.add("hidden");
@@ -2149,38 +2151,42 @@ async function loadSourcesFromFirebase({ silent = false } = {}) {
     return;
   }
 
-  const docs = {};
+  const docsByKind = {};
   snapshot.forEach((doc) => {
-    docs[doc.id] = doc.data() || {};
+    const data = doc.data() || {};
+    const fallbackKind = String(doc.id || "").split("__").pop();
+    const kind = String(data.kind || fallbackKind || "").trim().toLowerCase();
+    if (!kind) return;
+    docsByKind[kind] = data;
   });
 
   const loaded = [];
-  if (docs.students?.csvText) {
-    loadMasterStudentsCsv(docs.students.csvText);
+  if (docsByKind.students?.csvText) {
+    loadMasterStudentsCsv(docsByKind.students.csvText);
     loaded.push("siswa");
   }
-  if (docs.pricing?.csvText) {
-    applyPricingCsv(docs.pricing.csvText, false);
+  if (docsByKind.pricing?.csvText) {
+    applyPricingCsv(docsByKind.pricing.csvText, false);
     loaded.push("tarif");
   }
-  if (docs.discount?.csvText) {
-    applyDiscountCsv(docs.discount.csvText, false);
+  if (docsByKind.discount?.csvText) {
+    applyDiscountCsv(docsByKind.discount.csvText, false);
     loaded.push("diskon");
   }
-  if (docs.bank?.csvText) {
-    applyBankRows(parseCsv(docs.bank.csvText), false, docs.bank.csvText);
+  if (docsByKind.bank?.csvText) {
+    applyBankRows(parseCsv(docsByKind.bank.csvText), false, docsByKind.bank.csvText);
     loaded.push("rekening");
   }
-  if (docs.holiday?.csvText) {
-    applyHolidayCsv(docs.holiday.csvText, false);
+  if (docsByKind.holiday?.csvText) {
+    applyHolidayCsv(docsByKind.holiday.csvText, false);
     loaded.push("libur");
   }
-  if (docs.attendance?.csvText) {
-    loadAbsensiCsv(docs.attendance.csvText);
+  if (docsByKind.attendance?.csvText) {
+    loadAbsensiCsv(docsByKind.attendance.csvText);
     loaded.push("absensi");
   }
-  if (docs.template_after?.csvText) {
-    state.sourceTexts.template_after = docs.template_after.csvText;
+  if (docsByKind.template_after?.csvText) {
+    state.sourceTexts.template_after = docsByKind.template_after.csvText;
     loaded.push("template payment after");
   }
 
