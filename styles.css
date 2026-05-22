@@ -691,9 +691,9 @@ td .mini {
 }
 
 .total-box {
-  margin-top: 12px;
-  margin-left: auto;
-  width: fit-content;
+  margin-top: 0;
+  margin-left: 0;
+  width: 100%;
   border: 1px solid rgba(31, 41, 64, 0.28);
   border-radius: 10px;
   overflow: hidden;
@@ -702,7 +702,7 @@ td .mini {
 .invoice-footer-grid {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: 1.2fr auto auto;
+  grid-template-columns: 1.2fr minmax(340px, 420px);
   gap: 14px;
   align-items: start;
 }
@@ -752,7 +752,8 @@ td .mini {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.72);
   padding: 10px;
-  min-width: 360px;
+  min-width: 0;
+  width: 100%;
 }
 
 .portion-box h4 {
@@ -775,6 +776,21 @@ td .mini {
 
 .portion-table th {
   background: rgba(255, 255, 255, 0.82);
+}
+
+.bank-box {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.portion-box {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.total-box {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 @media (max-width: 800px) {
