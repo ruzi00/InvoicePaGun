@@ -506,6 +506,7 @@ td .mini {
   padding: 28mm 18mm 18mm;
   color: #1f2940;
   position: relative;
+  overflow: hidden;
 }
 
 .invoice-sheet.capture-safe {
@@ -702,7 +703,7 @@ td .mini {
 .invoice-footer-grid {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 420px);
+  grid-template-columns: minmax(0, 58%) minmax(0, 42%);
   gap: 14px;
   align-items: start;
 }
@@ -723,7 +724,7 @@ td .mini {
 .bank-row {
   padding: 4px 0;
   border-bottom: 1px dashed rgba(31, 41, 64, 0.18);
-  font-size: 0.9rem;
+  font-size: 0.84rem;
 }
 
 .bank-row:last-child {
@@ -732,7 +733,7 @@ td .mini {
 
 .total-box div {
   display: grid;
-  grid-template-columns: 150px 170px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .total-box span {
@@ -766,17 +767,22 @@ td .mini {
 .portion-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   table-layout: fixed;
 }
 
 .portion-table th,
 .portion-table td {
   border: 1px solid rgba(32, 46, 77, 0.2);
-  padding: 6px;
+  padding: 5px;
   text-align: left;
   white-space: normal;
   word-break: break-word;
+}
+
+.portion-table th:nth-child(1),
+.portion-table td:nth-child(1) {
+  width: 34%;
 }
 
 .portion-table th {
