@@ -1192,6 +1192,7 @@ function generateInvoice() {
   }
 
   const totals = calculateInvoiceTotals(selected);
+  const teacherPortions = calculateTeacherPortions(selected, totals);
   const invoiceDate = parseDateInput(el.invoiceDate.value) || new Date();
   const paymentDeadline = toLocalDateInputValue(invoiceDate);
   const invoiceNo = `INV-${invoiceDate.getFullYear()}${String(invoiceDate.getMonth() + 1).padStart(2, "0")}${String(
@@ -1285,6 +1286,22 @@ function generateInvoice() {
           <div><span>Diskon Invoice</span><span>${totals.diskonPersen}% (${formatRupiah(totals.diskonNominal)})</span></div>
           <div><span>Total Tagihan</span><span>${formatRupiah(totals.grandTotal)}</span></div>
         </div>
+        <div class="portion-box">
+          <h4>Porsi Pembayaran per Pengajar</h4>
+          <table class="portion-table">
+            <thead>
+              <tr>
+                <th>Pengajar</th>
+                <th>Sesi</th>
+                <th>Durasi</th>
+                <th>Subtotal</th>
+                <th>Diskon</th>
+                <th>Porsi Dibayar</th>
+              </tr>
+            </thead>
+            <tbody>${renderTeacherPortionRows(teacherPortions)}</tbody>
+          </table>
+        </div>
       </div>
 
       <div class="print-page-footer">
@@ -1321,6 +1338,7 @@ function generateInvoice() {
     invoiceDate: toLocalDateInputValue(invoiceDate),
     paymentDeadline,
     teachers,
+    teacherPortions,
     totals,
     studentDetail: {
       fullName: detail?.fullName || "",
@@ -1612,6 +1630,68 @@ function renderAllBankRows(bankList) {
         `<div class="bank-row"><strong>${escapeHtml(bank.namaPengajar)}</strong> - ${escapeHtml(bank.label)}: ${escapeHtml(
           bank.bank
         )} | ${escapeHtml(bank.nomor)} | a.n. ${escapeHtml(bank.atasNama)}</div>`
+    )
+    .join("");
+}
+
+function calculateTeacherPortions(rows, totals = {}) {
+  const grouped = new Map();
+  (rows || []).forEach((row) => {
+    const teacher = String(row?.pengajar || "").trim() || "Tanpa Pengajar";
+    const current = grouped.get(teacher) || { teacher, sessions: 0, duration: 0, gross: 0 };
+    current.sessions += 1;
+    current.duration += Number(row?.durasi || 0);
+    current.gross += Number(row?.subtotal || 0);
+    grouped.set(teacher, current);
+  });
+
+  const entries = Array.from(grouped.values()).sort((a, b) => a.teacher.localeCompare(b.teacher, "id"));
+  if (entries.length === 0) return [];
+
+  const fallbackBase = entries.reduce((sum, row) => sum + row.gross, 0);
+  const baseTotal = Number(totals?.baseTotal || fallbackBase);
+  const totalDiscount = Number(totals?.diskonNominal || 0);
+  let allocatedDiscount = 0;
+
+  return entries.map((entry, index) => {
+    let discount = 0;
+    if (totalDiscount > 0 && baseTotal > 0) {
+      if (index === entries.length - 1) {
+        discount = Math.max(0, totalDiscount - allocatedDiscount);
+      } else {
+        discount = Math.max(0, Math.round((entry.gross / baseTotal) * totalDiscount));
+        allocatedDiscount += discount;
+      }
+    }
+
+    return {
+      teacher: entry.teacher,
+      sessions: entry.sessions,
+      duration: entry.duration,
+      gross: entry.gross,
+      discount,
+      net: Math.max(0, entry.gross - discount),
+    };
+  });
+}
+
+function renderTeacherPortionRows(portions) {
+  if (!Array.isArray(portions) || portions.length === 0) {
+    return '<tr><td colspan="6">Belum ada pembagian porsi pengajar.</td></tr>';
+  }
+
+  return portions
+    .map(
+      (row) => `
+      <tr>
+        <td>${escapeHtml(row.teacher || "-")}</td>
+        <td>${Number(row.sessions || 0)}</td>
+        <td>${Number(row.duration || 0).toFixed(2)} jam</td>
+        <td>${formatRupiah(Number(row.gross || 0))}</td>
+        <td>${formatRupiah(Number(row.discount || 0))}</td>
+        <td>${formatRupiah(Number(row.net || 0))}</td>
+      </tr>
+    `
     )
     .join("");
 }
@@ -2612,6 +2692,12 @@ function showInvoiceHistoryPreview(item) {
         )} | ${formatRupiah(Number(row.subtotal || 0))}</li>`
     )
     .join("");
+  const teacherPortions = Array.isArray(item.teacherPortions)
+    ? item.teacherPortions
+    : calculateTeacherPortions(items, item.totals || {});
+  const teacherPortionLines = teacherPortions
+    .map((row) => `${row.teacher}: ${formatRupiah(Number(row.net || 0))}`)
+    .join(" | ");
 
   el.invoiceHistoryPreview.classList.remove("hidden");
   el.invoiceHistoryPreview.innerHTML = `
@@ -2621,6 +2707,7 @@ function showInvoiceHistoryPreview(item) {
     <div><strong>Deadline Pembayaran:</strong> ${escapeHtml(item.paymentDeadline || item.invoiceDate || "-")}</div>
     <div><strong>Mode:</strong> ${escapeHtml(item.mode || "-")}</div>
     <div><strong>Pengajar:</strong> ${escapeHtml(teacherList || "-")}</div>
+    <div><strong>Porsi Pengajar:</strong> ${escapeHtml(teacherPortionLines || "-")}</div>
     <div><strong>Total:</strong> ${formatRupiah(Number(item?.totals?.grandTotal || 0))}</div>
     <div><strong>Rincian Sesi:</strong></div>
     <ol class="history-items">${htmlItems || "<li>Tidak ada rincian sesi.</li>"}</ol>
@@ -2632,6 +2719,9 @@ function redownloadInvoiceFromHistory(item) {
   const detail = item.studentDetail || {};
   const teachers = Array.isArray(item.teachers) ? item.teachers : [];
   const totals = item.totals || { baseTotal: 0, totalDurasi: 0, diskonPersen: 0, diskonNominal: 0, grandTotal: 0 };
+  const teacherPortions = Array.isArray(item.teacherPortions)
+    ? item.teacherPortions
+    : calculateTeacherPortions(items, totals);
   const paymentDeadline = String(item.paymentDeadline || item.invoiceDate || "").trim();
   const bankList = getBankListForInvoice(teachers);
 
@@ -2737,6 +2827,22 @@ function redownloadInvoiceFromHistory(item) {
           <div><span>Subtotal</span><span>${formatRupiah(Number(totals.baseTotal || 0))}</span></div>
           <div><span>Diskon Invoice</span><span>${Number(totals.diskonPersen || 0)}% (${formatRupiah(Number(totals.diskonNominal || 0))})</span></div>
           <div><span>Total Tagihan</span><span>${formatRupiah(Number(totals.grandTotal || 0))}</span></div>
+        </div>
+        <div class="portion-box">
+          <h4>Porsi Pembayaran per Pengajar</h4>
+          <table class="portion-table">
+            <thead>
+              <tr>
+                <th>Pengajar</th>
+                <th>Sesi</th>
+                <th>Durasi</th>
+                <th>Subtotal</th>
+                <th>Diskon</th>
+                <th>Porsi Dibayar</th>
+              </tr>
+            </thead>
+            <tbody>${renderTeacherPortionRows(teacherPortions)}</tbody>
+          </table>
         </div>
       </div>
 

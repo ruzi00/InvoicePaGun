@@ -702,7 +702,7 @@ td .mini {
 .invoice-footer-grid {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: 1.2fr auto;
+  grid-template-columns: 1.2fr auto auto;
   gap: 14px;
   align-items: start;
 }
@@ -745,6 +745,36 @@ td .mini {
 .total-box span:last-child {
   background: rgba(217, 235, 249, 0.85);
   font-weight: 800;
+}
+
+.portion-box {
+  border: 1px solid rgba(31, 41, 64, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 10px;
+  min-width: 360px;
+}
+
+.portion-box h4 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.portion-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.portion-table th,
+.portion-table td {
+  border: 1px solid rgba(32, 46, 77, 0.2);
+  padding: 6px;
+  text-align: left;
+}
+
+.portion-table th {
+  background: rgba(255, 255, 255, 0.82);
 }
 
 @media (max-width: 800px) {
