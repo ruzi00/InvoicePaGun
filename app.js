@@ -468,6 +468,14 @@ async function preloadDefaults() {
     // ignore
   }
 
+  if (state.students.length === 0) {
+    try {
+      loadMasterStudentsCsv(await fetchCsv("REKAP DATA SISWA.csv", ""));
+    } catch {
+      // ignore
+    }
+  }
+
   try {
     applyPricingCsv(await fetchCsv("tarif.csv", ""), false);
   } catch {
@@ -500,6 +508,68 @@ async function preloadDefaults() {
   }
 
   syncCsvEditorsFromState();
+}
+
+async function loadBundledFallbackSources() {
+  const loaded = [];
+
+  if (state.students.length === 0) {
+    try {
+      loadMasterStudentsCsv(await fetchCsv("REKAP DATA SISWA.csv", ""));
+      loaded.push("siswa");
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!hasTarif(state.tarif)) {
+    try {
+      applyPricingCsv(await fetchCsv("tarif.csv", ""), false);
+      loaded.push("tarif");
+    } catch {
+      // ignore
+    }
+  }
+
+  if ((state.diskonDurasi || []).length === 0) {
+    try {
+      applyDiscountCsv(await fetchCsv("diskon_durasi.csv", ""), false);
+      loaded.push("diskon");
+    } catch {
+      // ignore
+    }
+  }
+
+  if ((state.bankGuru || []).length === 0) {
+    try {
+      const bankText = await fetchCsv("bank_guru.csv", "");
+      applyBankRows(parseCsv(bankText), false, bankText);
+      loaded.push("rekening");
+    } catch {
+      // ignore
+    }
+  }
+
+  if ((state.holidaySet || new Set()).size === 0) {
+    try {
+      applyHolidayCsv(await fetchCsv("hari_libur.csv", ""), false);
+      loaded.push("libur");
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!String(state.sourceTexts.template_after || "").trim()) {
+    try {
+      state.sourceTexts.template_after = await fetchCsv("template_payment_after.csv", "");
+      loaded.push("template payment after");
+    } catch {
+      // ignore
+    }
+  }
+
+  syncCsvEditorsFromState();
+  return loaded;
 }
 
 async function autoLoadFromCurrentFolder(silent) {
@@ -2145,8 +2215,16 @@ async function loadSourcesFromFirebase({ silent = false } = {}) {
 
   const snapshot = await state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).where("ownerUid", "==", uid).get();
   if (snapshot.empty) {
-    setFirebaseStatus("Firebase terhubung, tetapi belum ada data sumber yang tersimpan.", "warn");
-    if (!silent) alert("Belum ada data sumber di Firebase.");
+    const fallbackLoaded = await loadBundledFallbackSources();
+    if (fallbackLoaded.length > 0) {
+      setFirebaseStatus(`Firebase kosong. Fallback lokal dimuat: ${fallbackLoaded.join(", ")}.`, "ok");
+      if (!silent) alert(`Firebase belum punya source. Fallback lokal dimuat: ${fallbackLoaded.join(", ")}`);
+      refreshFirebaseButtons();
+      return;
+    }
+
+    setFirebaseStatus("Firebase terhubung, tetapi belum ada data sumber yang tersimpan dan fallback lokal tidak ditemukan.", "warn");
+    if (!silent) alert("Belum ada data sumber di Firebase, dan file fallback lokal juga tidak terbaca.");
     refreshFirebaseButtons();
     return;
   }
