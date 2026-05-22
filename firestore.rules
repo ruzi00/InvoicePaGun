@@ -1,6 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function sharedOwnerUid() {
+      return "bimbelpakgun-shared";
+    }
+
     function signedIn() {
       return request.auth != null;
     }
@@ -9,12 +13,16 @@ service cloud.firestore {
       return request.auth.uid;
     }
 
+    function ownerScopeMatch(value) {
+      return value == ownerUid() || value == sharedOwnerUid();
+    }
+
     function isOwnerDoc() {
-      return signedIn() && resource.data.ownerUid == ownerUid();
+      return signedIn() && ownerScopeMatch(resource.data.ownerUid);
     }
 
     function isOwnerWrite() {
-      return signedIn() && request.resource.data.ownerUid == ownerUid();
+      return signedIn() && ownerScopeMatch(request.resource.data.ownerUid);
     }
 
     function validSourceKind() {

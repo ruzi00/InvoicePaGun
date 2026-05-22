@@ -4,6 +4,7 @@ const DEFAULT_TEACHER_STORAGE_KEY = "invoice-default-teacher";
 const FIREBASE_SOURCE_COLLECTION = "invoice_sources";
 const FIREBASE_INVOICE_COLLECTION = "invoice_records";
 const FIREBASE_SOURCE_KINDS = ["students", "pricing", "discount", "bank", "holiday", "attendance", "template_after"];
+const FIREBASE_SHARED_OWNER_UID = "bimbelpakgun-shared";
 const DEFAULT_FIREBASE_CONFIG = {
   apiKey: "",
   authDomain: "",
@@ -48,6 +49,7 @@ const state = {
     hasNext: false,
     lastVisibleDoc: null,
     currentPage: 1,
+    activeOwnerUid: "",
   },
   firebase: {
     app: null,
@@ -2529,18 +2531,42 @@ async function firestoreGet(queryRef, { forceServer = false } = {}) {
   }
 }
 
+function getFirebaseWriteOwnerUid() {
+  return FIREBASE_SHARED_OWNER_UID;
+}
+
+function getFirebaseReadOwnerUidCandidates() {
+  const uid = String(state.firebase.user?.uid || "").trim();
+  const list = [FIREBASE_SHARED_OWNER_UID];
+  if (uid && uid !== FIREBASE_SHARED_OWNER_UID) list.push(uid);
+  return list;
+}
+
 async function loadSourcesFromFirebase({ silent = false, forceServer = false } = {}) {
   if (!state.firebase.ready || !state.firebase.db) {
     throw new Error("Firebase belum terhubung.");
   }
 
-  const uid = state.firebase.user?.uid;
-  if (!uid) throw new Error("User Firebase belum siap.");
+  const ownerCandidates = getFirebaseReadOwnerUidCandidates();
+  let snapshot = null;
+  let resolvedOwnerUid = "";
+  for (const ownerUid of ownerCandidates) {
+    const next = await firestoreGet(
+      state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).where("ownerUid", "==", ownerUid),
+      { forceServer }
+    );
+    if (!next.empty) {
+      snapshot = next;
+      resolvedOwnerUid = ownerUid;
+      break;
+    }
+    if (!snapshot) snapshot = next;
+  }
 
-  const snapshot = await firestoreGet(
-    state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).where("ownerUid", "==", uid),
-    { forceServer }
-  );
+  if (!snapshot) {
+    throw new Error("Gagal memuat source dari Firebase.");
+  }
+
   if (snapshot.empty) {
     const fallbackLoaded = await loadBundledFallbackSources();
     if (fallbackLoaded.length > 0) {
@@ -2550,8 +2576,8 @@ async function loadSourcesFromFirebase({ silent = false, forceServer = false } =
       return;
     }
 
-    setFirebaseStatus("Firebase terhubung, tetapi belum ada data sumber yang tersimpan dan fallback lokal tidak ditemukan.", "warn");
-    if (!silent) alert("Belum ada data sumber di Firebase, dan file fallback lokal juga tidak terbaca.");
+    setFirebaseStatus("Belum ada data di shared cloud dan fallback lokal juga tidak terbaca. Simpan data dari sesi utama sekali untuk bootstrap.", "warn");
+    if (!silent) alert("Belum ada data di shared cloud dan fallback lokal tidak terbaca. Buka sesi utama lalu klik Simpan Data ke Firebase sekali.");
     refreshFirebaseButtons();
     return;
   }
@@ -2604,6 +2630,9 @@ async function loadSourcesFromFirebase({ silent = false, forceServer = false } =
   }
 
   setFirebaseStatus(`Data Firebase dimuat: ${loaded.join(", ")}.`, "ok");
+  if (resolvedOwnerUid && resolvedOwnerUid !== FIREBASE_SHARED_OWNER_UID) {
+    setFirebaseStatus(`Data Firebase dimuat dari scope lama akun ini. Klik Simpan Data ke Firebase untuk sinkron ke shared cloud.`, "warn");
+  }
   if (!silent) alert(`Data Firebase dimuat: ${loaded.join(", ")}`);
 }
 
@@ -2617,18 +2646,17 @@ async function saveSourcesToFirebase() {
     throw new Error("Belum ada source data yang bisa disimpan ke Firebase.");
   }
 
-  const uid = state.firebase.user?.uid;
-  if (!uid) throw new Error("User Firebase belum siap.");
+  const ownerUid = getFirebaseWriteOwnerUid();
 
   const batch = state.firebase.db.batch();
   payloads.forEach((item) => {
-    const ref = state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).doc(`${uid}__${item.kind}`);
+    const ref = state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).doc(`${ownerUid}__${item.kind}`);
     batch.set(
       ref,
       {
         kind: item.kind,
         csvText: item.csvText,
-        ownerUid: uid,
+        ownerUid,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
@@ -2649,18 +2677,17 @@ async function saveSingleSourceToFirebase(kind) {
   }
 
   applyCsvFromEditor(kind);
-  const uid = state.firebase.user?.uid;
-  if (!uid) throw new Error("User Firebase belum siap.");
+  const ownerUid = getFirebaseWriteOwnerUid();
 
   const csvText = String(state.sourceTexts[kind] || "").trim();
   if (!csvText) throw new Error("CSV kosong. Isi data terlebih dahulu.");
 
-  const ref = state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).doc(`${uid}__${kind}`);
+  const ref = state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).doc(`${ownerUid}__${kind}`);
   await ref.set(
     {
       kind,
       csvText,
-      ownerUid: uid,
+      ownerUid,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     },
     { merge: true }
@@ -2678,16 +2705,15 @@ async function saveInvoiceRecordToFirebase({ silent = false } = {}) {
     throw new Error("Generate invoice terlebih dahulu sebelum menyimpan ke Firebase.");
   }
 
-  const uid = state.firebase.user?.uid;
-  if (!uid) throw new Error("User Firebase belum siap.");
+  const ownerUid = getFirebaseWriteOwnerUid();
 
   const record = {
     ...state.lastInvoiceRecord,
-    ownerUid: uid,
+    ownerUid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
-  const docId = `${uid}__${sanitizeFileName(state.lastInvoiceRecord.invoiceNo || "INV")}`;
+  const docId = `${ownerUid}__${sanitizeFileName(state.lastInvoiceRecord.invoiceNo || "INV")}`;
   await state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(docId).set(record, { merge: true });
   if (!silent) setFirebaseStatus(`Invoice ${state.lastInvoiceRecord.invoiceNo} tersimpan ke Firebase.`, "ok");
 }
@@ -2697,15 +2723,13 @@ async function loadInvoiceHistory({ silent = false, forceServer = false, directi
     throw new Error("Firebase belum terhubung.");
   }
 
-  const uid = state.firebase.user?.uid;
-  if (!uid) throw new Error("User Firebase belum siap.");
-
   const queryState = state.invoiceHistoryQuery;
   if (direction === "reset") {
     queryState.cursorStack = [];
     queryState.currentPage = 1;
     queryState.lastVisibleDoc = null;
     queryState.hasNext = false;
+    queryState.activeOwnerUid = "";
   } else if (direction === "next") {
     if (!queryState.hasNext || !queryState.lastVisibleDoc) return;
     queryState.cursorStack.push(queryState.lastVisibleDoc);
@@ -2721,24 +2745,44 @@ async function loadInvoiceHistory({ silent = false, forceServer = false, directi
   const studentFilter = String(queryState.studentFilter || "").trim();
   const pageSize = Number(queryState.pageSize || 20);
 
-  const buildBaseQuery = (orderField) => {
-    let q = state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).where("ownerUid", "==", uid);
-    if (studentFilter) {
-      q = q.where("student", "==", studentFilter);
+  const ownerCandidates = queryState.activeOwnerUid ? [queryState.activeOwnerUid] : getFirebaseReadOwnerUidCandidates();
+
+  const runHistoryQueryForOwner = async (ownerUid) => {
+    const buildBaseQuery = (orderField) => {
+      let q = state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).where("ownerUid", "==", ownerUid);
+      if (studentFilter) {
+        q = q.where("student", "==", studentFilter);
+      }
+      q = q.orderBy(orderField, "desc").limit(pageSize + 1);
+      if (startAfterDoc) {
+        q = q.startAfter(startAfterDoc);
+      }
+      return q;
+    };
+
+    try {
+      return await firestoreGet(buildBaseQuery("updatedAt"), { forceServer });
+    } catch {
+      return firestoreGet(buildBaseQuery("createdAt"), { forceServer });
     }
-    q = q.orderBy(orderField, "desc").limit(pageSize + 1);
-    if (startAfterDoc) {
-      q = q.startAfter(startAfterDoc);
-    }
-    return q;
   };
 
-  let snapshot;
-  try {
-    snapshot = await firestoreGet(buildBaseQuery("updatedAt"), { forceServer });
-  } catch {
-    snapshot = await firestoreGet(buildBaseQuery("createdAt"), { forceServer });
+  let snapshot = null;
+  let resolvedOwnerUid = queryState.activeOwnerUid || "";
+  for (const ownerUid of ownerCandidates) {
+    const next = await runHistoryQueryForOwner(ownerUid);
+    if (!next.empty) {
+      snapshot = next;
+      resolvedOwnerUid = ownerUid;
+      break;
+    }
+    if (!snapshot) snapshot = next;
   }
+
+  if (!snapshot) {
+    throw new Error("Gagal memuat riwayat invoice.");
+  }
+  queryState.activeOwnerUid = resolvedOwnerUid;
 
   const docs = snapshot.docs || [];
   const hasNext = docs.length > pageSize;
