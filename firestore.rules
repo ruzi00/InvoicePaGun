@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownerUid() {
+      return request.auth.uid;
+    }
+
+    function isOwnerDoc() {
+      return signedIn() && resource.data.ownerUid == ownerUid();
+    }
+
+    function isOwnerWrite() {
+      return signedIn() && request.resource.data.ownerUid == ownerUid();
+    }
+
+    function validSourceKind() {
+      return request.resource.data.kind in ["students", "pricing", "discount", "bank", "holiday", "attendance"];
+    }
+
+    function validSourceDoc() {
+      return request.resource.data.keys().hasOnly(["kind", "csvText", "ownerUid", "updatedAt"]) &&
+        request.resource.data.csvText is string &&
+        request.resource.data.csvText.size() <= 800000 &&
+        validSourceKind();
+    }
+
+    function validInvoiceDoc() {
+      return request.resource.data.ownerUid is string &&
+        request.resource.data.invoiceNo is string &&
+        request.resource.data.invoiceNo.size() <= 120 &&
+        request.resource.data.student is string &&
+        request.resource.data.mode in ["front", "after"];
+    }
+
+    match /invoice_sources/{docId} {
+      allow read: if isOwnerDoc();
+      allow create: if isOwnerWrite() && validSourceDoc();
+      allow update: if isOwnerDoc() && isOwnerWrite() && validSourceDoc();
+      allow delete: if isOwnerDoc();
+    }
+
+    match /invoice_records/{docId} {
+      allow read: if isOwnerDoc();
+      allow create: if isOwnerWrite() && validInvoiceDoc();
+      allow update: if isOwnerDoc() && isOwnerWrite() && validInvoiceDoc();
+      allow delete: if isOwnerDoc();
+    }
+  }
+}

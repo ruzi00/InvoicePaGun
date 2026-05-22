@@ -2,6 +2,7 @@ const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const FIREBASE_CONFIG_STORAGE_KEY = "invoice-firebase-config";
 const FIREBASE_SOURCE_COLLECTION = "invoice_sources";
 const FIREBASE_INVOICE_COLLECTION = "invoice_records";
+const FIREBASE_SOURCE_KINDS = ["students", "pricing", "discount", "bank", "holiday", "attendance"];
 
 const state = {
   mode: "front",
@@ -29,6 +30,7 @@ const state = {
     attendance: "",
   },
   lastInvoiceRecord: null,
+  invoiceHistory: [],
   firebase: {
     app: null,
     auth: null,
@@ -42,7 +44,9 @@ const state = {
 const el = {
   modeRadios: document.querySelectorAll('input[name="modePembayaran"]'),
   runtimeNotice: document.getElementById("runtimeNotice"),
+  cloudReadyNotice: document.getElementById("cloudReadyNotice"),
   autoLoadSection: document.getElementById("autoLoadSection"),
+  localSourceControls: document.getElementById("localSourceControls"),
   packageFiles: document.getElementById("packageFiles"),
   btnAutoLoadFolder: document.getElementById("btnAutoLoadFolder"),
   studentSheetUrl: document.getElementById("studentSheetUrl"),
@@ -86,6 +90,10 @@ const el = {
   btnDownloadPng: document.getElementById("btnDownloadPng"),
   btnPreviewPng: document.getElementById("btnPreviewPng"),
   preview: document.getElementById("invoicePreview"),
+  btnRefreshInvoiceHistory: document.getElementById("btnRefreshInvoiceHistory"),
+  invoiceHistoryStatus: document.getElementById("invoiceHistoryStatus"),
+  invoiceHistoryTableBody: document.querySelector("#invoiceHistoryTable tbody"),
+  invoiceHistoryPreview: document.getElementById("invoiceHistoryPreview"),
 
   firebaseStatus: document.getElementById("firebaseStatus"),
   firebaseApiKey: document.getElementById("firebaseApiKey"),
@@ -116,6 +124,7 @@ function initialize() {
   applyModeUI();
   refreshWeeklyTeacherOptions();
   refreshFirebaseButtons();
+  renderInvoiceHistoryTable();
   void bootstrapFirebaseFromStorage();
 }
 
@@ -311,6 +320,23 @@ function bindEvents() {
   el.btnGenerate.addEventListener("click", generateInvoice);
   el.btnDownloadPng.addEventListener("click", downloadPng);
   if (el.btnPreviewPng) el.btnPreviewPng.addEventListener("click", downloadPng);
+  el.btnRefreshInvoiceHistory?.addEventListener("click", async () => {
+    try {
+      await loadInvoiceHistory();
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal memuat riwayat invoice.", "error");
+      alert(err.message);
+    }
+  });
+
+  el.invoiceHistoryTableBody?.addEventListener("click", (event) => {
+    const btn = event.target.closest("button[data-history-id]");
+    if (!btn) return;
+    const historyId = btn.dataset.historyId;
+    const item = state.invoiceHistory.find((row) => row.historyId === historyId);
+    if (!item) return;
+    showInvoiceHistoryPreview(item);
+  });
 }
 
 async function preloadDefaults() {
@@ -1024,6 +1050,12 @@ function generateInvoice() {
     })),
   };
   refreshFirebaseButtons();
+
+  if (state.firebase.ready) {
+    void saveInvoiceRecordToFirebase({ silent: true }).catch(() => {
+      // ignore background autosave failures; manual save button remains available
+    });
+  }
 }
 
 async function downloadPng() {
@@ -1748,17 +1780,31 @@ function setFirebaseStatus(message, variant = "neutral") {
   el.firebaseStatus.textContent = message;
 }
 
+function setCloudReadyMode(ready) {
+  document.body.classList.toggle("cloud-ready", Boolean(ready));
+  if (!el.cloudReadyNotice) return;
+  if (ready) {
+    el.cloudReadyNotice.classList.remove("hidden");
+    el.cloudReadyNotice.innerHTML = "<strong>Cloud Mode Aktif</strong><br/>Kontrol CSV lokal disembunyikan karena Firebase sudah siap.";
+    return;
+  }
+  el.cloudReadyNotice.classList.add("hidden");
+  el.cloudReadyNotice.innerHTML = "";
+}
+
 function refreshFirebaseButtons() {
   const ready = Boolean(state.firebase.ready && state.firebase.db);
   if (el.btnFirebaseLoadSources) el.btnFirebaseLoadSources.disabled = !ready;
   if (el.btnFirebaseSaveSources) el.btnFirebaseSaveSources.disabled = !ready;
   if (el.btnFirebaseSaveInvoice) el.btnFirebaseSaveInvoice.disabled = !ready || !state.lastInvoiceRecord;
+  if (el.btnRefreshInvoiceHistory) el.btnRefreshInvoiceHistory.disabled = !ready;
 }
 
 async function bootstrapFirebaseFromStorage() {
   const config = loadFirebaseConfigFromStorage();
   if (!config) {
     setFirebaseStatus("Firebase belum dihubungkan.", "neutral");
+    setCloudReadyMode(false);
     refreshFirebaseButtons();
     return;
   }
@@ -1768,6 +1814,7 @@ async function bootstrapFirebaseFromStorage() {
     await connectFirebase({ saveConfig: false, loadSources: true, silent: true });
   } catch (err) {
     setFirebaseStatus(`Konfigurasi Firebase tersimpan, tetapi koneksi gagal: ${err.message}`, "warn");
+    setCloudReadyMode(false);
     refreshFirebaseButtons();
   }
 }
@@ -1812,11 +1859,14 @@ async function connectFirebase({ saveConfig = false, loadSources = false, silent
 
   const userLabel = state.firebase.user?.isAnonymous ? "anonymous" : "signed-in";
   setFirebaseStatus(`Firebase terhubung (${userLabel}) ke project ${config.projectId}.`, "ok");
+  setCloudReadyMode(true);
   refreshFirebaseButtons();
 
   if (loadSources) {
     await loadSourcesFromFirebase({ silent: true });
   }
+
+  await loadInvoiceHistory({ silent: true });
 }
 
 function collectFirebaseSourcePayloads() {
@@ -1835,7 +1885,10 @@ async function loadSourcesFromFirebase({ silent = false } = {}) {
     throw new Error("Firebase belum terhubung.");
   }
 
-  const snapshot = await state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).get();
+  const uid = state.firebase.user?.uid;
+  if (!uid) throw new Error("User Firebase belum siap.");
+
+  const snapshot = await state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).where("ownerUid", "==", uid).get();
   if (snapshot.empty) {
     setFirebaseStatus("Firebase terhubung, tetapi belum ada data sumber yang tersimpan.", "warn");
     if (!silent) alert("Belum ada data sumber di Firebase.");
@@ -1894,14 +1947,18 @@ async function saveSourcesToFirebase() {
     throw new Error("Belum ada source data yang bisa disimpan ke Firebase.");
   }
 
+  const uid = state.firebase.user?.uid;
+  if (!uid) throw new Error("User Firebase belum siap.");
+
   const batch = state.firebase.db.batch();
   payloads.forEach((item) => {
-    const ref = state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).doc(item.kind);
+    const ref = state.firebase.db.collection(FIREBASE_SOURCE_COLLECTION).doc(`${uid}__${item.kind}`);
     batch.set(
       ref,
       {
         kind: item.kind,
         csvText: item.csvText,
+        ownerUid: uid,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
@@ -1913,7 +1970,7 @@ async function saveSourcesToFirebase() {
   refreshFirebaseButtons();
 }
 
-async function saveInvoiceRecordToFirebase() {
+async function saveInvoiceRecordToFirebase({ silent = false } = {}) {
   if (!state.firebase.ready || !state.firebase.db) {
     throw new Error("Firebase belum terhubung.");
   }
@@ -1922,13 +1979,113 @@ async function saveInvoiceRecordToFirebase() {
     throw new Error("Generate invoice terlebih dahulu sebelum menyimpan ke Firebase.");
   }
 
+  const uid = state.firebase.user?.uid;
+  if (!uid) throw new Error("User Firebase belum siap.");
+
   const record = {
     ...state.lastInvoiceRecord,
+    ownerUid: uid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
-  await state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(state.lastInvoiceRecord.invoiceNo).set(record, { merge: true });
-  setFirebaseStatus(`Invoice ${state.lastInvoiceRecord.invoiceNo} tersimpan ke Firebase.`, "ok");
+  const docId = `${uid}__${sanitizeFileName(state.lastInvoiceRecord.invoiceNo || "INV")}`;
+  await state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(docId).set(record, { merge: true });
+  if (!silent) setFirebaseStatus(`Invoice ${state.lastInvoiceRecord.invoiceNo} tersimpan ke Firebase.`, "ok");
+}
+
+async function loadInvoiceHistory({ silent = false } = {}) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    throw new Error("Firebase belum terhubung.");
+  }
+
+  const uid = state.firebase.user?.uid;
+  if (!uid) throw new Error("User Firebase belum siap.");
+
+  let snapshot;
+  try {
+    snapshot = await state.firebase.db
+      .collection(FIREBASE_INVOICE_COLLECTION)
+      .where("ownerUid", "==", uid)
+      .orderBy("updatedAt", "desc")
+      .limit(50)
+      .get();
+  } catch {
+    snapshot = await state.firebase.db
+      .collection(FIREBASE_INVOICE_COLLECTION)
+      .where("ownerUid", "==", uid)
+      .orderBy("createdAt", "desc")
+      .limit(50)
+      .get();
+  }
+
+  state.invoiceHistory = snapshot.docs.map((doc) => ({
+    historyId: doc.id,
+    invoiceNo: doc.data()?.invoiceNo || doc.id,
+    ...doc.data(),
+  }));
+
+  renderInvoiceHistoryTable();
+  if (el.invoiceHistoryStatus) {
+    el.invoiceHistoryStatus.textContent = state.invoiceHistory.length
+      ? `Menampilkan ${state.invoiceHistory.length} invoice terbaru.`
+      : "Belum ada riwayat invoice di Firebase untuk akun ini.";
+  }
+
+  if (!silent && state.invoiceHistory.length > 0) {
+    setFirebaseStatus(`Riwayat invoice dimuat (${state.invoiceHistory.length} data).`, "ok");
+  }
+}
+
+function renderInvoiceHistoryTable() {
+  if (!el.invoiceHistoryTableBody) return;
+  if (state.invoiceHistory.length === 0) {
+    el.invoiceHistoryTableBody.innerHTML = '<tr><td colspan="6" class="empty">Belum ada riwayat invoice.</td></tr>';
+    return;
+  }
+
+  el.invoiceHistoryTableBody.innerHTML = state.invoiceHistory
+    .map((item) => {
+      const grandTotal = Number(item?.totals?.grandTotal || 0);
+      const invoiceDate = item.invoiceDate && isValidIsoDate(item.invoiceDate) ? item.invoiceDate : "-";
+      return `
+      <tr>
+        <td>${escapeHtml(item.invoiceNo || "-")}</td>
+        <td>${invoiceDate === "-" ? "-" : escapeHtml(formatTanggal(new Date(invoiceDate)))}</td>
+        <td>${escapeHtml(item.student || "-")}</td>
+        <td>${escapeHtml(item.mode || "-")}</td>
+        <td>${formatRupiah(grandTotal)}</td>
+        <td><button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}">Lihat</button></td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function showInvoiceHistoryPreview(item) {
+  if (!el.invoiceHistoryPreview) return;
+
+  const items = Array.isArray(item.items) ? item.items : [];
+  const teacherList = Array.isArray(item.teachers) ? item.teachers.join(", ") : "-";
+  const htmlItems = items
+    .slice(0, 30)
+    .map(
+      (row) =>
+        `<li>${escapeHtml(row.tanggal || "-")} | ${escapeHtml(row.hari || "-")} | ${escapeHtml(row.pengajar || "-")} | ${escapeHtml(
+          row.topik || "-"
+        )} | ${formatRupiah(Number(row.subtotal || 0))}</li>`
+    )
+    .join("");
+
+  el.invoiceHistoryPreview.classList.remove("hidden");
+  el.invoiceHistoryPreview.innerHTML = `
+    <h4>${escapeHtml(item.invoiceNo || "Invoice")}</h4>
+    <div><strong>Siswa:</strong> ${escapeHtml(item.student || "-")}</div>
+    <div><strong>Tanggal:</strong> ${escapeHtml(item.invoiceDate || "-")}</div>
+    <div><strong>Mode:</strong> ${escapeHtml(item.mode || "-")}</div>
+    <div><strong>Pengajar:</strong> ${escapeHtml(teacherList || "-")}</div>
+    <div><strong>Total:</strong> ${formatRupiah(Number(item?.totals?.grandTotal || 0))}</div>
+    <div><strong>Rincian Sesi:</strong></div>
+    <ol class="history-items">${htmlItems || "<li>Tidak ada rincian sesi.</li>"}</ol>
+  `;
 }
 
 function bankGuruToRows(bankList) {

@@ -22,8 +22,9 @@
       </div>
 
       <div id="runtimeNotice" class="runtime-notice hidden"></div>
+      <div id="cloudReadyNotice" class="runtime-notice hidden"></div>
 
-      <section id="autoLoadSection" class="auto-load-section hidden">
+      <section id="autoLoadSection" class="auto-load-section hidden csv-control-group">
         <h3>Auto Load</h3>
         <p class="sub">Khusus mode offline. App akan mencoba auto-load file standar dari folder yang sama dengan index.html.</p>
         <div class="grid-1">
@@ -38,7 +39,7 @@
         </div>
       </section>
 
-      <details class="collapsible-tools">
+      <details id="localSourceControls" class="collapsible-tools csv-control-group">
         <summary>Informasi File & Sumber Data (Opsional)</summary>
 
         <h3>Sumber Data Siswa</h3>
@@ -237,13 +238,13 @@
 
       <section id="afterSection" class="mode-section hidden">
         <h3>Sumber Absensi Payment After</h3>
-        <div class="grid-1">
+        <div class="grid-1 csv-control-group">
           <div class="field actions-inline">
             <span>&nbsp;</span>
             <button id="btnDownloadAfterTemplate" type="button" class="btn sekund">Download Template Payment After (CSV)</button>
           </div>
         </div>
-        <div class="grid-2">
+        <div class="grid-2 csv-control-group">
           <label class="field">
             <span>File CSV Absensi</span>
             <input id="csvFile" type="file" accept=".csv,text/csv" />
@@ -306,6 +307,30 @@
       <div class="preview-actions">
         <button id="btnPreviewPng" type="button" class="btn" disabled>Download PNG</button>
       </div>
+
+      <h3>Riwayat Invoice (Firebase)</h3>
+      <div class="preview-actions">
+        <button id="btnRefreshInvoiceHistory" type="button" class="btn" disabled>Muat Riwayat Invoice</button>
+      </div>
+      <div id="invoiceHistoryStatus" class="sub">Hubungkan Firebase untuk melihat riwayat invoice.</div>
+      <div class="table-wrap">
+        <table id="invoiceHistoryTable">
+          <thead>
+            <tr>
+              <th>No Invoice</th>
+              <th>Tanggal</th>
+              <th>Siswa</th>
+              <th>Mode</th>
+              <th>Total</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="6" class="empty">Belum ada riwayat invoice.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="invoiceHistoryPreview" class="history-preview hidden"></div>
     </section>
   </main>
 

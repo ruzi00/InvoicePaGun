@@ -83,6 +83,16 @@ h2 {
   line-height: 1.45;
 }
 
+#cloudReadyNotice {
+  border-color: #9dc8b0;
+  background: #eef9f1;
+  color: #1f7a4f;
+}
+
+body.cloud-ready .csv-control-group {
+  display: none !important;
+}
+
 .auto-load-section {
   margin: 8px 0 14px;
   border: 1px solid #c5d7e0;
@@ -402,6 +412,28 @@ td .mini {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.history-preview {
+  margin-top: 12px;
+  border: 1px solid #cfbb97;
+  border-radius: 10px;
+  background: #fff9ef;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.history-preview h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.history-preview .history-items {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow: auto;
 }
 
 .placeholder {

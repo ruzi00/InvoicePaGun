@@ -13,7 +13,7 @@ Sumber data utama:
 
 Mode cloud:
 - GitHub Pages: app ini bisa dipublish sebagai static site tanpa backend.
-- Firebase: sumber data dan invoice terakhir bisa disimpan ke Firestore.
+- Firebase: sumber data, riwayat invoice, dan auto-load startup bisa memakai Firestore.
 
 Cara pakai ringkas:
 1. Buka index.html dari local server (disarankan Live Server).
@@ -27,7 +27,7 @@ Payment in Front:
 3. Pilih hari aktif + jam mulai/jam selesai per hari.
 4. Klik "Generate Jadwal 1 Minggu".
 5. Cek tabel sesi, tambahkan catatan bila perlu.
-6. Klik "Generate Invoice" lalu "Cetak / Simpan PDF".
+6. Klik "Generate Invoice" lalu "Download PNG".
 
 Payment After:
 1. Pindah ke mode Payment After.
@@ -35,7 +35,7 @@ Payment After:
 3. Pilih siswa dari dropdown.
 4. Sistem menampilkan sesi yang attended oleh siswa tersebut.
 5. Cek baris, ubah peserta/catatan jika perlu.
-6. Klik "Generate Invoice" lalu "Cetak / Simpan PDF".
+6. Klik "Generate Invoice" lalu "Download PNG".
 
 Format file penting:
 
@@ -70,7 +70,15 @@ Setup GitHub Pages + Firebase:
 3. Di Firebase Console, buat project baru dan aktifkan Anonymous Authentication + Firestore.
 4. Salin konfigurasi Web App ke panel Firebase Sync di halaman app.
 5. Klik Hubungkan Firebase, lalu Simpan Data ke Firebase.
+6. Saat Firebase sudah siap, kontrol CSV lokal otomatis disembunyikan (cloud-ready mode).
+7. Gunakan tombol "Muat Riwayat Invoice" untuk melihat invoice terdahulu.
+
+Deploy Firestore Rules:
+1. Install Firebase CLI: npm install -g firebase-tools
+2. Login: firebase login
+3. Inisialisasi project lokal: firebase use bimbelpakgun
+4. Deploy rules: firebase deploy --only firestore:rules
 
 Koleksi Firebase yang dipakai:
-- invoice_sources: menyimpan CSV sumber data per jenis (students, pricing, discount, bank, holiday, attendance).
-- invoice_records: menyimpan invoice terakhir yang digenerate dari browser.
+- invoice_sources: menyimpan CSV sumber data per jenis (students, pricing, discount, bank, holiday, attendance), scoped per owner UID.
+- invoice_records: menyimpan riwayat invoice yang digenerate dari browser, scoped per owner UID.
