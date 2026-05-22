@@ -1701,10 +1701,13 @@ function calculateTeacherPortions(rows, totals = {}) {
   const grouped = new Map();
   (rows || []).forEach((row) => {
     const teacher = String(row?.pengajar || "").trim() || "Tanpa Pengajar";
-    const current = grouped.get(teacher) || { teacher, sessions: 0, duration: 0, gross: 0 };
+    const current = grouped.get(teacher) || { teacher, sessions: 0, duration: 0, gross: 0, discountableGross: 0 };
     current.sessions += 1;
     current.duration += Number(row?.durasi || 0);
     current.gross += Number(row?.subtotal || 0);
+    if (Number(row?.pesertaCount || 1) > 1) {
+      current.discountableGross += Number(row?.subtotal || 0);
+    }
     grouped.set(teacher, current);
   });
 
@@ -1712,17 +1715,21 @@ function calculateTeacherPortions(rows, totals = {}) {
   if (entries.length === 0) return [];
 
   const fallbackBase = entries.reduce((sum, row) => sum + row.gross, 0);
+  const fallbackDiscountableBase = entries.reduce((sum, row) => sum + row.discountableGross, 0);
   const baseTotal = Number(totals?.baseTotal || fallbackBase);
+  const discountableBaseTotal = Number(totals?.discountableBaseTotal || fallbackDiscountableBase);
   const totalDiscount = Number(totals?.diskonNominal || 0);
   let allocatedDiscount = 0;
 
   return entries.map((entry, index) => {
     let discount = 0;
-    if (totalDiscount > 0 && baseTotal > 0) {
-      if (index === entries.length - 1) {
+    const hasDiscountablePart = discountableBaseTotal > 0 && entry.discountableGross > 0;
+    if (totalDiscount > 0 && baseTotal > 0 && hasDiscountablePart) {
+      const discountableEntriesLeft = entries.slice(index + 1).some((row) => row.discountableGross > 0);
+      if (!discountableEntriesLeft) {
         discount = Math.max(0, totalDiscount - allocatedDiscount);
       } else {
-        discount = Math.max(0, Math.round((entry.gross / baseTotal) * totalDiscount));
+        discount = Math.max(0, Math.round((entry.discountableGross / discountableBaseTotal) * totalDiscount));
         allocatedDiscount += discount;
       }
     }
@@ -1760,11 +1767,13 @@ function renderTeacherPortionRows(portions) {
 function calculateInvoiceTotals(selectedSessions) {
   const baseTotal = selectedSessions.reduce((sum, s) => sum + s.subtotal, 0);
   const totalDurasi = selectedSessions.reduce((sum, s) => sum + s.durasi, 0);
-  const hasGroupSession = selectedSessions.some((s) => Number(s?.pesertaCount || 1) > 1);
-  const diskonPersen = hasGroupSession ? pickDiskonByDurasi(totalDurasi) : 0;
-  const diskonNominal = (baseTotal * diskonPersen) / 100;
+  const nonPrivateSessions = selectedSessions.filter((s) => Number(s?.pesertaCount || 1) > 1);
+  const nonPrivateDurasi = nonPrivateSessions.reduce((sum, s) => sum + Number(s?.durasi || 0), 0);
+  const discountableBaseTotal = nonPrivateSessions.reduce((sum, s) => sum + Number(s?.subtotal || 0), 0);
+  const diskonPersen = nonPrivateDurasi > 0 ? pickDiskonByDurasi(nonPrivateDurasi) : 0;
+  const diskonNominal = (discountableBaseTotal * diskonPersen) / 100;
   const grandTotal = Math.max(0, baseTotal - diskonNominal);
-  return { baseTotal, totalDurasi, diskonPersen, diskonNominal, grandTotal };
+  return { baseTotal, totalDurasi, discountableBaseTotal, nonPrivateDurasi, diskonPersen, diskonNominal, grandTotal };
 }
 
 function parseMasterStudents(rows) {
