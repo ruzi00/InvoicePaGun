@@ -39,7 +39,7 @@
         </div>
       </section>
 
-      <details id="localSourceControls" class="collapsible-tools csv-control-group">
+      <details id="localSourceControls" class="collapsible-tools csv-control-group" open>
         <summary>Informasi File & Sumber Data (Opsional)</summary>
 
         <h3>Sumber Data Siswa</h3>
@@ -166,7 +166,7 @@
           <button id="btnFirebaseSaveInvoice" type="button" class="btn" disabled>Simpan Invoice Terakhir</button>
         </div>
 
-        <details class="firebase-csv-editor" open>
+        <details id="firebaseCsvEditor" class="firebase-csv-editor" open>
           <summary>CSV Cloud Editor (Firestore)</summary>
           <p class="sub">Edit raw CSV di sini, klik Apply ke app, lalu simpan ke Firestore. Semua data tetap format CSV (bukan JSON).</p>
 
@@ -176,6 +176,9 @@
               <textarea id="csvEditorStudents" rows="6" placeholder="Paste CSV siswa..."></textarea>
               <div class="toolbar compact">
                 <button id="btnCsvApplyStudents" type="button" class="btn">Apply</button>
+                <button id="btnCsvDownloadStudents" type="button" class="btn">Download CSV</button>
+                <button id="btnCsvUploadStudents" type="button" class="btn">Upload CSV</button>
+                <input id="fileCsvUploadStudents" type="file" class="hidden-input" accept=".csv,text/csv" />
                 <button id="btnCsvSaveStudents" type="button" class="btn sekund" disabled>Simpan ke Firebase</button>
               </div>
             </label>
@@ -185,6 +188,9 @@
               <textarea id="csvEditorPricing" rows="6" placeholder="Paste CSV tarif..."></textarea>
               <div class="toolbar compact">
                 <button id="btnCsvApplyPricing" type="button" class="btn">Apply</button>
+                <button id="btnCsvDownloadPricing" type="button" class="btn">Download CSV</button>
+                <button id="btnCsvUploadPricing" type="button" class="btn">Upload CSV</button>
+                <input id="fileCsvUploadPricing" type="file" class="hidden-input" accept=".csv,text/csv" />
                 <button id="btnCsvSavePricing" type="button" class="btn sekund" disabled>Simpan ke Firebase</button>
               </div>
             </label>
@@ -194,6 +200,9 @@
               <textarea id="csvEditorDiscount" rows="6" placeholder="Paste CSV diskon..."></textarea>
               <div class="toolbar compact">
                 <button id="btnCsvApplyDiscount" type="button" class="btn">Apply</button>
+                <button id="btnCsvDownloadDiscount" type="button" class="btn">Download CSV</button>
+                <button id="btnCsvUploadDiscount" type="button" class="btn">Upload CSV</button>
+                <input id="fileCsvUploadDiscount" type="file" class="hidden-input" accept=".csv,text/csv" />
                 <button id="btnCsvSaveDiscount" type="button" class="btn sekund" disabled>Simpan ke Firebase</button>
               </div>
             </label>
@@ -203,6 +212,9 @@
               <textarea id="csvEditorBank" rows="6" placeholder="Paste CSV bank guru..."></textarea>
               <div class="toolbar compact">
                 <button id="btnCsvApplyBank" type="button" class="btn">Apply</button>
+                <button id="btnCsvDownloadBank" type="button" class="btn">Download CSV</button>
+                <button id="btnCsvUploadBank" type="button" class="btn">Upload CSV</button>
+                <input id="fileCsvUploadBank" type="file" class="hidden-input" accept=".csv,text/csv" />
                 <button id="btnCsvSaveBank" type="button" class="btn sekund" disabled>Simpan ke Firebase</button>
               </div>
             </label>
@@ -212,6 +224,9 @@
               <textarea id="csvEditorHoliday" rows="6" placeholder="Paste CSV hari libur..."></textarea>
               <div class="toolbar compact">
                 <button id="btnCsvApplyHoliday" type="button" class="btn">Apply</button>
+                <button id="btnCsvDownloadHoliday" type="button" class="btn">Download CSV</button>
+                <button id="btnCsvUploadHoliday" type="button" class="btn">Upload CSV</button>
+                <input id="fileCsvUploadHoliday" type="file" class="hidden-input" accept=".csv,text/csv" />
                 <button id="btnCsvSaveHoliday" type="button" class="btn sekund" disabled>Simpan ke Firebase</button>
               </div>
             </label>
@@ -221,6 +236,9 @@
               <textarea id="csvEditorAttendance" rows="6" placeholder="Paste CSV absensi..."></textarea>
               <div class="toolbar compact">
                 <button id="btnCsvApplyAttendance" type="button" class="btn">Apply</button>
+                <button id="btnCsvDownloadAttendance" type="button" class="btn">Download CSV</button>
+                <button id="btnCsvUploadAttendance" type="button" class="btn">Upload CSV</button>
+                <input id="fileCsvUploadAttendance" type="file" class="hidden-input" accept=".csv,text/csv" />
                 <button id="btnCsvSaveAttendance" type="button" class="btn sekund" disabled>Simpan ke Firebase</button>
               </div>
             </label>
@@ -230,6 +248,9 @@
               <textarea id="csvEditorTemplateAfter" rows="6" placeholder="Paste CSV template payment after..."></textarea>
               <div class="toolbar compact">
                 <button id="btnCsvApplyTemplateAfter" type="button" class="btn">Apply</button>
+                <button id="btnCsvDownloadTemplateAfter" type="button" class="btn">Download CSV</button>
+                <button id="btnCsvUploadTemplateAfter" type="button" class="btn">Upload CSV</button>
+                <input id="fileCsvUploadTemplateAfter" type="file" class="hidden-input" accept=".csv,text/csv" />
                 <button id="btnCsvSaveTemplateAfter" type="button" class="btn sekund" disabled>Simpan ke Firebase</button>
               </div>
             </label>

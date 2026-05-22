@@ -89,10 +89,6 @@ h2 {
   color: #1f7a4f;
 }
 
-body.cloud-ready .csv-control-group {
-  display: none !important;
-}
-
 .auto-load-section {
   margin: 8px 0 14px;
   border: 1px solid #c5d7e0;
@@ -184,6 +180,7 @@ body.cloud-ready .csv-control-group {
 
 .toolbar.compact {
   margin-top: 0;
+  gap: 8px;
 }
 
 .csv-editor-grid textarea {

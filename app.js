@@ -48,6 +48,7 @@ const el = {
   cloudReadyNotice: document.getElementById("cloudReadyNotice"),
   autoLoadSection: document.getElementById("autoLoadSection"),
   localSourceControls: document.getElementById("localSourceControls"),
+  firebaseCsvEditor: document.getElementById("firebaseCsvEditor"),
   packageFiles: document.getElementById("packageFiles"),
   btnAutoLoadFolder: document.getElementById("btnAutoLoadFolder"),
   studentSheetUrl: document.getElementById("studentSheetUrl"),
@@ -117,18 +118,39 @@ const el = {
   csvEditorTemplateAfter: document.getElementById("csvEditorTemplateAfter"),
   btnCsvApplyStudents: document.getElementById("btnCsvApplyStudents"),
   btnCsvSaveStudents: document.getElementById("btnCsvSaveStudents"),
+  btnCsvDownloadStudents: document.getElementById("btnCsvDownloadStudents"),
+  btnCsvUploadStudents: document.getElementById("btnCsvUploadStudents"),
+  fileCsvUploadStudents: document.getElementById("fileCsvUploadStudents"),
   btnCsvApplyPricing: document.getElementById("btnCsvApplyPricing"),
   btnCsvSavePricing: document.getElementById("btnCsvSavePricing"),
+  btnCsvDownloadPricing: document.getElementById("btnCsvDownloadPricing"),
+  btnCsvUploadPricing: document.getElementById("btnCsvUploadPricing"),
+  fileCsvUploadPricing: document.getElementById("fileCsvUploadPricing"),
   btnCsvApplyDiscount: document.getElementById("btnCsvApplyDiscount"),
   btnCsvSaveDiscount: document.getElementById("btnCsvSaveDiscount"),
+  btnCsvDownloadDiscount: document.getElementById("btnCsvDownloadDiscount"),
+  btnCsvUploadDiscount: document.getElementById("btnCsvUploadDiscount"),
+  fileCsvUploadDiscount: document.getElementById("fileCsvUploadDiscount"),
   btnCsvApplyBank: document.getElementById("btnCsvApplyBank"),
   btnCsvSaveBank: document.getElementById("btnCsvSaveBank"),
+  btnCsvDownloadBank: document.getElementById("btnCsvDownloadBank"),
+  btnCsvUploadBank: document.getElementById("btnCsvUploadBank"),
+  fileCsvUploadBank: document.getElementById("fileCsvUploadBank"),
   btnCsvApplyHoliday: document.getElementById("btnCsvApplyHoliday"),
   btnCsvSaveHoliday: document.getElementById("btnCsvSaveHoliday"),
+  btnCsvDownloadHoliday: document.getElementById("btnCsvDownloadHoliday"),
+  btnCsvUploadHoliday: document.getElementById("btnCsvUploadHoliday"),
+  fileCsvUploadHoliday: document.getElementById("fileCsvUploadHoliday"),
   btnCsvApplyAttendance: document.getElementById("btnCsvApplyAttendance"),
   btnCsvSaveAttendance: document.getElementById("btnCsvSaveAttendance"),
+  btnCsvDownloadAttendance: document.getElementById("btnCsvDownloadAttendance"),
+  btnCsvUploadAttendance: document.getElementById("btnCsvUploadAttendance"),
+  fileCsvUploadAttendance: document.getElementById("fileCsvUploadAttendance"),
   btnCsvApplyTemplateAfter: document.getElementById("btnCsvApplyTemplateAfter"),
   btnCsvSaveTemplateAfter: document.getElementById("btnCsvSaveTemplateAfter"),
+  btnCsvDownloadTemplateAfter: document.getElementById("btnCsvDownloadTemplateAfter"),
+  btnCsvUploadTemplateAfter: document.getElementById("btnCsvUploadTemplateAfter"),
+  fileCsvUploadTemplateAfter: document.getElementById("fileCsvUploadTemplateAfter"),
 };
 
 initialize();
@@ -381,6 +403,20 @@ function bindCsvEditorActions() {
     [el.btnCsvSaveHoliday, () => saveSingleSourceToFirebase("holiday")],
     [el.btnCsvSaveAttendance, () => saveSingleSourceToFirebase("attendance")],
     [el.btnCsvSaveTemplateAfter, () => saveSingleSourceToFirebase("template_after")],
+    [el.btnCsvDownloadStudents, () => downloadSourceCsv("students")],
+    [el.btnCsvDownloadPricing, () => downloadSourceCsv("pricing")],
+    [el.btnCsvDownloadDiscount, () => downloadSourceCsv("discount")],
+    [el.btnCsvDownloadBank, () => downloadSourceCsv("bank")],
+    [el.btnCsvDownloadHoliday, () => downloadSourceCsv("holiday")],
+    [el.btnCsvDownloadAttendance, () => downloadSourceCsv("attendance")],
+    [el.btnCsvDownloadTemplateAfter, () => downloadSourceCsv("template_after")],
+    [el.btnCsvUploadStudents, () => triggerCsvUpload("students")],
+    [el.btnCsvUploadPricing, () => triggerCsvUpload("pricing")],
+    [el.btnCsvUploadDiscount, () => triggerCsvUpload("discount")],
+    [el.btnCsvUploadBank, () => triggerCsvUpload("bank")],
+    [el.btnCsvUploadHoliday, () => triggerCsvUpload("holiday")],
+    [el.btnCsvUploadAttendance, () => triggerCsvUpload("attendance")],
+    [el.btnCsvUploadTemplateAfter, () => triggerCsvUpload("template_after")],
   ];
 
   pairs.forEach(([btn, handler]) => {
@@ -392,6 +428,31 @@ function bindCsvEditorActions() {
         setFirebaseStatus(err.message || "Gagal memproses CSV editor.", "error");
         alert(err.message);
       }
+    });
+  });
+
+  const uploads = [
+    [el.fileCsvUploadStudents, "students"],
+    [el.fileCsvUploadPricing, "pricing"],
+    [el.fileCsvUploadDiscount, "discount"],
+    [el.fileCsvUploadBank, "bank"],
+    [el.fileCsvUploadHoliday, "holiday"],
+    [el.fileCsvUploadAttendance, "attendance"],
+    [el.fileCsvUploadTemplateAfter, "template_after"],
+  ];
+
+  uploads.forEach(([input, kind]) => {
+    if (!input) return;
+    input.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      const editor = getCsvEditorElement(kind);
+      if (editor) editor.value = text;
+      applyCsvFromEditor(kind);
+      syncCsvEditorsFromState();
+      input.value = "";
+      setFirebaseStatus(`CSV ${kind} berhasil di-upload ke editor.`, "ok");
     });
   });
 }
@@ -1859,6 +1920,10 @@ function setFirebaseStatus(message, variant = "neutral") {
 
 function setCloudReadyMode(ready) {
   document.body.classList.toggle("cloud-ready", Boolean(ready));
+  if (ready) {
+    if (el.localSourceControls) el.localSourceControls.open = true;
+    if (el.firebaseCsvEditor) el.firebaseCsvEditor.open = true;
+  }
   if (!el.cloudReadyNotice) return;
   if (ready) {
     el.cloudReadyNotice.classList.remove("hidden");
@@ -1867,6 +1932,48 @@ function setCloudReadyMode(ready) {
   }
   el.cloudReadyNotice.classList.add("hidden");
   el.cloudReadyNotice.innerHTML = "";
+}
+
+function triggerCsvUpload(kind) {
+  const input = getCsvUploadInputElement(kind);
+  if (!input) throw new Error("Input upload CSV tidak ditemukan.");
+  input.click();
+}
+
+function getCsvUploadInputElement(kind) {
+  const map = {
+    students: el.fileCsvUploadStudents,
+    pricing: el.fileCsvUploadPricing,
+    discount: el.fileCsvUploadDiscount,
+    bank: el.fileCsvUploadBank,
+    holiday: el.fileCsvUploadHoliday,
+    attendance: el.fileCsvUploadAttendance,
+    template_after: el.fileCsvUploadTemplateAfter,
+  };
+  return map[kind] || null;
+}
+
+function downloadSourceCsv(kind) {
+  const editor = getCsvEditorElement(kind);
+  const text = String(editor?.value || state.sourceTexts[kind] || "").trim();
+  if (!text) throw new Error("CSV kosong. Tidak ada data untuk didownload.");
+
+  const fileNameMap = {
+    students: "REKAP DATA SISWA.csv",
+    pricing: "tarif.csv",
+    discount: "diskon_durasi.csv",
+    bank: "bank_guru.csv",
+    holiday: "hari_libur.csv",
+    attendance: "attendance.csv",
+    template_after: "template_payment_after.csv",
+  };
+
+  const blob = new Blob(["\uFEFF", text], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileNameMap[kind] || `${kind}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 function getCsvEditorElement(kind) {
