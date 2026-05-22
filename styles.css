@@ -757,6 +757,7 @@ td .mini {
   min-width: 0;
   width: 100%;
   overflow-x: auto;
+  margin-top: 10px;
 }
 
 .portion-box h4 {
@@ -789,19 +790,14 @@ td .mini {
   background: rgba(255, 255, 255, 0.82);
 }
 
-.portion-box {
-  grid-column: 1 / -1;
-  grid-row: 1;
-}
-
 .bank-box {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
 }
 
 .total-box {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
 }
 
 @media (max-width: 800px) {

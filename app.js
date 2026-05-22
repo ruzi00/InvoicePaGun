@@ -1271,22 +1271,22 @@ function generateInvoice() {
         <tbody>${rowsHtml}</tbody>
       </table>
 
-      <div class="invoice-footer-grid">
-        <div class="portion-box">
-          <h4>Porsi Pembayaran per Pengajar</h4>
-          <table class="portion-table">
-            <thead>
-              <tr>
-                <th>Pengajar</th>
-                <th>Durasi</th>
-                <th>Sesi</th>
-                <th>Biaya Akhir</th>
-              </tr>
-            </thead>
-            <tbody>${renderTeacherPortionRows(teacherPortions)}</tbody>
-          </table>
-        </div>
+      <div class="portion-box">
+        <h4>Porsi Pembayaran per Pengajar</h4>
+        <table class="portion-table">
+          <thead>
+            <tr>
+              <th>Pengajar</th>
+              <th>Durasi</th>
+              <th>Sesi</th>
+              <th>Biaya Akhir</th>
+            </tr>
+          </thead>
+          <tbody>${renderTeacherPortionRows(teacherPortions)}</tbody>
+        </table>
+      </div>
 
+      <div class="invoice-footer-grid">
         <div class="bank-box">
           <h4>Informasi Pembayaran</h4>
           ${renderAllBankRows(bankList)}
@@ -2811,22 +2811,22 @@ function redownloadInvoiceFromHistory(item) {
         <tbody>${rowsHtml}</tbody>
       </table>
 
-      <div class="invoice-footer-grid">
-        <div class="portion-box">
-          <h4>Porsi Pembayaran per Pengajar</h4>
-          <table class="portion-table">
-            <thead>
-              <tr>
-                <th>Pengajar</th>
-                <th>Durasi</th>
-                <th>Sesi</th>
-                <th>Biaya Akhir</th>
-              </tr>
-            </thead>
-            <tbody>${renderTeacherPortionRows(teacherPortions)}</tbody>
-          </table>
-        </div>
+      <div class="portion-box">
+        <h4>Porsi Pembayaran per Pengajar</h4>
+        <table class="portion-table">
+          <thead>
+            <tr>
+              <th>Pengajar</th>
+              <th>Durasi</th>
+              <th>Sesi</th>
+              <th>Biaya Akhir</th>
+            </tr>
+          </thead>
+          <tbody>${renderTeacherPortionRows(teacherPortions)}</tbody>
+        </table>
+      </div>
 
+      <div class="invoice-footer-grid">
         <div class="bank-box">
           <h4>Informasi Pembayaran</h4>
           ${renderAllBankRows(bankList)}
