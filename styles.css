@@ -703,7 +703,7 @@ td .mini {
 .invoice-footer-grid {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: minmax(0, 58%) minmax(0, 42%);
+  grid-template-columns: minmax(0, 33.333%) minmax(0, 66.667%);
   gap: 14px;
   align-items: start;
 }
