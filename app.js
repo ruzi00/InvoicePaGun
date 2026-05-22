@@ -844,7 +844,8 @@ function applyModeUI() {
   el.sessionsTitle.textContent = isFront ? "Daftar Sesi Mingguan (Payment in Front)" : "Daftar Sesi Unpaid (Payment After)";
 
   if (!isFront) {
-    updateAfterInvoiceDateOptions();
+    hydrateAfterSessionsForSelectedStudent();
+    return;
   }
 
   if (isFront) {
@@ -1241,7 +1242,20 @@ function generateInvoice() {
     return;
   }
 
-  const selected = state.sessions.filter((s) => s.dipilih);
+  if (state.mode === "after" && state.sessions.length === 0) {
+    hydrateAfterSessionsForSelectedStudent();
+  }
+
+  let selected = state.sessions.filter((s) => s.dipilih);
+  if (state.mode === "after" && selected.length === 0 && state.sessions.length > 0) {
+    state.sessions.forEach((s) => {
+      s.dipilih = true;
+    });
+    selected = state.sessions.slice();
+    renderSessionsTable();
+    updateTotal();
+  }
+
   if (selected.length === 0) {
     alert("Tidak ada sesi terpilih untuk ditagihkan.");
     return;
