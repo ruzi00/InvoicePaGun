@@ -1921,8 +1921,8 @@ function setFirebaseStatus(message, variant = "neutral") {
 function setCloudReadyMode(ready) {
   document.body.classList.toggle("cloud-ready", Boolean(ready));
   if (ready) {
-    if (el.localSourceControls) el.localSourceControls.open = true;
-    if (el.firebaseCsvEditor) el.firebaseCsvEditor.open = true;
+    if (el.localSourceControls) el.localSourceControls.open = false;
+    if (el.firebaseCsvEditor) el.firebaseCsvEditor.open = false;
   }
   if (!el.cloudReadyNotice) return;
   if (ready) {
