@@ -1292,11 +1292,9 @@ function generateInvoice() {
             <thead>
               <tr>
                 <th>Pengajar</th>
-                <th>Sesi</th>
                 <th>Durasi</th>
-                <th>Subtotal</th>
-                <th>Diskon</th>
-                <th>Porsi Dibayar</th>
+                <th>Sesi</th>
+                <th>Biaya Akhir</th>
               </tr>
             </thead>
             <tbody>${renderTeacherPortionRows(teacherPortions)}</tbody>
@@ -1677,7 +1675,7 @@ function calculateTeacherPortions(rows, totals = {}) {
 
 function renderTeacherPortionRows(portions) {
   if (!Array.isArray(portions) || portions.length === 0) {
-    return '<tr><td colspan="6">Belum ada pembagian porsi pengajar.</td></tr>';
+    return '<tr><td colspan="4">Belum ada pembagian porsi pengajar.</td></tr>';
   }
 
   return portions
@@ -1685,10 +1683,8 @@ function renderTeacherPortionRows(portions) {
       (row) => `
       <tr>
         <td>${escapeHtml(row.teacher || "-")}</td>
-        <td>${Number(row.sessions || 0)}</td>
         <td>${Number(row.duration || 0).toFixed(2)} jam</td>
-        <td>${formatRupiah(Number(row.gross || 0))}</td>
-        <td>${formatRupiah(Number(row.discount || 0))}</td>
+        <td>${Number(row.sessions || 0)}</td>
         <td>${formatRupiah(Number(row.net || 0))}</td>
       </tr>
     `
@@ -2834,11 +2830,9 @@ function redownloadInvoiceFromHistory(item) {
             <thead>
               <tr>
                 <th>Pengajar</th>
-                <th>Sesi</th>
                 <th>Durasi</th>
-                <th>Subtotal</th>
-                <th>Diskon</th>
-                <th>Porsi Dibayar</th>
+                <th>Sesi</th>
+                <th>Biaya Akhir</th>
               </tr>
             </thead>
             <tbody>${renderTeacherPortionRows(teacherPortions)}</tbody>
