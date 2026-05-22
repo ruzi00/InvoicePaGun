@@ -21,6 +21,19 @@
         <label><input type="radio" name="modePembayaran" value="after" /> Payment After</label>
       </div>
 
+      <div class="grid-2">
+        <label class="field">
+          <span>Default Pengajar (Simpan di Browser)</span>
+          <select id="defaultTeacherSelect">
+            <option value="">- Pilih Pengajar Default -</option>
+          </select>
+        </label>
+        <div class="field actions-inline">
+          <span>&nbsp;</span>
+          <button id="btnSaveDefaultTeacher" type="button" class="btn sekund">Simpan Default Pengajar</button>
+        </div>
+      </div>
+
       <div id="runtimeNotice" class="runtime-notice hidden"></div>
       <div id="cloudReadyNotice" class="runtime-notice hidden"></div>
       <textarea id="holidayDates" class="hidden-input"></textarea>
@@ -340,6 +353,7 @@
             <tr>
               <th>No Invoice</th>
               <th>Tanggal</th>
+              <th>Deadline</th>
               <th>Siswa</th>
               <th>Mode</th>
               <th>Total</th>
@@ -347,7 +361,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="6" class="empty">Belum ada riwayat invoice.</td></tr>
+            <tr><td colspan="7" class="empty">Belum ada riwayat invoice.</td></tr>
           </tbody>
         </table>
       </div>

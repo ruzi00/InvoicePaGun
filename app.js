@@ -1,5 +1,6 @@
 const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const FIREBASE_CONFIG_STORAGE_KEY = "invoice-firebase-config";
+const DEFAULT_TEACHER_STORAGE_KEY = "invoice-default-teacher";
 const FIREBASE_SOURCE_COLLECTION = "invoice_sources";
 const FIREBASE_INVOICE_COLLECTION = "invoice_records";
 const FIREBASE_SOURCE_KINDS = ["students", "pricing", "discount", "bank", "holiday", "attendance", "template_after"];
@@ -87,6 +88,8 @@ const el = {
   frontWeeks: document.getElementById("frontWeeks"),
   btnGenerateMingguan: document.getElementById("btnGenerateMingguan"),
   frontWeekTable: document.getElementById("frontWeekTable"),
+  defaultTeacherSelect: document.getElementById("defaultTeacherSelect"),
+  btnSaveDefaultTeacher: document.getElementById("btnSaveDefaultTeacher"),
 
   afterSection: document.getElementById("afterSection"),
   csvFile: document.getElementById("csvFile"),
@@ -177,6 +180,7 @@ function initialize() {
   parseHolidaySetFromInput();
   applyModeUI();
   refreshWeeklyTeacherOptions();
+  applyDefaultTeacherToWeekTable();
   refreshFirebaseButtons();
   syncCsvEditorsFromState();
   renderInvoiceHistoryTable();
@@ -395,6 +399,16 @@ function bindEvents() {
   });
 
   el.btnGenerateMingguan.addEventListener("click", generateFrontWeeklySessions);
+  el.btnSaveDefaultTeacher?.addEventListener("click", () => {
+    const teacher = String(el.defaultTeacherSelect?.value || "").trim();
+    if (!teacher) {
+      alert("Pilih nama pengajar default terlebih dahulu.");
+      return;
+    }
+    persistDefaultTeacher(teacher);
+    applyDefaultTeacherToWeekTable();
+    alert(`Default pengajar disimpan: ${teacher}`);
+  });
   el.btnGenerate.addEventListener("click", generateInvoice);
   el.btnDownloadPng.addEventListener("click", downloadPng);
   if (el.btnPreviewPng) el.btnPreviewPng.addEventListener("click", downloadPng);
@@ -411,8 +425,13 @@ function bindEvents() {
     const btn = event.target.closest("button[data-history-id]");
     if (!btn) return;
     const historyId = btn.dataset.historyId;
+    const action = String(btn.dataset.historyAction || "view").toLowerCase();
     const item = state.invoiceHistory.find((row) => row.historyId === historyId);
     if (!item) return;
+    if (action === "download") {
+      redownloadInvoiceFromHistory(item);
+      return;
+    }
     showInvoiceHistoryPreview(item);
   });
 }
@@ -839,6 +858,7 @@ function applyBankRows(rows, notify = true, rawText = "") {
   state.bankGuru = parsed;
   state.sourceTexts.bank = rawText || serializeRowsToCsv(rows);
   refreshWeeklyTeacherOptions();
+  applyDefaultTeacherToWeekTable();
   if (notify) alert("Data rekening guru berhasil dimuat.");
 }
 
@@ -1173,6 +1193,7 @@ function generateInvoice() {
 
   const totals = calculateInvoiceTotals(selected);
   const invoiceDate = parseDateInput(el.invoiceDate.value) || new Date();
+  const paymentDeadline = toLocalDateInputValue(invoiceDate);
   const invoiceNo = `INV-${invoiceDate.getFullYear()}${String(invoiceDate.getMonth() + 1).padStart(2, "0")}${String(
     invoiceDate.getDate()
   ).padStart(2, "0")}-${student.replace(/\s+/g, "").slice(0, 6).toUpperCase()}`;
@@ -1255,7 +1276,7 @@ function generateInvoice() {
           ${renderAllBankRows(bankList)}
           <label class="deadline-field">
             <span>Deadline Pembayaran</span>
-            <input id="invoiceDeadline" type="date" value="${toLocalDateInputValue(invoiceDate)}" />
+            <input id="invoiceDeadline" type="date" value="${paymentDeadline}" />
           </label>
         </div>
         <div class="total-box">
@@ -1280,6 +1301,14 @@ function generateInvoice() {
   if (deadlineInput) {
     deadlineInput.addEventListener("input", () => {
       deadlineInput.dataset.userEdited = "true";
+      if (state.lastInvoiceRecord) {
+        state.lastInvoiceRecord.paymentDeadline = String(deadlineInput.value || "").trim() || state.lastInvoiceRecord.invoiceDate;
+        if (state.firebase.ready) {
+          void saveInvoiceRecordToFirebase({ silent: true }).catch(() => {
+            // ignore background autosave failures; manual save button remains available
+          });
+        }
+      }
     });
   }
 
@@ -1290,6 +1319,7 @@ function generateInvoice() {
     title: String(el.invoiceTitle.value || "INVOICE LES").trim(),
     student,
     invoiceDate: toLocalDateInputValue(invoiceDate),
+    paymentDeadline,
     teachers,
     totals,
     studentDetail: {
@@ -1459,6 +1489,7 @@ function refreshWeeklyTeacherOptions() {
   const names = [
     ...new Set(state.bankGuru.filter((b) => !isCollaboratedAccountRow(b)).map((b) => b.namaPengajar).filter(Boolean)),
   ].sort((a, b) => a.localeCompare(b, "id"));
+  const defaultTeacher = loadDefaultTeacher();
   const html = names.length === 0
     ? '<option value="-" selected>-</option>'
     : names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
@@ -1467,6 +1498,49 @@ function refreshWeeklyTeacherOptions() {
     const prev = sel.value;
     sel.innerHTML = html;
     if (prev && names.includes(prev)) sel.value = prev;
+    if ((!prev || prev === "-" || !names.includes(prev)) && defaultTeacher && names.includes(defaultTeacher)) {
+      sel.value = defaultTeacher;
+    }
+  });
+
+  refreshDefaultTeacherOptions(names);
+}
+
+function refreshDefaultTeacherOptions(names) {
+  if (!el.defaultTeacherSelect) return;
+  const current = loadDefaultTeacher();
+  el.defaultTeacherSelect.innerHTML =
+    '<option value="">- Pilih Pengajar Default -</option>' +
+    names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+  if (current && names.includes(current)) {
+    el.defaultTeacherSelect.value = current;
+  }
+}
+
+function loadDefaultTeacher() {
+  try {
+    return String(localStorage.getItem(DEFAULT_TEACHER_STORAGE_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function persistDefaultTeacher(name) {
+  try {
+    localStorage.setItem(DEFAULT_TEACHER_STORAGE_KEY, String(name || "").trim());
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function applyDefaultTeacherToWeekTable() {
+  const defaultTeacher = loadDefaultTeacher();
+  if (!defaultTeacher) return;
+  el.frontWeekTable.querySelectorAll("select.teacher-week").forEach((sel) => {
+    const options = Array.from(sel.options || []).map((o) => o.value);
+    if (options.includes(defaultTeacher) && (!sel.value || sel.value === "-")) {
+      sel.value = defaultTeacher;
+    }
   });
 }
 
@@ -2498,7 +2572,7 @@ async function loadInvoiceHistory({ silent = false, forceServer = false } = {}) 
 function renderInvoiceHistoryTable() {
   if (!el.invoiceHistoryTableBody) return;
   if (state.invoiceHistory.length === 0) {
-    el.invoiceHistoryTableBody.innerHTML = '<tr><td colspan="6" class="empty">Belum ada riwayat invoice.</td></tr>';
+    el.invoiceHistoryTableBody.innerHTML = '<tr><td colspan="7" class="empty">Belum ada riwayat invoice.</td></tr>';
     return;
   }
 
@@ -2506,14 +2580,19 @@ function renderInvoiceHistoryTable() {
     .map((item) => {
       const grandTotal = Number(item?.totals?.grandTotal || 0);
       const invoiceDate = item.invoiceDate && isValidIsoDate(item.invoiceDate) ? item.invoiceDate : "-";
+      const paymentDeadline = item.paymentDeadline && isValidIsoDate(item.paymentDeadline) ? item.paymentDeadline : "-";
       return `
       <tr>
         <td>${escapeHtml(item.invoiceNo || "-")}</td>
         <td>${invoiceDate === "-" ? "-" : escapeHtml(formatTanggal(new Date(invoiceDate)))}</td>
+        <td>${paymentDeadline === "-" ? "-" : escapeHtml(formatTanggal(new Date(paymentDeadline)))}</td>
         <td>${escapeHtml(item.student || "-")}</td>
         <td>${escapeHtml(item.mode || "-")}</td>
         <td>${formatRupiah(grandTotal)}</td>
-        <td><button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}">Lihat</button></td>
+        <td>
+          <button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="view">Lihat</button>
+          <button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="download">Download PNG</button>
+        </td>
       </tr>`;
     })
     .join("");
@@ -2539,12 +2618,139 @@ function showInvoiceHistoryPreview(item) {
     <h4>${escapeHtml(item.invoiceNo || "Invoice")}</h4>
     <div><strong>Siswa:</strong> ${escapeHtml(item.student || "-")}</div>
     <div><strong>Tanggal:</strong> ${escapeHtml(item.invoiceDate || "-")}</div>
+    <div><strong>Deadline Pembayaran:</strong> ${escapeHtml(item.paymentDeadline || item.invoiceDate || "-")}</div>
     <div><strong>Mode:</strong> ${escapeHtml(item.mode || "-")}</div>
     <div><strong>Pengajar:</strong> ${escapeHtml(teacherList || "-")}</div>
     <div><strong>Total:</strong> ${formatRupiah(Number(item?.totals?.grandTotal || 0))}</div>
     <div><strong>Rincian Sesi:</strong></div>
     <ol class="history-items">${htmlItems || "<li>Tidak ada rincian sesi.</li>"}</ol>
   `;
+}
+
+function redownloadInvoiceFromHistory(item) {
+  const items = Array.isArray(item.items) ? item.items : [];
+  const detail = item.studentDetail || {};
+  const teachers = Array.isArray(item.teachers) ? item.teachers : [];
+  const totals = item.totals || { baseTotal: 0, totalDurasi: 0, diskonPersen: 0, diskonNominal: 0, grandTotal: 0 };
+  const paymentDeadline = String(item.paymentDeadline || item.invoiceDate || "").trim();
+  const bankList = getBankListForInvoice(teachers);
+
+  const rowsHtml = items
+    .map((s, i) => {
+      const tanggalRaw = String(s.tanggal || "").trim();
+      const tanggalDate = parseDateFlex(tanggalRaw) || parseDateInput(tanggalRaw);
+      const tanggalText = tanggalDate ? formatTanggal(tanggalDate) : escapeHtml(tanggalRaw || "-");
+      const hari = String(s.hari || "-");
+      const jamMulai = String(s.jamMulai || "-");
+      const jamSelesai = String(s.jamSelesai || "-");
+      const pengajar = String(s.pengajar || "-");
+      const topik = String(s.topik || "-");
+      const durasi = Number(s.durasi || 0);
+      const tarifPerJam = Number(s.tarifPerJam || 0);
+      const pesertaCount = Number(s.pesertaCount || 1);
+      const subtotal = Number(s.subtotal || 0);
+      const catatan = String(s.catatan || "-");
+
+      return `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${escapeHtml(hari)}</td>
+        <td>${tanggalText}</td>
+        <td>${escapeHtml(formatJamRange(jamMulai, jamSelesai))}</td>
+        <td>${escapeHtml(pengajar)}</td>
+        <td>${escapeHtml(topik)}</td>
+        <td>${durasi.toFixed(2)}</td>
+        <td>${formatRupiah(tarifPerJam)}</td>
+        <td>${pesertaCount}</td>
+        <td>${formatRupiah(subtotal)}</td>
+        <td>${escapeHtml(catatan)}</td>
+      </tr>
+    `;
+    })
+    .join("");
+
+  const invoiceDate = parseDateInput(String(item.invoiceDate || "")) || new Date();
+  const invoiceNo = String(item.invoiceNo || "INV").trim() || "INV";
+  const schoolAndClass = `${detail.sekolah || "-"} / ${detail.kelas || "-"}`;
+
+  el.preview.innerHTML = `
+    <article class="invoice-sheet landscape">
+      <div class="print-page-header">
+        <div><strong>${escapeHtml(invoiceNo)}</strong></div>
+        <div class="print-header-logo"><img src="Logo.png" alt="Logo" /></div>
+      </div>
+
+      <div class="invoice-top">
+        <div class="invoice-left">
+          <div class="invoice-title-box"><div class="invoice-title">${escapeHtml(item.title || "INVOICE")}</div></div>
+          <div class="badge">
+            <div><strong>No:</strong> ${escapeHtml(invoiceNo)}</div>
+            <div><strong>Tanggal:</strong> ${formatTanggalPanjang(invoiceDate)}</div>
+          </div>
+        </div>
+        <div class="invoice-right">
+          <div class="invoice-logo" aria-label="Logo Rumah Belajar Pak Gun">
+            <img src="Logo.png" alt="Logo Rumah Belajar Pak Gun" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+            <span class="logo-fallback">LOGO</span>
+          </div>
+        </div>
+      </div>
+
+      <section class="student-info-box">
+        <div><strong>Nama Siswa:</strong> ${escapeHtml(item.student || "-")}</div>
+        <div><strong>Nama Lengkap:</strong> ${escapeHtml(detail.fullName || "-")}</div>
+        <div><strong>Nama Orang Tua:</strong> ${escapeHtml(detail.parentName || "-")}</div>
+        <div><strong>Sekolah / Kelas:</strong> ${escapeHtml(schoolAndClass)}</div>
+        <div class="student-full"><strong>Pengajar Terlibat:</strong> ${escapeHtml(teachers.join(", ") || "-")}</div>
+      </section>
+
+      <table class="invoice-table">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Hari</th>
+            <th>Tanggal</th>
+            <th>Jam</th>
+            <th>Pengajar</th>
+            <th>Topik/Mapel</th>
+            <th>Durasi</th>
+            <th>Tarif/Jam</th>
+            <th>Peserta</th>
+            <th>Subtotal</th>
+            <th>Catatan</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+
+      <div class="invoice-footer-grid">
+        <div class="bank-box">
+          <h4>Informasi Pembayaran</h4>
+          ${renderAllBankRows(bankList)}
+          <label class="deadline-field">
+            <span>Deadline Pembayaran</span>
+            <input id="invoiceDeadline" type="date" value="${escapeHtml(paymentDeadline)}" disabled />
+          </label>
+        </div>
+        <div class="total-box">
+          <div><span>Total Durasi</span><span>${Number(totals.totalDurasi || 0).toFixed(2)} jam</span></div>
+          <div><span>Subtotal</span><span>${formatRupiah(Number(totals.baseTotal || 0))}</span></div>
+          <div><span>Diskon Invoice</span><span>${Number(totals.diskonPersen || 0)}% (${formatRupiah(Number(totals.diskonNominal || 0))})</span></div>
+          <div><span>Total Tagihan</span><span>${formatRupiah(Number(totals.grandTotal || 0))}</span></div>
+        </div>
+      </div>
+
+      <div class="print-page-footer">
+        <span>${escapeHtml(invoiceNo)}</span>
+        <span class="page-count"></span>
+      </div>
+    </article>
+  `;
+
+  state.currentInvoiceId = invoiceNo;
+  el.btnDownloadPng.disabled = false;
+  if (el.btnPreviewPng) el.btnPreviewPng.disabled = false;
+  void downloadPng();
 }
 
 function bankGuruToRows(bankList) {
