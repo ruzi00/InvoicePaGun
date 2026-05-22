@@ -6,12 +6,12 @@ const FIREBASE_INVOICE_COLLECTION = "invoice_records";
 const FIREBASE_SOURCE_KINDS = ["students", "pricing", "discount", "bank", "holiday", "attendance", "template_after"];
 const FIREBASE_SHARED_OWNER_UID = "bimbelpakgun-shared";
 const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyATOra_DTbyKzS-YY7KyRqBWLmeGPqReKY",
+  authDomain: "bimbelpakgun.firebaseapp.com",
+  projectId: "bimbelpakgun",
+  storageBucket: "bimbelpakgun.firebasestorage.app",
+  messagingSenderId: "1089600700256",
+  appId: "1:1089600700256:web:1e99ba6cd2c2e88592a805",
 };
 
 const state = {
@@ -1760,7 +1760,8 @@ function renderTeacherPortionRows(portions) {
 function calculateInvoiceTotals(selectedSessions) {
   const baseTotal = selectedSessions.reduce((sum, s) => sum + s.subtotal, 0);
   const totalDurasi = selectedSessions.reduce((sum, s) => sum + s.durasi, 0);
-  const diskonPersen = pickDiskonByDurasi(totalDurasi);
+  const hasGroupSession = selectedSessions.some((s) => Number(s?.pesertaCount || 1) > 1);
+  const diskonPersen = hasGroupSession ? pickDiskonByDurasi(totalDurasi) : 0;
   const diskonNominal = (baseTotal * diskonPersen) / 100;
   const grandTotal = Math.max(0, baseTotal - diskonNominal);
   return { baseTotal, totalDurasi, diskonPersen, diskonNominal, grandTotal };
