@@ -2537,10 +2537,7 @@ function getFirebaseWriteOwnerUid() {
 }
 
 function getFirebaseReadOwnerUidCandidates() {
-  const uid = String(state.firebase.user?.uid || "").trim();
-  const list = [FIREBASE_SHARED_OWNER_UID];
-  if (uid && uid !== FIREBASE_SHARED_OWNER_UID) list.push(uid);
-  return list;
+  return [FIREBASE_SHARED_OWNER_UID];
 }
 
 async function loadSourcesFromFirebase({ silent = false, forceServer = false } = {}) {
@@ -2631,9 +2628,6 @@ async function loadSourcesFromFirebase({ silent = false, forceServer = false } =
   }
 
   setFirebaseStatus(`Data Firebase dimuat: ${loaded.join(", ")}.`, "ok");
-  if (resolvedOwnerUid && resolvedOwnerUid !== FIREBASE_SHARED_OWNER_UID) {
-    setFirebaseStatus(`Data Firebase dimuat dari scope lama akun ini. Klik Simpan Data ke Firebase untuk sinkron ke shared cloud.`, "warn");
-  }
   if (!silent) alert(`Data Firebase dimuat: ${loaded.join(", ")}`);
 }
 
@@ -2803,7 +2797,7 @@ async function loadInvoiceHistory({ silent = false, forceServer = false, directi
   if (el.invoiceHistoryStatus) {
     el.invoiceHistoryStatus.textContent = state.invoiceHistory.length
       ? `Menampilkan ${state.invoiceHistory.length} invoice (halaman ${queryState.currentPage}).`
-      : "Belum ada riwayat invoice di Firebase untuk akun ini.";
+      : "Belum ada riwayat invoice di shared cloud Firebase.";
   }
 
   if (!silent && state.invoiceHistory.length > 0) {
