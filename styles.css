@@ -359,18 +359,13 @@ textarea {
   vertical-align: top;
 }
 
-.cal-time-head,
-.cal-time-axis {
-  width: 110px;
-  min-width: 110px;
+.cal-day-head,
+.cal-day-axis {
+  width: 84px;
+  min-width: 84px;
   background: #f3e7cf;
   color: #574730;
   font-weight: 700;
-}
-
-.cal-week-day {
-  background: #f8efe0;
-  color: #5a4932;
 }
 
 .cal-week-day-group {
@@ -379,23 +374,24 @@ textarea {
   text-align: center;
 }
 
-.cal-week-day span {
+.cal-day-axis span {
   display: block;
   font-size: 0.78rem;
   font-weight: 600;
 }
 
-.cal-week-day strong {
+.cal-day-axis strong {
   display: block;
   font-size: 1rem;
 }
 
 .cal-slot-cell {
-  min-width: 98px;
+  min-width: 86px;
   background: #fffdfa;
 }
 
-.cal-teacher-head {
+.cal-teacher-head,
+.cal-teacher-axis {
   min-width: 92px;
   background: #fcf6ea;
   color: #624f36;
@@ -405,11 +401,17 @@ textarea {
 }
 
 .cal-slot-cell.out-range,
-.cal-week-day.out-range,
 .cal-week-day-group.out-range,
+.cal-day-axis.out-range,
+.cal-teacher-axis.out-range,
 .cal-teacher-head.out-range {
   background: #ececec !important;
   color: #8a8a8a;
+}
+
+.day-separator-top th,
+.day-separator-top td {
+  border-top: 3px solid #baa077;
 }
 
 .cal-slot-item {
@@ -435,6 +437,15 @@ textarea {
 
 .cal-time-head.subhead {
   font-size: 0.78rem;
+}
+
+.cal-time-head-col {
+  min-width: 92px;
+  background: #f8efe0;
+  color: #5a4932;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .cal-slot-item.issued {
@@ -982,6 +993,35 @@ td .mini {
 
   .panel {
     padding: 12px;
+  }
+
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .workflow-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .preview-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  table {
+    min-width: 760px;
+  }
+
+  .calendar-week-table {
+    min-width: 900px;
   }
 
   .invoice-preview {

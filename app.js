@@ -3095,30 +3095,22 @@ function renderInvoiceCalendar() {
   const teachers = [...teacherSet].sort((a, b) => a.localeCompare(b, "id"));
   if (teachers.length === 0) teachers.push("Tanpa Pengajar");
 
-  const headerDayCells = weekDays
-    .map((d) => {
-      const outRange = d < start || d > end;
-      return `<th class="cal-week-day-group ${outRange ? "out-range" : ""}" colspan="${teachers.length}"><span>${escapeHtml(HARI[d.getDay()])}</span><strong>${d.getDate()}</strong></th>`;
-    })
+  const headerTimeCells = timeLabels
+    .map((timeLabel) => `<th class="cal-time-head-col">${escapeHtml(timeLabel)}</th>`)
     .join("");
 
-  const headerTeacherCells = weekDays
+  const bodyRows = weekDays
     .map((d) => {
       const outRange = d < start || d > end;
+      const dayKey = toLocalDateInputValue(d);
       return teachers
-        .map((teacher) => `<th class="cal-teacher-head ${outRange ? "out-range" : ""}">${escapeHtml(teacher)}</th>`)
-        .join("");
-    })
-    .join("");
+        .map((teacher, teacherIndex) => {
+          const dayLabelCell = teacherIndex === 0
+            ? `<th class="cal-day-axis ${outRange ? "out-range" : ""}" rowspan="${teachers.length}"><span>${escapeHtml(HARI[d.getDay()])}</span><strong>${d.getDate()}</strong></th>`
+            : "";
 
-  const bodyRows = timeLabels
-    .map((timeLabel) => {
-      const rowCells = weekDays
-        .map((d) => {
-          const outRange = d < start || d > end;
-          const dayKey = toLocalDateInputValue(d);
-          return teachers
-            .map((teacher) => {
+          const timeCells = timeLabels
+            .map((timeLabel) => {
               const slotKey = `${dayKey}__${timeLabel}__${teacher}`;
               const entries = slotMap.get(slotKey) || [];
               const cards = entries
@@ -3130,10 +3122,10 @@ function renderInvoiceCalendar() {
               return `<td class="cal-slot-cell ${outRange ? "out-range" : ""}">${cards || ""}</td>`;
             })
             .join("");
+
+          return `<tr class="${teacherIndex === 0 ? "day-separator-top" : ""}">${dayLabelCell}<th class="cal-teacher-axis ${outRange ? "out-range" : ""}">${escapeHtml(teacher)}</th>${timeCells}</tr>`;
         })
         .join("");
-
-      return `<tr><th class="cal-time-axis">${escapeHtml(timeLabel)}</th>${rowCells}</tr>`;
     })
     .join("");
 
@@ -3142,12 +3134,9 @@ function renderInvoiceCalendar() {
       <table class="calendar-week-table">
         <thead>
           <tr>
-            <th class="cal-time-head">Jam Tutor</th>
-            ${headerDayCells}
-          </tr>
-          <tr>
-            <th class="cal-time-head subhead">Pengajar</th>
-            ${headerTeacherCells}
+            <th class="cal-day-head">Hari</th>
+            <th class="cal-teacher-head">Pengajar</th>
+            ${headerTimeCells}
           </tr>
         </thead>
         <tbody>
