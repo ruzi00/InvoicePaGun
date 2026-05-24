@@ -25,6 +25,7 @@
       <div class="workflow-groups" role="tablist" aria-label="Grup Menu">
         <button type="button" class="workflow-group active" data-group="invoice" role="tab" aria-selected="true">Invoice Group</button>
         <button type="button" class="workflow-group" data-group="data" role="tab" aria-selected="false">Data Management Group</button>
+        <button type="button" class="workflow-group" data-group="operations" role="tab" aria-selected="false">Operations Group</button>
       </div>
 
       <div class="workflow-tabs" role="tablist" aria-label="Mode dan Dashboard">
@@ -37,6 +38,10 @@
         <button type="button" class="workflow-tab" data-group="data" data-tab="discount" role="tab" aria-selected="false">Diskon</button>
         <button type="button" class="workflow-tab" data-group="data" data-tab="bank" role="tab" aria-selected="false">Bank Guru</button>
         <button type="button" class="workflow-tab" data-group="data" data-tab="holiday" role="tab" aria-selected="false">Hari Libur</button>
+        <button type="button" class="workflow-tab" data-group="operations" data-tab="attendance_input" role="tab" aria-selected="false">Attendance Input</button>
+        <button type="button" class="workflow-tab" data-group="operations" data-tab="attendance" role="tab" aria-selected="false">Attendance Recap</button>
+        <button type="button" class="workflow-tab" data-group="operations" data-tab="receivables" role="tab" aria-selected="false">Receivables</button>
+        <button type="button" class="workflow-tab" data-group="operations" data-tab="reminders" role="tab" aria-selected="false">Reminder Center</button>
       </div>
 
       <div class="grid-2">
@@ -280,37 +285,12 @@
 
       <section id="afterSection" class="mode-section hidden">
         <h3>Sumber Absensi Payment After</h3>
-        <div class="grid-1 csv-control-group">
-          <div class="field actions-inline">
-            <span>&nbsp;</span>
-            <button id="btnDownloadAfterTemplate" type="button" class="btn sekund">Download Template Payment After (CSV)</button>
-          </div>
-        </div>
-        <div class="grid-2 csv-control-group">
-          <label class="field">
-            <span>File CSV Absensi</span>
-            <input id="csvFile" type="file" accept=".csv,text/csv" />
-          </label>
-          <div class="field actions-inline">
-            <span>&nbsp;</span>
-            <button id="btnContoh" type="button" class="btn sekund">Info Absensi</button>
-          </div>
-        </div>
+        <p class="sub">Payment After sekarang memakai data dari Attendance Input (Operations Group). Import CSV absensi dilakukan dari tab Attendance Input.</p>
         <div class="grid-2">
           <label class="field">
-            <span>URL Google Sheet Absensi</span>
-            <input id="sheetUrl" type="text" placeholder="Tempel URL Google Sheet absensi" />
-          </label>
-          <div class="field actions-inline">
-            <span>&nbsp;</span>
-            <button id="btnMuatSheet" type="button" class="btn">Muat Absensi dari Google Sheet</button>
-          </div>
-        </div>
-        <div class="grid-2">
-          <label class="field">
-            <span>Daftar Tanggal Invoice (dari CSV Absensi)</span>
+            <span>Daftar Tanggal Invoice (dari Attendance Data)</span>
             <select id="afterInvoiceDateSelect">
-              <option value="">Belum ada tanggal dari CSV</option>
+              <option value="">Belum ada tanggal attendance</option>
             </select>
           </label>
           <div class="field actions-inline">
@@ -358,11 +338,12 @@
                 <th>Tanggal Invoice</th>
                 <th>Deadline</th>
                 <th>Status</th>
+                <th>Catatan Pembayaran</th>
                 <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="6" class="empty">Belum ada data invoice.</td></tr>
+              <tr><td colspan="7" class="empty">Belum ada data invoice.</td></tr>
             </tbody>
           </table>
         </div>
@@ -409,22 +390,14 @@
                 <th>No</th>
                 <th>Nama Panggilan</th>
                 <th>Nama Lengkap</th>
-                <th>L/P</th>
                 <th>Kelas</th>
-                <th>H1</th>
-                <th>Kelas Selanjutnya</th>
-                <th>H2</th>
                 <th>Sekolah</th>
-                <th>WA Siswa</th>
-                <th>Nama Orang Tua/Wali</th>
-                <th>WA Orang Tua</th>
-                <th>Riwayat Les</th>
                 <th>Student ID</th>
                 <th>Aksi</th>
               </tr>
             </thead>
             <tbody id="studentManageTableBody">
-              <tr><td colspan="15" class="empty">Belum ada data siswa.</td></tr>
+              <tr><td colspan="7" class="empty">Belum ada data siswa.</td></tr>
             </tbody>
           </table>
         </div>
@@ -443,7 +416,7 @@
 
         <dialog id="studentCreateModal" class="student-modal">
           <form method="dialog" id="studentCreateForm" class="student-modal-form">
-            <h4>Tambah Siswa Baru</h4>
+            <h4 id="studentFormTitle">Tambah Siswa Baru</h4>
             <div class="grid-3">
               <label class="field"><span>Nama Lengkap Siswa</span><input id="studentFormFullName" type="text" required /></label>
               <label class="field"><span>Nama Panggilan Siswa</span><input id="studentFormNickname" type="text" /></label>
@@ -608,6 +581,140 @@
             </thead>
             <tbody id="holidayManageTableBody">
               <tr><td colspan="5" class="empty">Belum ada data hari libur.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="attendanceOperationsSection" class="mode-section hidden">
+        <h3>Attendance Recap</h3>
+        <p class="sub">Ringkasan cepat dari sumber absensi aktif untuk melihat kepadatan data dan siswa paling sering hadir.</p>
+        <div id="attendanceOpsSummary" class="operations-summary-grid">
+          <div class="operations-card"><span>Total Sesi</span><strong>0</strong></div>
+          <div class="operations-card"><span>Siswa Terdeteksi</span><strong>0</strong></div>
+          <div class="operations-card"><span>Rentang Data</span><strong>-</strong></div>
+        </div>
+        <div class="table-wrap">
+          <table id="attendanceOpsTable">
+            <thead>
+              <tr>
+                <th>Nama Siswa</th>
+                <th>Total Hadir</th>
+                <th>Sesi Terakhir</th>
+                <th>Format Sumber</th>
+              </tr>
+            </thead>
+            <tbody id="attendanceOpsTableBody">
+              <tr><td colspan="4" class="empty">Belum ada data absensi.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="attendanceInputOperationsSection" class="mode-section hidden">
+        <h3>Attendance Input</h3>
+        <p class="sub">Input absensi harian per sesi secara langsung. Data disimpan per baris ke Firebase agar aman untuk multi-operator.</p>
+        <div class="toolbar">
+          <button id="btnDownloadAfterTemplate" type="button" class="btn sekund">Download Absensi Template (CSV)</button>
+          <button id="btnAttendanceInputSeedDummy" type="button" class="btn sekund">Isi Dummy Attendance</button>
+        </div>
+        <div class="grid-2 csv-control-group">
+          <label class="field">
+            <span>Import CSV Absensi</span>
+            <input id="csvFile" type="file" accept=".csv,text/csv" />
+          </label>
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnContoh" type="button" class="btn sekund">Info Absensi</button>
+          </div>
+        </div>
+        <div class="grid-2">
+          <label class="field">
+            <span>URL Google Sheet Absensi</span>
+            <input id="sheetUrl" type="text" placeholder="Tempel URL Google Sheet absensi" />
+          </label>
+          <div class="field actions-inline">
+            <span>&nbsp;</span>
+            <button id="btnMuatSheet" type="button" class="btn">Import dari Google Sheet</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button id="btnAttendanceInputAddRow" type="button" class="btn sekund">Tambah Baris Attendance</button>
+          <button id="btnAttendanceInputSaveAll" type="button" class="btn" disabled>Simpan Semua ke Firebase</button>
+        </div>
+        <div class="table-wrap">
+          <table id="attendanceInputTable">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Tanggal</th>
+                <th>Siswa</th>
+                <th>Status</th>
+                <th>Jam Mulai</th>
+                <th>Jam Selesai</th>
+                <th>Pengajar</th>
+                <th>Peserta</th>
+                <th>Topik</th>
+                <th>Catatan</th>
+                <th>Attendance ID</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="attendanceInputTableBody">
+              <tr><td colspan="12" class="empty">Belum ada data attendance input.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="receivablesOperationsSection" class="mode-section hidden">
+        <h3>Receivables</h3>
+        <p class="sub">Pantau invoice issued yang masih terbuka, jatuh tempo, dan total outstanding tanpa masuk ke editor invoice.</p>
+        <div id="receivablesOpsSummary" class="operations-summary-grid">
+          <div class="operations-card"><span>Open Invoice</span><strong>0</strong></div>
+          <div class="operations-card"><span>Overdue</span><strong>0</strong></div>
+          <div class="operations-card"><span>Outstanding</span><strong>Rp0</strong></div>
+        </div>
+        <div class="table-wrap">
+          <table id="receivablesOpsTable">
+            <thead>
+              <tr>
+                <th>No Invoice</th>
+                <th>Siswa</th>
+                <th>Deadline</th>
+                <th>Status</th>
+                <th>Total</th>
+                <th>Umur Piutang</th>
+              </tr>
+            </thead>
+            <tbody id="receivablesOpsTableBody">
+              <tr><td colspan="6" class="empty">Hubungkan Firebase untuk memuat piutang.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="remindersOperationsSection" class="mode-section hidden">
+        <h3>Reminder Center</h3>
+        <p class="sub">Siapkan template follow-up manual untuk invoice unpaid. Tombol di sini hanya menyalin pesan, belum mengirim WhatsApp otomatis.</p>
+        <div id="remindersOpsSummary" class="operations-summary-grid">
+          <div class="operations-card"><span>Perlu Follow-up</span><strong>0</strong></div>
+          <div class="operations-card"><span>Punya Kontak WA</span><strong>0</strong></div>
+          <div class="operations-card"><span>Tanpa Kontak</span><strong>0</strong></div>
+        </div>
+        <div class="table-wrap">
+          <table id="remindersOpsTable">
+            <thead>
+              <tr>
+                <th>No Invoice</th>
+                <th>Siswa</th>
+                <th>WA Orang Tua</th>
+                <th>Deadline</th>
+                <th>Pesan</th>
+              </tr>
+            </thead>
+            <tbody id="remindersOpsTableBody">
+              <tr><td colspan="5" class="empty">Hubungkan Firebase untuk memuat reminder.</td></tr>
             </tbody>
           </table>
         </div>

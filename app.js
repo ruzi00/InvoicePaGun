@@ -3,8 +3,10 @@ const FIREBASE_CONFIG_STORAGE_KEY = "invoice-firebase-config";
 const DEFAULT_TEACHER_STORAGE_KEY = "invoice-default-teacher";
 const FIREBASE_SOURCE_COLLECTION = "invoice_sources";
 const FIREBASE_STUDENT_COLLECTION = "student_details";
+const FIREBASE_ATTENDANCE_COLLECTION = "attendance_records";
 const FIREBASE_INVOICE_COLLECTION = "invoice_records";
 const FIREBASE_SOURCE_KINDS = ["students", "pricing", "discount", "bank", "holiday", "attendance", "template_after"];
+const APP_TIME_ZONE = "Asia/Jakarta";
 const STUDENT_CSV_HEADERS = [
   "No.",
   "Nama Lengkap Siswa",
@@ -53,11 +55,16 @@ const TAB_GROUP_MAP = {
   discount: "data",
   bank: "data",
   holiday: "data",
+  attendance_input: "operations",
+  attendance: "operations",
+  receivables: "operations",
+  reminders: "operations",
 };
 
 const GROUP_TABS = {
   invoice: ["front", "after", "calendar", "status"],
   data: ["students", "pricing", "discount", "bank", "holiday"],
+  operations: ["attendance_input", "attendance", "receivables", "reminders"],
 };
 
 const state = {
@@ -67,15 +74,18 @@ const state = {
   lastTabByGroup: {
     invoice: "front",
     data: "students",
+    operations: "attendance_input",
   },
   currentInvoiceId: "",
   autoLoadTried: false,
+  calendarWeekAutoFocus: true,
   students: [],
   studentsByNickname: new Map(),
   studentsByFullName: new Map(),
   studentsById: new Map(),
   absensiRows: [],
   absensiHeaders: [],
+  attendanceEntries: [],
   sessions: [],
   tarif: {
     weekdays: {},
@@ -115,10 +125,12 @@ const state = {
     currentPage: 1,
     gradeFilter: "",
   },
+  studentFormEditIndex: -1,
   pricingManageRows: [],
   discountManageRows: [],
   bankManageRows: [],
   holidayManageRows: [],
+  operationsReminderRows: [],
   firebase: {
     app: null,
     auth: null,
@@ -187,6 +199,20 @@ const el = {
   discountManagementSection: document.getElementById("discountManagementSection"),
   bankManagementSection: document.getElementById("bankManagementSection"),
   holidayManagementSection: document.getElementById("holidayManagementSection"),
+  attendanceOperationsSection: document.getElementById("attendanceOperationsSection"),
+  attendanceOpsSummary: document.getElementById("attendanceOpsSummary"),
+  attendanceOpsTableBody: document.getElementById("attendanceOpsTableBody"),
+  attendanceInputOperationsSection: document.getElementById("attendanceInputOperationsSection"),
+  attendanceInputTableBody: document.getElementById("attendanceInputTableBody"),
+  btnAttendanceInputAddRow: document.getElementById("btnAttendanceInputAddRow"),
+  btnAttendanceInputSaveAll: document.getElementById("btnAttendanceInputSaveAll"),
+  btnAttendanceInputSeedDummy: document.getElementById("btnAttendanceInputSeedDummy"),
+  receivablesOperationsSection: document.getElementById("receivablesOperationsSection"),
+  receivablesOpsSummary: document.getElementById("receivablesOpsSummary"),
+  receivablesOpsTableBody: document.getElementById("receivablesOpsTableBody"),
+  remindersOperationsSection: document.getElementById("remindersOperationsSection"),
+  remindersOpsSummary: document.getElementById("remindersOpsSummary"),
+  remindersOpsTableBody: document.getElementById("remindersOpsTableBody"),
   btnCalendarRefresh: document.getElementById("btnCalendarRefresh"),
   btnDownloadCalendarCurrentMonth: document.getElementById("btnDownloadCalendarCurrentMonth"),
   btnDownloadCalendarNextMonth: document.getElementById("btnDownloadCalendarNextMonth"),
@@ -211,6 +237,7 @@ const el = {
   btnStudentManageSaveFirebase: document.getElementById("btnStudentManageSaveFirebase"),
   studentCreateModal: document.getElementById("studentCreateModal"),
   studentCreateForm: document.getElementById("studentCreateForm"),
+  studentFormTitle: document.getElementById("studentFormTitle"),
   studentFormFullName: document.getElementById("studentFormFullName"),
   studentFormNickname: document.getElementById("studentFormNickname"),
   studentFormGender: document.getElementById("studentFormGender"),
@@ -369,6 +396,10 @@ function initialize() {
   renderDiscountManagementTable();
   renderBankManagementTable();
   renderHolidayManagementTable();
+  renderAttendanceInputSection();
+  renderAttendanceOperationsSection();
+  renderReceivablesOperationsSection();
+  renderRemindersOperationsSection();
   renderInvoiceHistoryTable();
   void initializeDataSources();
 }
@@ -514,7 +545,12 @@ function bindEvents() {
   el.csvFile.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    loadAbsensiCsv(await file.text());
+    const text = await file.text();
+    loadAbsensiCsv(text);
+    const added = appendAttendanceEntriesFromCsvText(text);
+    if (added > 0) {
+      setFirebaseStatus(`Import attendance selesai: ${added} baris ditambahkan.`, "ok");
+    }
   });
 
   el.btnContoh.addEventListener("click", async () => {
@@ -571,7 +607,12 @@ function bindEvents() {
   el.btnMuatSheet.addEventListener("click", async () => {
     try {
       const url = toGoogleSheetCsvUrl((el.sheetUrl.value || "").trim());
-      loadAbsensiCsv(await fetchCsv(url, "Gagal mengambil absensi dari Google Sheet."));
+      const text = await fetchCsv(url, "Gagal mengambil absensi dari Google Sheet.");
+      loadAbsensiCsv(text);
+      const added = appendAttendanceEntriesFromCsvText(text);
+      if (added > 0) {
+        setFirebaseStatus(`Import attendance dari Google Sheet selesai: ${added} baris ditambahkan.`, "ok");
+      }
     } catch (err) {
       alert(err.message);
     }
@@ -629,12 +670,14 @@ function bindEvents() {
 
   el.btnCalendarPrevWeek?.addEventListener("click", () => {
     if (state.calendarWeekIndex <= 0) return;
+    state.calendarWeekAutoFocus = false;
     state.calendarWeekIndex -= 1;
     renderInvoiceCalendar();
   });
 
   el.btnCalendarNextWeek?.addEventListener("click", () => {
     if (state.calendarWeekIndex >= Math.max(0, state.calendarWeekCount - 1)) return;
+    state.calendarWeekAutoFocus = false;
     state.calendarWeekIndex += 1;
     renderInvoiceCalendar();
   });
@@ -657,13 +700,146 @@ function bindEvents() {
     }
   });
 
+  el.btnAttendanceInputAddRow?.addEventListener("click", () => {
+    const student = getSelectedStudentRecord();
+    const now = getCurrentTimeInZone();
+    state.attendanceEntries.unshift(normalizeAttendanceEntry({
+      tanggal: toLocalDateInputValue(now),
+      studentId: String(student?.studentId || "").trim(),
+      studentName: String(student?.nickname || student?.fullName || getSelectedStudentName() || "").trim(),
+      status: "hadir",
+      jamMulai: "19:30",
+      jamSelesai: "21:00",
+      pengajar: String(loadDefaultTeacher() || "-").trim() || "-",
+      pesertaCount: 1,
+      topik: "-",
+      catatan: "",
+    }));
+    renderAttendanceInputSection();
+    renderAttendanceOperationsSection();
+    if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
+  });
+
+  el.btnAttendanceInputSaveAll?.addEventListener("click", async () => {
+    if (!state.firebase.ready) {
+      alert("Hubungkan Firebase terlebih dahulu.");
+      return;
+    }
+    try {
+      await saveAllAttendanceEntriesToFirebase();
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal menyimpan attendance ke Firebase.", "error");
+      alert(err.message);
+    }
+  });
+
+  el.btnAttendanceInputSeedDummy?.addEventListener("click", () => {
+    const baseStudents = (state.students || []).slice(0, 6);
+    if (baseStudents.length === 0) {
+      alert("Belum ada data siswa. Tambahkan siswa terlebih dahulu untuk membuat dummy attendance.");
+      return;
+    }
+
+    const now = getCurrentTimeInZone();
+    const teachers = [String(loadDefaultTeacher() || "").trim() || "-", "Rensie", "Trias"];
+    const topics = ["Matematika", "Fisika", "Kimia", "Bahasa Inggris"];
+    const generated = [];
+
+    for (let dayOffset = 0; dayOffset < 3; dayOffset += 1) {
+      const date = addDays(now, -dayOffset);
+      baseStudents.forEach((student, idx) => {
+        const status = (dayOffset === 1 && idx % 4 === 0) ? "izin" : "hadir";
+        generated.push(normalizeAttendanceEntry({
+          tanggal: toLocalDateInputValue(date),
+          studentId: String(student.studentId || "").trim(),
+          studentName: String(student.nickname || student.fullName || "").trim(),
+          status,
+          jamMulai: idx % 2 === 0 ? "19:30" : "17:00",
+          jamSelesai: idx % 2 === 0 ? "21:00" : "18:30",
+          pengajar: teachers[idx % teachers.length],
+          pesertaCount: (idx % 3) + 1,
+          topik: `${topics[idx % topics.length]} - Dummy`,
+          catatan: status === "hadir" ? "Dummy data otomatis" : "Izin - dummy data",
+        }));
+      });
+    }
+
+    const existing = sortAttendanceEntries(state.attendanceEntries || []);
+    const seen = new Set(existing.map((item) => attendanceEntryFingerprint(item)));
+    let added = 0;
+    generated.forEach((item) => {
+      const key = attendanceEntryFingerprint(item);
+      if (seen.has(key)) return;
+      seen.add(key);
+      existing.push(item);
+      added += 1;
+    });
+
+    state.attendanceEntries = sortAttendanceEntries(existing);
+    renderAttendanceInputSection();
+    renderAttendanceOperationsSection();
+    if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
+    alert(`Dummy attendance ditambahkan: ${added} baris.`);
+  });
+
+  el.attendanceInputTableBody?.addEventListener("click", async (event) => {
+    const saveBtn = event.target.closest("button[data-save-attendance]");
+    if (saveBtn) {
+      const rowIndex = Number.parseInt(String(saveBtn.dataset.saveAttendance || "-1"), 10);
+      if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.attendanceEntries.length) return;
+      const row = state.attendanceEntries[rowIndex];
+
+      const readField = (field) => String(el.attendanceInputTableBody.querySelector(`[data-row="${rowIndex}"][data-field="${field}"]`)?.value || "").trim();
+      row.tanggal = readField("tanggal");
+      row.studentName = readField("studentName");
+      row.status = normalizeAttendanceStatus(readField("status"));
+      row.jamMulai = readField("jamMulai");
+      row.jamSelesai = readField("jamSelesai");
+      row.pengajar = readField("pengajar") || "-";
+      row.pesertaCount = Math.max(1, Number.parseInt(readField("pesertaCount") || "1", 10) || 1);
+      row.topik = readField("topik") || "-";
+      row.catatan = readField("catatan");
+
+      const matchedStudent = (state.students || []).find((item) => normalizeName(item.nickname || item.fullName || "") === normalizeName(row.studentName || ""));
+      row.studentId = String(matchedStudent?.studentId || row.studentId || "").trim();
+
+      const normalized = normalizeAttendanceEntry(row, row.attendanceId);
+      state.attendanceEntries[rowIndex] = normalized;
+      renderAttendanceInputSection();
+      renderAttendanceOperationsSection();
+      if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
+
+      if (state.firebase.ready) {
+        await saveAttendanceEntryToFirebase(normalized);
+      }
+      return;
+    }
+
+    const removeBtn = event.target.closest("button[data-remove-attendance]");
+    if (removeBtn) {
+      const rowIndex = Number.parseInt(String(removeBtn.dataset.removeAttendance || "-1"), 10);
+      if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.attendanceEntries.length) return;
+      const target = state.attendanceEntries[rowIndex];
+      const agreed = window.confirm(`Hapus attendance ${target?.attendanceId || "baris ini"}?`);
+      if (!agreed) return;
+
+      state.attendanceEntries.splice(rowIndex, 1);
+      renderAttendanceInputSection();
+      renderAttendanceOperationsSection();
+      if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
+
+      if (state.firebase.ready && target?.attendanceId) {
+        await deleteAttendanceEntryFromFirebase(target.attendanceId);
+      }
+    }
+  });
+
   el.btnStudentManageAddRow?.addEventListener("click", () => {
-    if (!el.studentCreateModal) return;
-    el.studentCreateForm?.reset();
-    el.studentCreateModal.showModal();
+    openStudentFormForCreate();
   });
 
   el.btnStudentFormCancel?.addEventListener("click", () => {
+    state.studentFormEditIndex = -1;
     el.studentCreateModal?.close();
   });
 
@@ -676,7 +852,7 @@ function bindEvents() {
       return;
     }
 
-    state.students.push(normalizeStudentRecord({
+    const payload = {
       fullName,
       nickname,
       gender: String(el.studentFormGender?.value || "").trim(),
@@ -689,15 +865,30 @@ function bindEvents() {
       parentName: String(el.studentFormParentName?.value || "").trim(),
       parentWhatsapp: String(el.studentFormParentWa?.value || "").trim(),
       studyHistory: String(el.studentFormStudyHistory?.value || "").trim(),
-    }));
+    };
+
+    const editIndex = Number(state.studentFormEditIndex || -1);
+    let savedStudent = null;
+    if (Number.isInteger(editIndex) && editIndex >= 0 && editIndex < state.students.length) {
+      const current = state.students[editIndex] || {};
+      state.students[editIndex] = normalizeStudentRecord({ ...current, ...payload, studentId: current.studentId }, current.studentId || "");
+      savedStudent = state.students[editIndex];
+    } else {
+      const created = normalizeStudentRecord(payload);
+      state.students.push(created);
+      savedStudent = created;
+      state.studentManageQuery.currentPage = 1;
+    }
+
     normalizeStudentsState({ sort: false, syncEditors: true });
-    state.studentManageQuery.currentPage = 1;
     renderStudentManagementTable();
+    state.studentFormEditIndex = -1;
+    if (el.studentFormTitle) el.studentFormTitle.textContent = "Tambah Siswa Baru";
     el.studentCreateModal?.close();
 
-    const created = state.students[state.students.length - 1];
-    if (state.firebase.ready && created) {
-      await saveStudentRecordToFirebase(created);
+    if (state.firebase.ready && savedStudent) {
+      const refreshed = getStudentRecordById(savedStudent.studentId) || savedStudent;
+      await saveStudentRecordToFirebase(refreshed);
     }
   });
 
@@ -806,6 +997,14 @@ function bindEvents() {
   });
 
   el.studentManageTableBody?.addEventListener("click", (event) => {
+    const editBtn = event.target.closest("button[data-edit-student]");
+    if (editBtn) {
+      const rowIndex = Number.parseInt(String(editBtn.dataset.editStudent || "-1"), 10);
+      if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.students.length) return;
+      openStudentFormForEdit(rowIndex);
+      return;
+    }
+
     const saveBtn = event.target.closest("button[data-save-student]");
     if (saveBtn) {
       const rowIndex = Number.parseInt(String(saveBtn.dataset.saveStudent || "-1"), 10);
@@ -815,21 +1014,15 @@ function bindEvents() {
       const readField = (field) => String(el.studentManageTableBody.querySelector(`[data-row="${rowIndex}"][data-field="${field}"]`)?.value || "").trim();
       row.nickname = readField("nickname") || deriveNicknameFromFullName(readField("fullName"));
       row.fullName = readField("fullName");
-      row.gender = readField("gender");
       row.kelas = readField("kelas");
-      row.h1 = readField("h1");
-      row.nextGrade = readField("nextGrade");
-      row.h2 = readField("h2");
       row.sekolah = readField("sekolah");
-      row.studentWhatsapp = readField("studentWhatsapp");
-      row.parentName = readField("parentName");
-      row.parentWhatsapp = readField("parentWhatsapp");
-      row.studyHistory = readField("studyHistory");
 
+      const savedId = String(row.studentId || "").trim();
       normalizeStudentsState({ sort: false, syncEditors: true });
       renderStudentManagementTable();
       if (state.firebase.ready) {
-        void saveStudentRecordToFirebase(state.students[rowIndex]).catch((err) => setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error"));
+        const updated = getStudentRecordById(savedId) || row;
+        void saveStudentRecordToFirebase(updated).catch((err) => setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error"));
       }
       return;
     }
@@ -1116,9 +1309,11 @@ function bindEvents() {
     if (!historyId) return;
     const row = btn.closest("tr");
     const statusSelect = row?.querySelector("select[data-payment-status]");
+    const noteInput = row?.querySelector("input[data-payment-note]");
     const status = String(statusSelect?.value || "issued");
+    const note = String(noteInput?.value || "").trim();
     try {
-      await updateInvoicePaymentStatus(historyId, status);
+      await updateInvoicePaymentStatus(historyId, status, note);
       await refreshDashboardInvoices({ forceServer: true });
       renderPaymentStatusTable();
       renderInvoiceCalendar();
@@ -1134,6 +1329,27 @@ function bindEvents() {
     const normalized = normalizeInvoiceStatus(statusSelect.value);
     statusSelect.value = normalized;
     statusSelect.className = `payment-status-select ${normalized}`;
+  });
+
+  el.remindersOpsTableBody?.addEventListener("click", async (event) => {
+    const copyBtn = event.target.closest("button[data-copy-reminder]");
+    if (!copyBtn) return;
+    const historyId = String(copyBtn.dataset.copyReminder || "").trim();
+    if (!historyId) return;
+    const reminder = state.operationsReminderRows.find((item) => String(item.historyId || "") === historyId);
+    if (!reminder?.message) return;
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(reminder.message);
+        alert(`Pesan reminder ${reminder.invoiceNo || historyId} berhasil disalin.`);
+        return;
+      }
+    } catch {
+      // Fallback below.
+    }
+
+    window.prompt("Clipboard browser tidak tersedia. Salin pesan berikut:", reminder.message);
   });
 }
 
@@ -1580,6 +1796,10 @@ async function setActiveTab(nextTab, { force = false, group = "" } = {}) {
   el.discountManagementSection?.classList.toggle("hidden", tab !== "discount");
   el.bankManagementSection?.classList.toggle("hidden", tab !== "bank");
   el.holidayManagementSection?.classList.toggle("hidden", tab !== "holiday");
+  el.attendanceInputOperationsSection?.classList.toggle("hidden", tab !== "attendance_input");
+  el.attendanceOperationsSection?.classList.toggle("hidden", tab !== "attendance");
+  el.receivablesOperationsSection?.classList.toggle("hidden", tab !== "receivables");
+  el.remindersOperationsSection?.classList.toggle("hidden", tab !== "reminders");
 
   if (el.sessionsPanel) el.sessionsPanel.classList.toggle("hidden", !billingTab);
   if (el.previewPanel) el.previewPanel.classList.toggle("hidden", !billingTab);
@@ -1622,15 +1842,31 @@ async function setActiveTab(nextTab, { force = false, group = "" } = {}) {
     return;
   }
 
+  if (tab === "attendance_input") {
+    renderAttendanceInputSection();
+    refreshFirebaseButtons();
+    return;
+  }
+
+  if (tab === "attendance") {
+    renderAttendanceOperationsSection();
+    refreshFirebaseButtons();
+    return;
+  }
+
   if (!state.firebase.ready) {
     if (tab === "calendar") renderInvoiceCalendar();
     if (tab === "status") renderPaymentStatusTable();
+    if (tab === "receivables") renderReceivablesOperationsSection();
+    if (tab === "reminders") renderRemindersOperationsSection();
     return;
   }
 
   await refreshDashboardInvoices({ forceServer: true });
   if (tab === "calendar") renderInvoiceCalendar();
   if (tab === "status") renderPaymentStatusTable();
+  if (tab === "receivables") renderReceivablesOperationsSection();
+  if (tab === "reminders") renderRemindersOperationsSection();
 }
 
 function applyModeUI() {
@@ -1678,8 +1914,129 @@ function loadAbsensiCsv(text) {
   state.absensiHeaders = parsed[0].map(normalizeHeader);
   state.absensiRows = parsed.slice(1);
   state.sourceTexts.attendance = text;
+  renderAttendanceOperationsSection();
 
   if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
+}
+
+function attendanceEntryFingerprint(entry = {}) {
+  return [
+    String(entry.tanggal || "").trim(),
+    normalizeName(entry.studentName || ""),
+    normalizeAttendanceStatus(entry.status || "hadir"),
+    String(entry.jamMulai || "").trim(),
+    String(entry.jamSelesai || "").trim(),
+    normalizeName(entry.pengajar || ""),
+    String(entry.topik || "").trim().toLowerCase(),
+  ].join("|");
+}
+
+function buildAttendanceEntriesFromCsvText(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) return [];
+
+  const headers = rows[0].map(normalizeHeader);
+  const idxNama = findHeaderIndex(headers, ["nama siswa", "siswa", "nama panggilan"]);
+  const idxTanggal = findHeaderIndex(headers, ["tanggal"]);
+  const idxMulai = findHeaderIndex(headers, ["jam_mulai", "jam mulai", "mulai"]);
+  const idxSelesai = findHeaderIndex(headers, ["jam_selesai", "jam selesai", "selesai"]);
+  const idxDurasi = findHeaderIndex(headers, ["durasi"]);
+  const idxPengajar = findHeaderIndex(headers, ["pengajar", "guru"]);
+  const idxPeserta = findHeaderIndex(headers, ["jumlah peserta", "total peserta", "peserta"]);
+  const idxTopik = findHeaderIndex(headers, ["topik", "mata pelajaran", "subject", "mapel"]);
+  const idxCatatan = findHeaderIndex(headers, ["catatan", "keterangan", "notes"]);
+  const idxStatus = findHeaderIndex(headers, ["status", "kehadiran"]);
+  const idxStudentId = findHeaderIndex(headers, ["student_id", "student id", "siswa_id", "siswa id"]);
+
+  const entries = [];
+
+  const buildTimeRange = (row) => {
+    const start = String(idxMulai >= 0 ? row[idxMulai] || "" : "").trim();
+    const end = String(idxSelesai >= 0 ? row[idxSelesai] || "" : "").trim();
+    if (start && end) return { start, end };
+    const durasi = Number.parseFloat(String(idxDurasi >= 0 ? row[idxDurasi] || "0" : "0").replace(",", "."));
+    if (Number.isFinite(durasi) && durasi > 0) {
+      const base = "19:30";
+      const baseMin = parseTimeToMinutes(base);
+      const endText = minutesToTimeText(baseMin + Math.max(15, Math.round(durasi * 60)));
+      return { start: base, end: endText };
+    }
+    return { start: "19:30", end: "21:00" };
+  };
+
+  if (idxNama >= 0 && idxTanggal >= 0) {
+    for (let i = 1; i < rows.length; i += 1) {
+      const row = rows[i] || [];
+      const studentName = String(row[idxNama] || "").trim();
+      const parsedDate = parseDateFlex(String(row[idxTanggal] || "").trim()) || parseDateInput(String(row[idxTanggal] || "").trim());
+      if (!studentName || !parsedDate) continue;
+      const times = buildTimeRange(row);
+      entries.push(normalizeAttendanceEntry({
+        tanggal: toLocalDateInputValue(parsedDate),
+        studentId: String(idxStudentId >= 0 ? row[idxStudentId] || "" : "").trim(),
+        studentName,
+        status: normalizeAttendanceStatus(idxStatus >= 0 ? row[idxStatus] || "hadir" : "hadir"),
+        jamMulai: times.start,
+        jamSelesai: times.end,
+        pengajar: String(idxPengajar >= 0 ? row[idxPengajar] || "" : "").trim() || "-",
+        pesertaCount: Math.max(1, parseIntFromText(idxPeserta >= 0 ? row[idxPeserta] || "1" : "1") || 1),
+        topik: String(idxTopik >= 0 ? row[idxTopik] || "" : "").trim() || "-",
+        catatan: String(idxCatatan >= 0 ? row[idxCatatan] || "" : "").trim(),
+      }));
+    }
+    return entries;
+  }
+
+  const idxAbsensiLabel = headers.findIndex((h) => h.toLowerCase().includes("absensi - jangan diapus"));
+  const idxTotalPeserta = headers.findIndex((h) => h.toLowerCase().includes("total peserta"));
+  if (idxAbsensiLabel >= 0 && idxTotalPeserta > idxAbsensiLabel && idxTanggal >= 0) {
+    const attendanceNames = headers.slice(idxAbsensiLabel + 1, idxTotalPeserta);
+    for (let i = 1; i < rows.length; i += 1) {
+      const row = rows[i] || [];
+      const parsedDate = parseDateFlex(String(row[idxTanggal] || "").trim()) || parseDateInput(String(row[idxTanggal] || "").trim());
+      if (!parsedDate) continue;
+      const times = buildTimeRange(row);
+      attendanceNames.forEach((name, offset) => {
+        const value = String(row[idxAbsensiLabel + 1 + offset] || "").trim().toUpperCase();
+        if (value !== "TRUE") return;
+        entries.push(normalizeAttendanceEntry({
+          tanggal: toLocalDateInputValue(parsedDate),
+          studentName: String(name || "").trim(),
+          status: "hadir",
+          jamMulai: times.start,
+          jamSelesai: times.end,
+          pengajar: String(idxPengajar >= 0 ? row[idxPengajar] || "" : "").trim() || "-",
+          pesertaCount: Math.max(1, parseIntFromText(idxPeserta >= 0 ? row[idxPeserta] || "1" : "1") || 1),
+          topik: String(idxTopik >= 0 ? row[idxTopik] || "" : "").trim() || "-",
+          catatan: String(idxCatatan >= 0 ? row[idxCatatan] || "" : "").trim(),
+        }));
+      });
+    }
+  }
+
+  return entries;
+}
+
+function appendAttendanceEntriesFromCsvText(text) {
+  const imported = buildAttendanceEntriesFromCsvText(text);
+  if (imported.length === 0) return 0;
+
+  const existing = sortAttendanceEntries(state.attendanceEntries || []);
+  const seen = new Set(existing.map((item) => attendanceEntryFingerprint(item)));
+  let added = 0;
+  imported.forEach((item) => {
+    const key = attendanceEntryFingerprint(item);
+    if (seen.has(key)) return;
+    seen.add(key);
+    existing.push(item);
+    added += 1;
+  });
+
+  state.attendanceEntries = sortAttendanceEntries(existing);
+  renderAttendanceInputSection();
+  renderAttendanceOperationsSection();
+  if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
+  return added;
 }
 
 function applyPricingCsv(text, notify = true) {
@@ -1829,6 +2186,45 @@ function generateFrontWeeklySessions() {
   updateTotal();
 }
 
+function buildAfterSessionsFromAttendanceEntries(studentName) {
+  const target = normalizeName(studentName);
+  const items = (state.attendanceEntries || []).filter((entry) => {
+    const status = normalizeAttendanceStatus(entry?.status || "hadir");
+    if (status !== "hadir") return false;
+    if (entry?.studentId) {
+      const record = getStudentRecordById(entry.studentId);
+      if (record) {
+        const aliases = [record.nickname, record.fullName].map((name) => normalizeName(name || "")).filter(Boolean);
+        if (aliases.includes(target)) return true;
+      }
+    }
+    return normalizeName(entry?.studentName || "") === target;
+  });
+
+  return items
+    .map((entry) => {
+      const tanggal = parseDateInput(String(entry.tanggal || "").trim()) || parseDateFlex(String(entry.tanggal || "").trim());
+      if (!tanggal) return null;
+      const jamMulai = String(entry.jamMulai || "-").trim() || "-";
+      const jamSelesai = String(entry.jamSelesai || "-").trim() || "-";
+      const durasiOverride = calculateDuration(jamMulai, jamSelesai);
+      if (durasiOverride <= 0) return null;
+      return buildSession({
+        date: tanggal,
+        hari: HARI[tanggal.getDay()] || "-",
+        jamMulai,
+        jamSelesai,
+        pengajar: String(entry.pengajar || "-").trim() || "-",
+        pesertaCount: Math.max(1, Number.parseInt(String(entry.pesertaCount || "1"), 10) || 1),
+        durasiOverride,
+        topik: String(entry.topik || "-").trim() || "-",
+        catatan: String(entry.catatan || "").trim(),
+        source: "after",
+      });
+    })
+    .filter(Boolean);
+}
+
 function hydrateAfterSessionsForSelectedStudent() {
   const studentName = getSelectedStudentName();
   if (!studentName) {
@@ -1837,9 +2233,18 @@ function hydrateAfterSessionsForSelectedStudent() {
     return;
   }
 
+  const structured = buildAfterSessionsFromAttendanceEntries(studentName);
+  if (structured.length > 0) {
+    state.sessions = structured.sort((a, b) => a.tanggal - b.tanggal);
+    updateAfterInvoiceDateOptions(state.sessions);
+    renderSessionsTable();
+    updateTotal();
+    return;
+  }
+
   if (state.absensiRows.length === 0 || state.absensiHeaders.length === 0) {
     state.sessions = [];
-    renderSessionsTable("Belum ada data absensi. Unggah CSV atau Google Sheet absensi.");
+    renderSessionsTable("Belum ada data attendance. Tambahkan dari Operations > Attendance Input.");
     return;
   }
 
@@ -2167,14 +2572,11 @@ function generateInvoice() {
 
   const totals = calculateInvoiceTotals(selected);
   const teacherPortions = calculateTeacherPortions(selected, totals);
-  const invoiceDate = parseDateInput(el.invoiceDate.value) || new Date();
-  const paymentDeadline = toLocalDateTimeInputValue(addHours(new Date(), 24));
-  const invoiceNo = `INV-${invoiceDate.getFullYear()}${String(invoiceDate.getMonth() + 1).padStart(2, "0")}${String(
-    invoiceDate.getDate()
-  ).padStart(2, "0")}-${student.replace(/\s+/g, "").slice(0, 6).toUpperCase()}`;
-  state.currentInvoiceId = invoiceNo;
-
   const detail = getSelectedStudentRecord();
+  const invoiceDate = parseDateInput(el.invoiceDate.value) || getCurrentTimeInZone();
+  const paymentDeadline = toLocalDateTimeInputValue(addHours(getCurrentTimeInZone(), 24));
+  const invoiceNo = buildInvoiceNumber(invoiceDate, detail, student);
+  state.currentInvoiceId = invoiceNo;
   const studentId = String(detail?.studentId || "").trim();
   const rowsHtml = selected
     .map(
@@ -2772,6 +3174,56 @@ function generateStudentId() {
   return `stu_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function generateAttendanceId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeAttendanceStatus(value) {
+  const normalized = String(value || "hadir").trim().toLowerCase();
+  if (["izin", "sakit"].includes(normalized)) return normalized;
+  return "hadir";
+}
+
+function normalizeAttendanceEntry(entry = {}, fallbackId = "") {
+  const attendanceId = String(entry.attendanceId || fallbackId || generateAttendanceId()).trim();
+  return {
+    attendanceId,
+    tanggal: String(entry.tanggal || "").trim(),
+    studentId: String(entry.studentId || "").trim(),
+    studentName: String(entry.studentName || "").trim(),
+    status: normalizeAttendanceStatus(entry.status || "hadir"),
+    jamMulai: String(entry.jamMulai || "").trim(),
+    jamSelesai: String(entry.jamSelesai || "").trim(),
+    pengajar: String(entry.pengajar || "-").trim() || "-",
+    pesertaCount: Math.max(1, Number.parseInt(String(entry.pesertaCount || "1"), 10) || 1),
+    topik: String(entry.topik || "-").trim() || "-",
+    catatan: String(entry.catatan || "").trim(),
+  };
+}
+
+function sortAttendanceEntries(entries = []) {
+  return [...entries].sort((a, b) => {
+    const timeA = parseDateInput(String(a.tanggal || ""))?.getTime?.() || 0;
+    const timeB = parseDateInput(String(b.tanggal || ""))?.getTime?.() || 0;
+    if (timeA !== timeB) return timeB - timeA;
+    const startA = parseTimeToMinutes(String(a.jamMulai || ""));
+    const startB = parseTimeToMinutes(String(b.jamMulai || ""));
+    if (startA >= 0 && startB >= 0 && startA !== startB) return startA - startB;
+    return String(a.studentName || "").localeCompare(String(b.studentName || ""), "id");
+  });
+}
+
+function buildInvoiceNumber(invoiceDate, studentRecord, studentName) {
+  const datePart = `${invoiceDate.getFullYear()}${String(invoiceDate.getMonth() + 1).padStart(2, "0")}${String(invoiceDate.getDate()).padStart(2, "0")}`;
+  const nowParts = getDatePartsInZone(new Date(), APP_TIME_ZONE);
+  const timePart = `${String(nowParts.hour).padStart(2, "0")}${String(nowParts.minute).padStart(2, "0")}${String(nowParts.second).padStart(2, "0")}`;
+  const nameSource = String(studentName || studentRecord?.nickname || studentRecord?.fullName || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const studentKey = (nameSource.slice(0, 6) || "SISWA").toUpperCase();
+  const randomPart = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `INV-${datePart}-${timePart}-${studentKey}-${randomPart}`;
+}
+
 function studentFingerprint(student) {
   return [student?.fullName || "", student?.nickname || ""]
     .map((x) => normalizeName(x))
@@ -2877,6 +3329,33 @@ function renderStudentHardDeletePreview(studentId) {
     `Sekolah: ${escapeHtml(student.sekolah || "-")}`,
     `Orang Tua/Wali: ${escapeHtml(student.parentName || "-")}`,
   ].join("<br/>");
+}
+
+function openStudentFormForCreate() {
+  state.studentFormEditIndex = -1;
+  el.studentCreateForm?.reset();
+  if (el.studentFormTitle) el.studentFormTitle.textContent = "Tambah Siswa Baru";
+  el.studentCreateModal?.showModal();
+}
+
+function openStudentFormForEdit(sourceIndex) {
+  const row = state.students?.[sourceIndex];
+  if (!row) return;
+  state.studentFormEditIndex = sourceIndex;
+  if (el.studentFormTitle) el.studentFormTitle.textContent = "Edit Detail Siswa";
+  if (el.studentFormFullName) el.studentFormFullName.value = String(row.fullName || "");
+  if (el.studentFormNickname) el.studentFormNickname.value = String(row.nickname || "");
+  if (el.studentFormGender) el.studentFormGender.value = String(row.gender || "");
+  if (el.studentFormKelas) el.studentFormKelas.value = String(row.kelas || "");
+  if (el.studentFormH1) el.studentFormH1.value = String(row.h1 || "");
+  if (el.studentFormNextGrade) el.studentFormNextGrade.value = String(row.nextGrade || "");
+  if (el.studentFormH2) el.studentFormH2.value = String(row.h2 || "");
+  if (el.studentFormSekolah) el.studentFormSekolah.value = String(row.sekolah || "");
+  if (el.studentFormStudentWa) el.studentFormStudentWa.value = String(row.studentWhatsapp || "");
+  if (el.studentFormParentName) el.studentFormParentName.value = String(row.parentName || "");
+  if (el.studentFormParentWa) el.studentFormParentWa.value = String(row.parentWhatsapp || "");
+  if (el.studentFormStudyHistory) el.studentFormStudyHistory.value = String(row.studyHistory || "");
+  el.studentCreateModal?.showModal();
 }
 
 function getStudentDisplayName(studentName, detail = null) {
@@ -3605,6 +4084,7 @@ function refreshFirebaseButtons() {
   if (el.btnDownloadCalendarNextMonth) el.btnDownloadCalendarNextMonth.disabled = !ready;
   if (el.btnPaymentStatusRefresh) el.btnPaymentStatusRefresh.disabled = !ready;
   if (el.btnStudentManageHardDelete) el.btnStudentManageHardDelete.disabled = !ready;
+  if (el.btnAttendanceInputSaveAll) el.btnAttendanceInputSaveAll.disabled = !ready;
   const saveButtons = [
     el.btnCsvSaveStudents,
     el.btnCsvSavePricing,
@@ -3718,6 +4198,8 @@ async function connectFirebase({ saveConfig = false, loadSources = false, silent
   if (loadSources) {
     await loadSourcesFromFirebase({ silent: true, forceServer });
   }
+
+  await loadAttendanceEntriesFromFirebase({ forceServer });
 
   await loadInvoiceHistory({ silent: true, forceServer });
   await refreshDashboardInvoices({ forceServer });
@@ -3919,6 +4401,153 @@ async function saveStudentsToFirebase({ applyEditor = true, silent = false } = {
   refreshFirebaseButtons();
   if (!silent) return true;
   return true;
+}
+
+async function loadAttendanceEntriesFromFirebase({ forceServer = false } = {}) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    state.attendanceEntries = [];
+    renderAttendanceInputSection();
+    renderAttendanceOperationsSection();
+    return false;
+  }
+
+  const ownerUid = getFirebaseReadOwnerUidCandidates()[0];
+  const snapshot = await firestoreGet(
+    state.firebase.db.collection(FIREBASE_ATTENDANCE_COLLECTION).where("ownerUid", "==", ownerUid),
+    { forceServer }
+  );
+
+  const rows = [];
+  snapshot.forEach((doc) => {
+    const data = doc.data() || {};
+    if (String(data.deletedAt || "").trim()) return;
+    rows.push(normalizeAttendanceEntry({
+      attendanceId: String(data.attendanceId || doc.id.split("__").slice(1).join("__") || "").trim(),
+      tanggal: String(data.tanggal || "").trim(),
+      studentId: String(data.studentId || "").trim(),
+      studentName: String(data.studentName || "").trim(),
+      status: normalizeAttendanceStatus(data.status || "hadir"),
+      jamMulai: String(data.jamMulai || "").trim(),
+      jamSelesai: String(data.jamSelesai || "").trim(),
+      pengajar: String(data.pengajar || "-").trim() || "-",
+      pesertaCount: Math.max(1, Number.parseInt(String(data.pesertaCount || "1"), 10) || 1),
+      topik: String(data.topik || "-").trim() || "-",
+      catatan: String(data.catatan || "").trim(),
+    }));
+  });
+
+  state.attendanceEntries = sortAttendanceEntries(rows);
+  renderAttendanceInputSection();
+  renderAttendanceOperationsSection();
+  if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
+  return true;
+}
+
+async function saveAttendanceEntryToFirebase(entry) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    throw new Error("Firebase belum terhubung.");
+  }
+
+  const ownerUid = getFirebaseWriteOwnerUid();
+  const next = normalizeAttendanceEntry(entry, entry?.attendanceId || "");
+  const ref = state.firebase.db.collection(FIREBASE_ATTENDANCE_COLLECTION).doc(`${ownerUid}__${next.attendanceId}`);
+  const existing = await ref.get();
+  const existingData = existing.exists ? (existing.data() || {}) : {};
+
+  await ref.set(
+    {
+      attendanceId: next.attendanceId,
+      tanggal: next.tanggal,
+      studentId: next.studentId,
+      studentName: next.studentName,
+      status: next.status,
+      jamMulai: next.jamMulai,
+      jamSelesai: next.jamSelesai,
+      pengajar: next.pengajar,
+      pesertaCount: next.pesertaCount,
+      topik: next.topik,
+      catatan: next.catatan,
+      deletedAt: "",
+      ownerUid,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdAt: existingData.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  setFirebaseStatus(`Attendance ${next.attendanceId} tersimpan.`, "ok");
+}
+
+async function deleteAttendanceEntryFromFirebase(attendanceId) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    throw new Error("Firebase belum terhubung.");
+  }
+  const ownerUid = getFirebaseWriteOwnerUid();
+  const safeId = String(attendanceId || "").trim();
+  if (!safeId) throw new Error("attendanceId tidak valid.");
+  await state.firebase.db.collection(FIREBASE_ATTENDANCE_COLLECTION).doc(`${ownerUid}__${safeId}`).delete();
+  setFirebaseStatus(`Attendance ${safeId} dihapus.`, "ok");
+}
+
+async function saveAllAttendanceEntriesToFirebase() {
+  if (!state.firebase.ready || !state.firebase.db) {
+    throw new Error("Firebase belum terhubung.");
+  }
+  const ownerUid = getFirebaseWriteOwnerUid();
+  const list = sortAttendanceEntries((state.attendanceEntries || []).map((item) => normalizeAttendanceEntry(item, item?.attendanceId || "")));
+  state.attendanceEntries = list;
+  renderAttendanceInputSection();
+
+  const existingSnapshot = await firestoreGet(
+    state.firebase.db.collection(FIREBASE_ATTENDANCE_COLLECTION).where("ownerUid", "==", ownerUid),
+    { forceServer: false }
+  );
+
+  const existingIds = new Set();
+  existingSnapshot.forEach((doc) => {
+    const data = doc.data() || {};
+    const id = String(data.attendanceId || doc.id.split("__").slice(1).join("__") || "").trim();
+    if (!id) return;
+    existingIds.add(id);
+  });
+
+  const currentIds = new Set(list.map((item) => String(item.attendanceId || "").trim()).filter(Boolean));
+  const batch = state.firebase.db.batch();
+
+  list.forEach((item) => {
+    const ref = state.firebase.db.collection(FIREBASE_ATTENDANCE_COLLECTION).doc(`${ownerUid}__${item.attendanceId}`);
+    batch.set(
+      ref,
+      {
+        attendanceId: item.attendanceId,
+        tanggal: item.tanggal,
+        studentId: item.studentId,
+        studentName: item.studentName,
+        status: item.status,
+        jamMulai: item.jamMulai,
+        jamSelesai: item.jamSelesai,
+        pengajar: item.pengajar,
+        pesertaCount: item.pesertaCount,
+        topik: item.topik,
+        catatan: item.catatan,
+        deletedAt: "",
+        ownerUid,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
+
+  existingIds.forEach((id) => {
+    if (currentIds.has(id)) return;
+    const ref = state.firebase.db.collection(FIREBASE_ATTENDANCE_COLLECTION).doc(`${ownerUid}__${id}`);
+    batch.delete(ref);
+  });
+
+  await batch.commit();
+  setFirebaseStatus(`Attendance tersimpan: ${list.length} baris.`, "ok");
+  renderAttendanceOperationsSection();
+  if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
 }
 
 async function firestoreGet(queryRef, { forceServer = false } = {}) {
@@ -4256,8 +4885,11 @@ async function backfillInvoiceStudentIds(items = []) {
 async function refreshDashboardInvoices({ forceServer = false } = {}) {
   if (!state.firebase.ready || !state.firebase.db) {
     state.dashboardInvoices = [];
+    state.calendarWeekAutoFocus = true;
     renderPaymentStatusTable();
     renderInvoiceCalendar();
+    renderReceivablesOperationsSection();
+    renderRemindersOperationsSection();
     return;
   }
 
@@ -4281,17 +4913,58 @@ async function refreshDashboardInvoices({ forceServer = false } = {}) {
     ...doc.data(),
     paymentStatus: normalizeInvoiceStatus(doc.data()?.paymentStatus || "issued"),
   }));
-  state.calendarWeekIndex = 0;
+  state.calendarWeekAutoFocus = true;
 
   renderPaymentStatusTable();
   renderInvoiceCalendar();
+  renderReceivablesOperationsSection();
+  renderRemindersOperationsSection();
 }
 
 function getCalendarRangeBase() {
-  const now = new Date();
+  const now = getCurrentTimeInZone();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
   return { start, end };
+}
+
+function getDatePartsInZone(date = new Date(), timeZone = APP_TIME_ZONE) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const lookup = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return {
+    year: Number(lookup.year || 0),
+    month: Number(lookup.month || 1),
+    day: Number(lookup.day || 1),
+    hour: Number(lookup.hour || 0),
+    minute: Number(lookup.minute || 0),
+    second: Number(lookup.second || 0),
+  };
+}
+
+function getCurrentTimeInZone(timeZone = APP_TIME_ZONE) {
+  const parts = getDatePartsInZone(new Date(), timeZone);
+  return new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+}
+
+function getCurrentIsoDateInZone(timeZone = APP_TIME_ZONE) {
+  const parts = getDatePartsInZone(new Date(), timeZone);
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+function getDefaultCalendarWeekIndex(viewStart, totalWeeks) {
+  const currentWeekStart = getStartOfWeekMonday(getCurrentTimeInZone());
+  const diffDays = Math.floor((currentWeekStart.getTime() - viewStart.getTime()) / 86400000);
+  const rawIndex = Math.floor(diffDays / 7);
+  return Math.max(0, Math.min(rawIndex, Math.max(0, totalWeeks - 1)));
 }
 
 function getStartOfWeekMonday(date) {
@@ -4445,6 +5118,7 @@ function buildCalendarViewModel(days, viewStart, viewEnd, rangeStart, rangeEnd) 
     days,
     rangeStart,
     rangeEnd,
+    todayKey: getCurrentIsoDateInZone(),
     ensureRow,
     getTeachersForDay,
     timelineStart,
@@ -4469,12 +5143,13 @@ function buildCalendarBoardHtml(model) {
     .map((d) => {
       const dayKey = toLocalDateInputValue(d);
       const outRange = d < model.rangeStart || d > model.rangeEnd;
+      const isToday = dayKey === model.todayKey;
       const teachersForDay = model.getTeachersForDay(dayKey);
       return teachersForDay
         .map((teacher, teacherIndex) => {
           const row = model.ensureRow(dayKey, teacher, d);
           const dayLabel = teacherIndex === 0
-            ? `<div class="cal-day-label ${outRange ? "out-range" : ""}"><em>${escapeHtml(formatMonthShort(d))}</em><span>${escapeHtml(HARI[d.getDay()])}</span><strong>${d.getDate()}</strong></div>`
+            ? `<div class="cal-day-label ${outRange ? "out-range" : ""} ${isToday ? "today" : ""}"><em>${escapeHtml(formatMonthShort(d))}</em><span>${escapeHtml(HARI[d.getDay()])}</span><strong>${d.getDate()}</strong></div>`
             : "<div class=\"cal-day-label-spacer\"></div>";
 
           const laneLayout = assignCalendarEntryLanes(row.timed);
@@ -4537,6 +5212,10 @@ function renderInvoiceCalendar() {
   const viewEnd = addDays(getStartOfWeekMonday(end), 6);
   const totalWeeks = Math.max(1, Math.round((viewEnd - viewStart) / (7 * 24 * 60 * 60 * 1000)) + 1);
   state.calendarWeekCount = totalWeeks;
+  if (state.calendarWeekAutoFocus) {
+    state.calendarWeekIndex = getDefaultCalendarWeekIndex(viewStart, totalWeeks);
+    state.calendarWeekAutoFocus = false;
+  }
   state.calendarWeekIndex = Math.max(0, Math.min(state.calendarWeekIndex, totalWeeks - 1));
   if (el.btnCalendarPrevWeek) el.btnCalendarPrevWeek.disabled = state.calendarWeekIndex <= 0;
   if (el.btnCalendarNextWeek) el.btnCalendarNextWeek.disabled = state.calendarWeekIndex >= totalWeeks - 1;
@@ -4558,7 +5237,7 @@ async function downloadCalendarMonthPng(monthOffset) {
     return;
   }
 
-  const now = new Date();
+  const now = getCurrentTimeInZone();
   const monthStart = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 0);
   const days = [];
@@ -4607,13 +5286,13 @@ function renderPaymentStatusTable() {
 
   if (!state.firebase.ready) {
     el.paymentStatusSummary.textContent = "Hubungkan Firebase untuk memuat data.";
-    el.paymentStatusTableBody.innerHTML = '<tr><td colspan="6" class="empty">Firebase belum terhubung.</td></tr>';
+    el.paymentStatusTableBody.innerHTML = '<tr><td colspan="7" class="empty">Firebase belum terhubung.</td></tr>';
     return;
   }
 
   if (state.dashboardInvoices.length === 0) {
     el.paymentStatusSummary.textContent = "Belum ada invoice di cloud.";
-    el.paymentStatusTableBody.innerHTML = '<tr><td colspan="6" class="empty">Belum ada data invoice.</td></tr>';
+    el.paymentStatusTableBody.innerHTML = '<tr><td colspan="7" class="empty">Belum ada data invoice.</td></tr>';
     return;
   }
 
@@ -4627,6 +5306,7 @@ function renderPaymentStatusTable() {
       const invoiceDate = parseDateInput(String(item.invoiceDate || ""));
       const deadlineDate = parseDateInput(String(item.paymentDeadline || ""));
       const status = normalizeInvoiceStatus(item.paymentStatus || "issued");
+      const note = String(item.paymentNote || "").trim();
       return `
       <tr>
         <td>${escapeHtml(item.invoiceNo || "-")}</td>
@@ -4640,9 +5320,340 @@ function renderPaymentStatusTable() {
             <option value="cancelled" ${status === "cancelled" ? "selected" : ""}>CANCELLED</option>
           </select>
         </td>
+        <td><input type="text" data-payment-note value="${escapeHtml(note)}" placeholder="Transfer ke BCA xxx / alasan cancel" /></td>
         <td><button type="button" class="btn" data-payment-save="${escapeHtml(item.historyId || "")}">Simpan</button></td>
       </tr>`;
     })
+    .join("");
+}
+
+function renderOperationsSummaryCards(host, cards) {
+  if (!host) return;
+  host.innerHTML = (cards || [])
+    .map((card) => `<div class="operations-card"><span>${escapeHtml(card.label || "-")}</span><strong>${escapeHtml(card.value || "-")}</strong></div>`)
+    .join("");
+}
+
+function formatOperationsDateRange(minDate, maxDate) {
+  if (!minDate || !maxDate) return "-";
+  const start = formatTanggal(minDate);
+  const end = formatTanggal(maxDate);
+  return start === end ? start : `${start} - ${end}`;
+}
+
+function startOfDay(date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function diffInDays(fromDate, toDate) {
+  return Math.round((startOfDay(toDate).getTime() - startOfDay(fromDate).getTime()) / 86400000);
+}
+
+function renderAttendanceInputSection() {
+  if (!el.attendanceInputTableBody) return;
+
+  const rows = sortAttendanceEntries(state.attendanceEntries || []);
+  state.attendanceEntries = rows;
+
+  if (rows.length === 0) {
+    el.attendanceInputTableBody.innerHTML = '<tr><td colspan="12" class="empty">Belum ada data attendance input.</td></tr>';
+    return;
+  }
+
+  el.attendanceInputTableBody.innerHTML = rows
+    .map((row, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td><input type="date" data-row="${index}" data-field="tanggal" value="${escapeHtml(String(row.tanggal || ""))}" /></td>
+        <td><input type="text" data-row="${index}" data-field="studentName" value="${escapeHtml(String(row.studentName || ""))}" placeholder="Nama siswa" list="studentOptions" /></td>
+        <td>
+          <select data-row="${index}" data-field="status">
+            <option value="hadir" ${normalizeAttendanceStatus(row.status) === "hadir" ? "selected" : ""}>Hadir</option>
+            <option value="izin" ${normalizeAttendanceStatus(row.status) === "izin" ? "selected" : ""}>Izin</option>
+            <option value="sakit" ${normalizeAttendanceStatus(row.status) === "sakit" ? "selected" : ""}>Sakit</option>
+          </select>
+        </td>
+        <td><input type="time" data-row="${index}" data-field="jamMulai" value="${escapeHtml(String(row.jamMulai || ""))}" /></td>
+        <td><input type="time" data-row="${index}" data-field="jamSelesai" value="${escapeHtml(String(row.jamSelesai || ""))}" /></td>
+        <td><input type="text" data-row="${index}" data-field="pengajar" value="${escapeHtml(String(row.pengajar || ""))}" /></td>
+        <td><input type="number" min="1" data-row="${index}" data-field="pesertaCount" value="${escapeHtml(String(row.pesertaCount || 1))}" /></td>
+        <td><input type="text" data-row="${index}" data-field="topik" value="${escapeHtml(String(row.topik || ""))}" /></td>
+        <td><input type="text" data-row="${index}" data-field="catatan" value="${escapeHtml(String(row.catatan || ""))}" /></td>
+        <td><code>${escapeHtml(String(row.attendanceId || "-"))}</code></td>
+        <td>
+          <div class="attendance-actions">
+            <button type="button" class="icon-btn save" title="Simpan" data-save-attendance="${index}">&#128190;</button>
+            <button type="button" class="icon-btn delete" title="Hapus" data-remove-attendance="${index}">&#128465;</button>
+          </div>
+        </td>
+      </tr>`)
+    .join("");
+}
+
+function buildAttendanceOperationsViewModel() {
+  const structuredRows = sortAttendanceEntries((state.attendanceEntries || []).map((entry) => normalizeAttendanceEntry(entry, entry?.attendanceId || "")));
+  if (structuredRows.length > 0) {
+    const summary = new Map();
+    let minDate = null;
+    let maxDate = null;
+    let totalSessions = 0;
+
+    structuredRows.forEach((entry) => {
+      const date = parseDateInput(String(entry.tanggal || ""));
+      if (!date) return;
+      if (!minDate || date < minDate) minDate = date;
+      if (!maxDate || date > maxDate) maxDate = date;
+      if (normalizeAttendanceStatus(entry.status) !== "hadir") return;
+
+      totalSessions += 1;
+      const key = String(entry.studentId || normalizeName(entry.studentName || "")).trim();
+      const current = summary.get(key) || { name: entry.studentName || "-", count: 0, lastDate: null, sourceFormat: "structured" };
+      current.count += 1;
+      if (!current.lastDate || date > current.lastDate) current.lastDate = date;
+      summary.set(key, current);
+    });
+
+    const items = [...summary.values()]
+      .sort((a, b) => b.count - a.count || String(a.name || "").localeCompare(String(b.name || ""), "id"))
+      .slice(0, 40);
+
+    return {
+      totalSessions,
+      uniqueStudents: summary.size,
+      rangeText: formatOperationsDateRange(minDate, maxDate),
+      items,
+    };
+  }
+
+  const headers = Array.isArray(state.absensiHeaders) ? state.absensiHeaders : [];
+  const rows = Array.isArray(state.absensiRows) ? state.absensiRows : [];
+  if (headers.length === 0 || rows.length === 0) {
+    return {
+      totalSessions: 0,
+      uniqueStudents: 0,
+      rangeText: "-",
+      items: [],
+    };
+  }
+
+  const idxNama = findHeaderIndex(headers, ["nama siswa", "siswa", "nama panggilan"]);
+  const idxTanggal = findHeaderIndex(headers, ["tanggal"]);
+  const summary = new Map();
+  let minDate = null;
+  let maxDate = null;
+  let totalSessions = 0;
+
+  const registerHit = (label, date, sourceFormat) => {
+    const name = String(label || "").trim();
+    if (!name || !date) return;
+    const key = normalizeName(name);
+    const current = summary.get(key) || { name, count: 0, lastDate: null, sourceFormat };
+    current.count += 1;
+    current.sourceFormat = sourceFormat;
+    if (!current.lastDate || date > current.lastDate) current.lastDate = date;
+    summary.set(key, current);
+  };
+
+  if (idxNama >= 0 && idxTanggal >= 0) {
+    rows.forEach((row) => {
+      const name = String(row[idxNama] || "").trim();
+      const date = parseDateFlex(String(row[idxTanggal] || "").trim());
+      if (!name || !date) return;
+      registerHit(name, date, "simple");
+      totalSessions += 1;
+      if (!minDate || date < minDate) minDate = date;
+      if (!maxDate || date > maxDate) maxDate = date;
+    });
+  } else {
+    const idxAbsensiLabel = headers.findIndex((h) => h.toLowerCase().includes("absensi - jangan diapus"));
+    const idxTotalPeserta = headers.findIndex((h) => h.toLowerCase().includes("total peserta"));
+    if (idxAbsensiLabel >= 0 && idxTotalPeserta > idxAbsensiLabel && idxTanggal >= 0) {
+      const attendanceNames = headers.slice(idxAbsensiLabel + 1, idxTotalPeserta);
+      rows.forEach((row) => {
+        const date = parseDateFlex(String(row[idxTanggal] || "").trim());
+        if (!date) return;
+        totalSessions += 1;
+        if (!minDate || date < minDate) minDate = date;
+        if (!maxDate || date > maxDate) maxDate = date;
+        attendanceNames.forEach((name, index) => {
+          const value = String(row[idxAbsensiLabel + 1 + index] || "").trim().toUpperCase();
+          if (value === "TRUE") registerHit(name, date, "matrix");
+        });
+      });
+    }
+  }
+
+  const items = [...summary.values()]
+    .sort((a, b) => b.count - a.count || String(a.name || "").localeCompare(String(b.name || ""), "id"))
+    .slice(0, 40);
+
+  return {
+    totalSessions,
+    uniqueStudents: summary.size,
+    rangeText: formatOperationsDateRange(minDate, maxDate),
+    items,
+  };
+}
+
+function renderAttendanceOperationsSection() {
+  const view = buildAttendanceOperationsViewModel();
+  renderOperationsSummaryCards(el.attendanceOpsSummary, [
+    { label: "Total Sesi", value: String(view.totalSessions) },
+    { label: "Siswa Terdeteksi", value: String(view.uniqueStudents) },
+    { label: "Rentang Data", value: view.rangeText },
+  ]);
+
+  if (!el.attendanceOpsTableBody) return;
+  if (view.items.length === 0) {
+    el.attendanceOpsTableBody.innerHTML = '<tr><td colspan="4" class="empty">Belum ada data absensi yang bisa diringkas.</td></tr>';
+    return;
+  }
+
+  el.attendanceOpsTableBody.innerHTML = view.items
+    .map((item) => `
+      <tr>
+        <td>${escapeHtml(item.name || "-")}</td>
+        <td>${escapeHtml(String(item.count || 0))}</td>
+        <td>${item.lastDate ? escapeHtml(formatTanggal(item.lastDate)) : "-"}</td>
+        <td>${escapeHtml(item.sourceFormat || "-")}</td>
+      </tr>`)
+    .join("");
+}
+
+function getReceivablesOperationsItems() {
+  const today = new Date();
+  return (state.dashboardInvoices || [])
+    .map((item) => {
+      const status = normalizeInvoiceStatus(item.paymentStatus || "issued");
+      const deadlineDate = parseDateInput(String(item.paymentDeadline || item.invoiceDate || ""));
+      const total = Number(item?.totals?.grandTotal || 0);
+      const dayDelta = deadlineDate ? diffInDays(deadlineDate, today) : null;
+      return {
+        ...item,
+        status,
+        deadlineDate,
+        total,
+        isOpen: status === "issued",
+        isOverdue: status === "issued" && Number.isFinite(dayDelta) && dayDelta > 0,
+        dayDelta,
+      };
+    })
+    .filter((item) => item.isOpen)
+    .sort((a, b) => {
+      if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+      const aTime = a.deadlineDate?.getTime?.() || Number.MAX_SAFE_INTEGER;
+      const bTime = b.deadlineDate?.getTime?.() || Number.MAX_SAFE_INTEGER;
+      if (aTime !== bTime) return aTime - bTime;
+      return String(a.invoiceNo || "").localeCompare(String(b.invoiceNo || ""), "id");
+    });
+}
+
+function formatReceivableAgeLabel(item) {
+  if (!item?.deadlineDate || !Number.isFinite(item.dayDelta)) return "Tanpa deadline";
+  if (item.dayDelta > 0) return `Overdue ${item.dayDelta} hari`;
+  if (item.dayDelta === 0) return "Jatuh tempo hari ini";
+  return `${Math.abs(item.dayDelta)} hari lagi`;
+}
+
+function renderReceivablesOperationsSection() {
+  const items = getReceivablesOperationsItems();
+  const overdueCount = items.filter((item) => item.isOverdue).length;
+  const outstanding = items.reduce((sum, item) => sum + Number(item.total || 0), 0);
+
+  renderOperationsSummaryCards(el.receivablesOpsSummary, [
+    { label: "Open Invoice", value: String(items.length) },
+    { label: "Overdue", value: String(overdueCount) },
+    { label: "Outstanding", value: formatRupiah(outstanding) },
+  ]);
+
+  if (!el.receivablesOpsTableBody) return;
+  if (!state.firebase.ready) {
+    el.receivablesOpsTableBody.innerHTML = '<tr><td colspan="6" class="empty">Hubungkan Firebase untuk memuat piutang.</td></tr>';
+    return;
+  }
+  if (items.length === 0) {
+    el.receivablesOpsTableBody.innerHTML = '<tr><td colspan="6" class="empty">Tidak ada invoice issued yang masih terbuka.</td></tr>';
+    return;
+  }
+
+  el.receivablesOpsTableBody.innerHTML = items
+    .map((item) => {
+      const ageLabel = formatReceivableAgeLabel(item);
+      return `
+      <tr>
+        <td>${escapeHtml(item.invoiceNo || "-")}</td>
+        <td>${escapeHtml(getStudentDisplayName(item.student, item.studentDetail || {}))}</td>
+        <td>${item.deadlineDate ? escapeHtml(formatTanggalWaktu(item.deadlineDate)) : "-"}</td>
+        <td><span class="ops-pill ${escapeHtml(item.status || "issued")}">${escapeHtml(String(item.status || "issued").toUpperCase())}</span></td>
+        <td>${formatRupiah(item.total)}</td>
+        <td class="${item.isOverdue ? "ops-overdue" : ""}">${escapeHtml(ageLabel)}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function buildReminderMessage(item, studentRecord) {
+  const studentName = getStudentDisplayName(item.student, item.studentDetail || {});
+  const parentName = String(studentRecord?.parentName || "Bapak/Ibu").trim() || "Bapak/Ibu";
+  const deadlineText = item.deadlineDate ? formatTanggalWaktu(item.deadlineDate) : "segera";
+  return [
+    `Halo ${parentName},`,
+    "",
+    `Mengingatkan untuk invoice les ${studentName} dengan nomor ${item.invoiceNo || "-"}.`,
+    `Total tagihan: ${formatRupiah(Number(item.total || 0))}.`,
+    `Deadline pembayaran: ${deadlineText}.`,
+    "",
+    "Mohon konfirmasi jika pembayaran sudah dilakukan. Terima kasih.",
+  ].join("\n");
+}
+
+function renderRemindersOperationsSection() {
+  const items = getReceivablesOperationsItems().slice(0, 50).map((item) => {
+    const studentRecord = getStudentRecordFromInvoice(item);
+    const phone = String(studentRecord?.parentWhatsapp || studentRecord?.studentWhatsapp || "").trim();
+    return {
+      historyId: String(item.historyId || ""),
+      invoiceNo: String(item.invoiceNo || ""),
+      studentLabel: getStudentDisplayName(item.student, item.studentDetail || {}),
+      deadlineText: item.deadlineDate ? formatTanggalWaktu(item.deadlineDate) : "-",
+      phone,
+      message: buildReminderMessage(item, studentRecord),
+    };
+  });
+
+  state.operationsReminderRows = items;
+  const withPhone = items.filter((item) => item.phone).length;
+
+  renderOperationsSummaryCards(el.remindersOpsSummary, [
+    { label: "Perlu Follow-up", value: String(items.length) },
+    { label: "Punya Kontak WA", value: String(withPhone) },
+    { label: "Tanpa Kontak", value: String(items.length - withPhone) },
+  ]);
+
+  if (!el.remindersOpsTableBody) return;
+  if (!state.firebase.ready) {
+    el.remindersOpsTableBody.innerHTML = '<tr><td colspan="5" class="empty">Hubungkan Firebase untuk memuat reminder.</td></tr>';
+    return;
+  }
+  if (items.length === 0) {
+    el.remindersOpsTableBody.innerHTML = '<tr><td colspan="5" class="empty">Tidak ada invoice issued yang perlu di-follow-up.</td></tr>';
+    return;
+  }
+
+  el.remindersOpsTableBody.innerHTML = items
+    .map((item) => `
+      <tr>
+        <td>${escapeHtml(item.invoiceNo || "-")}</td>
+        <td>${escapeHtml(item.studentLabel || "-")}</td>
+        <td>${escapeHtml(item.phone || "-")}</td>
+        <td>${escapeHtml(item.deadlineText || "-")}</td>
+        <td>
+          <button type="button" class="btn" data-copy-reminder="${escapeHtml(item.historyId || "")}" ${item.phone ? "" : "disabled"}>Salin Pesan</button>
+          <pre class="ops-message">${escapeHtml(item.message || "")}</pre>
+        </td>
+      </tr>`)
     .join("");
 }
 
@@ -4692,7 +5703,7 @@ function renderStudentManagementTable() {
 
   if (!Array.isArray(state.students) || state.students.length === 0 || pageItems.length === 0) {
     const message = state.students.length === 0 ? "Belum ada data siswa." : "Tidak ada siswa untuk filter kelas ini.";
-    el.studentManageTableBody.innerHTML = `<tr><td colspan="15" class="empty">${message}</td></tr>`;
+    el.studentManageTableBody.innerHTML = `<tr><td colspan="7" class="empty">${message}</td></tr>`;
     return;
   }
 
@@ -4705,19 +5716,12 @@ function renderStudentManagementTable() {
         <td>${rowNumber}</td>
         <td><input type="text" data-row="${sourceIndex}" data-field="nickname" value="${escapeHtml(s.nickname || "")}" /></td>
         <td><input type="text" data-row="${sourceIndex}" data-field="fullName" value="${escapeHtml(s.fullName || "")}" /></td>
-        <td><input type="text" data-row="${sourceIndex}" data-field="gender" value="${escapeHtml(s.gender || "")}" /></td>
         <td><input type="text" data-row="${sourceIndex}" data-field="kelas" value="${escapeHtml(s.kelas || "")}" /></td>
-        <td><input type="text" data-row="${sourceIndex}" data-field="h1" value="${escapeHtml(s.h1 || "")}" /></td>
-        <td><input type="text" data-row="${sourceIndex}" data-field="nextGrade" value="${escapeHtml(s.nextGrade || "")}" /></td>
-        <td><input type="text" data-row="${sourceIndex}" data-field="h2" value="${escapeHtml(s.h2 || "")}" /></td>
         <td><input type="text" data-row="${sourceIndex}" data-field="sekolah" value="${escapeHtml(s.sekolah || "")}" /></td>
-        <td><input type="text" data-row="${sourceIndex}" data-field="studentWhatsapp" value="${escapeHtml(s.studentWhatsapp || "")}" /></td>
-        <td><input type="text" data-row="${sourceIndex}" data-field="parentName" value="${escapeHtml(s.parentName || "")}" /></td>
-        <td><input type="text" data-row="${sourceIndex}" data-field="parentWhatsapp" value="${escapeHtml(s.parentWhatsapp || "")}" /></td>
-        <td><input type="text" data-row="${sourceIndex}" data-field="studyHistory" value="${escapeHtml(s.studyHistory || "")}" /></td>
         <td><code>${escapeHtml(s.studentId || "-")}</code></td>
         <td>
           <div class="student-row-actions">
+            <button type="button" class="btn" title="Edit Detail" data-edit-student="${sourceIndex}">Detail</button>
             <button type="button" class="icon-btn save" title="Simpan" data-save-student="${sourceIndex}">&#128190;</button>
             <button type="button" class="icon-btn delete" title="Soft Delete" data-remove-student="${sourceIndex}">&#128465;</button>
           </div>
@@ -5219,15 +6223,17 @@ function serializeStudentsToCsv(students) {
   return serializeRowsToCsv(rows);
 }
 
-async function updateInvoicePaymentStatus(historyId, status) {
+async function updateInvoicePaymentStatus(historyId, status, note = "") {
   if (!state.firebase.ready || !state.firebase.db) {
     throw new Error("Firebase belum terhubung.");
   }
   const normalized = normalizeInvoiceStatus(status || "issued");
+  const paymentNote = String(note || "").trim();
   const ref = state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(historyId);
   await ref.set(
     {
       paymentStatus: normalized,
+      paymentNote,
       paidAt: normalized === "paid" ? new Date().toISOString() : "",
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     },
