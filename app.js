@@ -127,6 +127,7 @@ const el = {
   sessionsPanel: document.getElementById("sessionsPanel"),
   previewPanel: document.getElementById("previewPanel"),
   billingActionToolbar: document.getElementById("billingActionToolbar"),
+  billingInvoiceInfoSection: document.getElementById("billingInvoiceInfoSection"),
 
   sessionsTitle: document.getElementById("sessionsTitle"),
   tableBody: document.querySelector("#sessionsTable tbody"),
@@ -925,6 +926,7 @@ async function setActiveTab(nextTab, { force = false } = {}) {
   if (el.sessionsPanel) el.sessionsPanel.classList.toggle("hidden", !billingTab);
   if (el.previewPanel) el.previewPanel.classList.toggle("hidden", !billingTab);
   if (el.billingActionToolbar) el.billingActionToolbar.classList.toggle("hidden", !billingTab);
+  if (el.billingInvoiceInfoSection) el.billingInvoiceInfoSection.classList.toggle("hidden", !billingTab);
 
   if (tab === "front" || tab === "after") {
     state.mode = tab;
@@ -3161,7 +3163,7 @@ function renderPaymentStatusTable() {
         <td>${invoiceDate ? escapeHtml(formatTanggal(invoiceDate)) : "-"}</td>
         <td>${deadlineDate ? escapeHtml(formatTanggalWaktu(deadlineDate)) : "-"}</td>
         <td>
-          <select data-payment-status>
+          <select data-payment-status class="payment-status-select ${status}">
             <option value="issued" ${status === "issued" ? "selected" : ""}>ISSUED</option>
             <option value="paid" ${status === "paid" ? "selected" : ""}>PAID</option>
           </select>

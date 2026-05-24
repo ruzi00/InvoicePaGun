@@ -403,6 +403,20 @@ textarea {
   background: #edfbf2;
 }
 
+.payment-status-select.issued {
+  border-color: #dfbe87;
+  background: #fff5df;
+  color: #7f571d;
+  font-weight: 700;
+}
+
+.payment-status-select.paid {
+  border-color: #9ccfb2;
+  background: #e9f9ef;
+  color: #236846;
+  font-weight: 700;
+}
+
 .mode-section {
   margin-top: 14px;
   border-top: 1px dashed #cfbb97;

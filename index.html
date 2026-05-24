@@ -191,31 +191,33 @@
         </details>
       </details>
 
-      <h3>Informasi Invoice</h3>
-      <div class="grid-2">
-        <label class="field">
-          <span>Judul Invoice</span>
-          <input id="invoiceTitle" type="text" value="INVOICE LES" />
-        </label>
-        <label class="field">
-          <span>Tanggal Invoice</span>
-          <input id="invoiceDate" type="date" />
-        </label>
-        <label class="field">
-          <span>Nama Panggilan Siswa</span>
-          <input id="studentSelect" type="text" list="studentOptions" placeholder="Ketik nama siswa..." autocomplete="off" />
-          <datalist id="studentOptions"></datalist>
-        </label>
-      </div>
+      <section id="billingInvoiceInfoSection">
+        <h3>Informasi Invoice</h3>
+        <div class="grid-2">
+          <label class="field">
+            <span>Judul Invoice</span>
+            <input id="invoiceTitle" type="text" value="INVOICE LES" />
+          </label>
+          <label class="field">
+            <span>Tanggal Invoice</span>
+            <input id="invoiceDate" type="date" />
+          </label>
+          <label class="field">
+            <span>Nama Panggilan Siswa</span>
+            <input id="studentSelect" type="text" list="studentOptions" placeholder="Ketik nama siswa..." autocomplete="off" />
+            <datalist id="studentOptions"></datalist>
+          </label>
+        </div>
 
-      <div class="grid-1">
-        <label class="field readonly">
-          <span>Total Tagihan Terpilih</span>
-          <input id="totalTagihan" type="text" readonly value="Rp0" />
-        </label>
-      </div>
+        <div class="grid-1">
+          <label class="field readonly">
+            <span>Total Tagihan Terpilih</span>
+            <input id="totalTagihan" type="text" readonly value="Rp0" />
+          </label>
+        </div>
 
-      <div id="studentDetail" class="student-detail">Detail siswa akan muncul di sini.</div>
+        <div id="studentDetail" class="student-detail">Detail siswa akan muncul di sini.</div>
+      </section>
 
       <section id="frontSection" class="mode-section">
         <h3>Pengaturan Payment in Front (Mingguan)</h3>
