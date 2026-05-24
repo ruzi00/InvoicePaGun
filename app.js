@@ -2995,23 +2995,35 @@ function renderInvoiceCalendar() {
 
   const dayMap = new Map();
   state.dashboardInvoices.forEach((item) => {
-    const d = parseDateInput(String(item.paymentDeadline || item.invoiceDate || ""));
-    if (!d) return;
-    if (d < start || d > end) return;
-    const key = toLocalDateInputValue(d);
-    const list = dayMap.get(key) || [];
-    list.push(item);
-    dayMap.set(key, list);
+    if (String(item.mode || "").toLowerCase() !== "after") return;
+    const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
+    const sessions = Array.isArray(item.items) ? item.items : [];
+    const seenDates = new Set();
+
+    sessions.forEach((session) => {
+      const d = parseDateInput(String(session?.tanggal || ""));
+      if (!d) return;
+      if (d < start || d > end) return;
+      const key = toLocalDateInputValue(d);
+      if (seenDates.has(key)) return;
+      seenDates.add(key);
+      const list = dayMap.get(key) || [];
+      list.push({
+        invoiceNo: item.invoiceNo,
+        student: item.student,
+        status,
+      });
+      dayMap.set(key, list);
+    });
   });
 
   const cells = [];
   for (let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)) {
     const key = toLocalDateInputValue(cursor);
-    const invoices = dayMap.get(key) || [];
-    const cards = invoices
-      .map((item) => {
-        const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
-        return `<div class="cal-item ${status}"><span>${escapeHtml(item.invoiceNo || "INV")}</span><strong>${status.toUpperCase()}</strong></div>`;
+    const booked = dayMap.get(key) || [];
+    const cards = booked
+      .map((entry) => {
+        return `<div class="cal-item ${entry.status}"><span>${escapeHtml(entry.invoiceNo || "INV")} • ${escapeHtml(entry.student || "-")}</span><strong>${entry.status.toUpperCase()}</strong></div>`;
       })
       .join("");
 
