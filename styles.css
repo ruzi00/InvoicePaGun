@@ -897,6 +897,22 @@ h3 {
   margin: 0 0 10px;
 }
 
+#studentHardDeletePreview {
+  margin-top: 6px;
+}
+
+#studentHardDeleteConfirmSection {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #d4ba92;
+}
+
+#btnStudentHardDeleteConfirm {
+  background: linear-gradient(135deg, #c63b3b, #982424);
+  border-color: #7f1f1f;
+  color: #fff;
+}
+
 .data-management-grid > div {
   min-height: 10px;
 }

@@ -464,6 +464,35 @@
             </div>
           </form>
         </dialog>
+
+        <dialog id="studentHardDeleteModal" class="student-modal">
+          <div class="student-modal-form">
+            <h4>Hard Delete Siswa (Admin)</h4>
+            <p class="sub">Pilih siswa terlebih dahulu, cek preview, lalu konfirmasi penghapusan permanen.</p>
+            <div class="grid-2">
+              <label class="field" style="grid-column: span 2;">
+                <span>Pilih Siswa</span>
+                <select id="studentHardDeleteSelect">
+                  <option value="">- Pilih siswa -</option>
+                </select>
+              </label>
+            </div>
+            <div id="studentHardDeletePreview" class="runtime-notice">Preview siswa akan muncul di sini.</div>
+            <div class="toolbar">
+              <button id="btnStudentHardDeleteArm" type="button" class="btn">Lanjut Konfirmasi</button>
+              <button id="btnStudentHardDeleteCancel" type="button" class="btn sekund">Batal</button>
+            </div>
+            <div id="studentHardDeleteConfirmSection" class="hidden">
+              <label class="field">
+                <span>Ketik HAPUS-PERMANEN untuk konfirmasi</span>
+                <input id="studentHardDeleteToken" type="text" autocomplete="off" />
+              </label>
+              <div class="toolbar">
+                <button id="btnStudentHardDeleteConfirm" type="button" class="btn">Hapus Permanen Sekarang</button>
+              </div>
+            </div>
+          </div>
+        </dialog>
       </section>
 
       <section id="pricingManagementSection" class="mode-section hidden">

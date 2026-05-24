@@ -224,6 +224,14 @@ const el = {
   studentFormParentWa: document.getElementById("studentFormParentWa"),
   studentFormStudyHistory: document.getElementById("studentFormStudyHistory"),
   btnStudentFormCancel: document.getElementById("btnStudentFormCancel"),
+  studentHardDeleteModal: document.getElementById("studentHardDeleteModal"),
+  studentHardDeleteSelect: document.getElementById("studentHardDeleteSelect"),
+  studentHardDeletePreview: document.getElementById("studentHardDeletePreview"),
+  btnStudentHardDeleteArm: document.getElementById("btnStudentHardDeleteArm"),
+  btnStudentHardDeleteCancel: document.getElementById("btnStudentHardDeleteCancel"),
+  studentHardDeleteConfirmSection: document.getElementById("studentHardDeleteConfirmSection"),
+  studentHardDeleteToken: document.getElementById("studentHardDeleteToken"),
+  btnStudentHardDeleteConfirm: document.getElementById("btnStudentHardDeleteConfirm"),
   pricingManageTableBody: document.getElementById("pricingManageTableBody"),
   btnPricingManageAddRow: document.getElementById("btnPricingManageAddRow"),
   btnPricingManageApply: document.getElementById("btnPricingManageApply"),
@@ -698,20 +706,51 @@ function bindEvents() {
       alert("Hubungkan Firebase terlebih dahulu.");
       return;
     }
-    const token = window.prompt("Mode admin hard delete: ketik ADMIN-HARD-DELETE untuk melanjutkan.", "");
-    if (String(token || "").trim() !== "ADMIN-HARD-DELETE") {
-      alert("Token admin tidak valid. Hard delete dibatalkan.");
+    renderStudentHardDeleteOptions();
+    if (el.studentHardDeleteSelect) el.studentHardDeleteSelect.value = "";
+    if (el.studentHardDeleteToken) el.studentHardDeleteToken.value = "";
+    el.studentHardDeleteConfirmSection?.classList.add("hidden");
+    renderStudentHardDeletePreview("");
+    el.studentHardDeleteModal?.showModal();
+  });
+
+  el.studentHardDeleteSelect?.addEventListener("change", () => {
+    renderStudentHardDeletePreview(String(el.studentHardDeleteSelect?.value || ""));
+    el.studentHardDeleteConfirmSection?.classList.add("hidden");
+    if (el.studentHardDeleteToken) el.studentHardDeleteToken.value = "";
+  });
+
+  el.btnStudentHardDeleteCancel?.addEventListener("click", () => {
+    el.studentHardDeleteModal?.close();
+  });
+
+  el.btnStudentHardDeleteArm?.addEventListener("click", () => {
+    const studentId = String(el.studentHardDeleteSelect?.value || "").trim();
+    if (!studentId) {
+      alert("Pilih siswa yang ingin dihapus permanen.");
       return;
     }
+    el.studentHardDeleteConfirmSection?.classList.remove("hidden");
+    el.studentHardDeleteToken?.focus();
+  });
 
-    const targetId = window.prompt("Masukkan studentId yang ingin dihapus permanen:", "");
-    const studentId = String(targetId || "").trim();
-    if (!studentId) return;
+  el.btnStudentHardDeleteConfirm?.addEventListener("click", async () => {
+    const studentId = String(el.studentHardDeleteSelect?.value || "").trim();
+    if (!studentId) {
+      alert("Pilih siswa terlebih dahulu.");
+      return;
+    }
+    const token = String(el.studentHardDeleteToken?.value || "").trim().toUpperCase();
+    if (token !== "HAPUS-PERMANEN") {
+      alert("Token konfirmasi salah. Hard delete dibatalkan.");
+      return;
+    }
 
     await hardDeleteStudentRecord(studentId);
     state.students = (state.students || []).filter((s) => String(s.studentId || "") !== studentId);
     normalizeStudentsState({ sort: false, syncEditors: true });
     renderStudentManagementTable();
+    el.studentHardDeleteModal?.close();
   });
 
   el.studentManageGradeFilter?.addEventListener("change", () => {
@@ -2810,6 +2849,34 @@ function getStudentRecordFromInvoice(item) {
     || state.studentsByNickname.get(normalizeName(item?.student || ""))
     || state.studentsByFullName.get(normalizeName(item?.studentDetail?.fullName || ""))
     || null;
+}
+
+function renderStudentHardDeleteOptions() {
+  if (!el.studentHardDeleteSelect) return;
+  const options = (state.students || [])
+    .slice()
+    .sort((a, b) => String(a.nickname || "").localeCompare(String(b.nickname || ""), "id"))
+    .map((student) => `<option value="${escapeHtml(student.studentId || "")}">${escapeHtml(student.nickname || student.fullName || "-")} (${escapeHtml(student.kelas || "-")})</option>`);
+
+  el.studentHardDeleteSelect.innerHTML = ['<option value="">- Pilih siswa -</option>', ...options].join("");
+}
+
+function renderStudentHardDeletePreview(studentId) {
+  if (!el.studentHardDeletePreview) return;
+  const student = getStudentRecordById(studentId);
+  if (!student) {
+    el.studentHardDeletePreview.innerHTML = "Preview siswa akan muncul di sini.";
+    return;
+  }
+
+  el.studentHardDeletePreview.innerHTML = [
+    `<strong>${escapeHtml(student.nickname || student.fullName || "-")}</strong>`,
+    `ID: ${escapeHtml(student.studentId || "-")}`,
+    `Nama Lengkap: ${escapeHtml(student.fullName || "-")}`,
+    `Kelas: ${escapeHtml(student.kelas || "-")}`,
+    `Sekolah: ${escapeHtml(student.sekolah || "-")}`,
+    `Orang Tua/Wali: ${escapeHtml(student.parentName || "-")}`,
+  ].join("<br/>");
 }
 
 function getStudentDisplayName(studentName, detail = null) {
