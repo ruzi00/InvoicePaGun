@@ -116,6 +116,8 @@ const el = {
   calendarSection: document.getElementById("calendarSection"),
   paymentStatusSection: document.getElementById("paymentStatusSection"),
   btnCalendarRefresh: document.getElementById("btnCalendarRefresh"),
+  btnDownloadCalendarCurrentMonth: document.getElementById("btnDownloadCalendarCurrentMonth"),
+  btnDownloadCalendarNextMonth: document.getElementById("btnDownloadCalendarNextMonth"),
   btnCalendarPrevWeek: document.getElementById("btnCalendarPrevWeek"),
   btnCalendarNextWeek: document.getElementById("btnCalendarNextWeek"),
   calendarWeekLabel: document.getElementById("calendarWeekLabel"),
@@ -467,6 +469,14 @@ function bindEvents() {
     if (state.calendarWeekIndex >= Math.max(0, state.calendarWeekCount - 1)) return;
     state.calendarWeekIndex += 1;
     renderInvoiceCalendar();
+  });
+
+  el.btnDownloadCalendarCurrentMonth?.addEventListener("click", async () => {
+    await downloadCalendarMonthPng(0);
+  });
+
+  el.btnDownloadCalendarNextMonth?.addEventListener("click", async () => {
+    await downloadCalendarMonthPng(1);
   });
 
   el.btnPaymentStatusRefresh?.addEventListener("click", async () => {
@@ -2555,6 +2565,8 @@ function refreshFirebaseButtons() {
   if (el.btnInvoiceHistoryPrev) el.btnInvoiceHistoryPrev.disabled = !ready || state.invoiceHistoryQuery.cursorStack.length === 0;
   if (el.btnInvoiceHistoryNext) el.btnInvoiceHistoryNext.disabled = !ready || !state.invoiceHistoryQuery.hasNext;
   if (el.btnCalendarRefresh) el.btnCalendarRefresh.disabled = !ready;
+  if (el.btnDownloadCalendarCurrentMonth) el.btnDownloadCalendarCurrentMonth.disabled = !ready;
+  if (el.btnDownloadCalendarNextMonth) el.btnDownloadCalendarNextMonth.disabled = !ready;
   if (el.btnPaymentStatusRefresh) el.btnPaymentStatusRefresh.disabled = !ready;
   const saveButtons = [
     el.btnCsvSaveStudents,
@@ -3014,31 +3026,198 @@ function getStartOfWeekMonday(date) {
   return addDays(d, diff);
 }
 
-function getCalendarSessionTimeLabel(session) {
-  const jamMulai = String(session?.jamMulai || "").trim();
-  const jamSelesai = String(session?.jamSelesai || "").trim();
-  if (jamMulai && jamMulai !== "-" && jamSelesai && jamSelesai !== "-") {
-    return `${jamMulai}-${jamSelesai}`;
-  }
-  if (jamMulai && jamMulai !== "-") {
-    return jamMulai;
-  }
-  return "Tanpa Jam";
+function roundDownToStep(value, step) {
+  return Math.floor(value / step) * step;
 }
 
-function sortCalendarTimeLabels(labels) {
-  return [...labels].sort((a, b) => {
-    if (a === "Tanpa Jam") return 1;
-    if (b === "Tanpa Jam") return -1;
-    const aStart = String(a || "").split("-")[0];
-    const bStart = String(b || "").split("-")[0];
-    const aMin = parseTimeToMinutes(aStart);
-    const bMin = parseTimeToMinutes(bStart);
-    if (aMin >= 0 && bMin >= 0) return aMin - bMin;
-    if (aMin >= 0) return -1;
-    if (bMin >= 0) return 1;
-    return a.localeCompare(b, "id");
+function roundUpToStep(value, step) {
+  return Math.ceil(value / step) * step;
+}
+
+function formatMinuteLabel(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function formatMonthShort(date) {
+  return new Intl.DateTimeFormat("id-ID", { month: "short" }).format(date);
+}
+
+function assignCalendarEntryLanes(entries) {
+  const sorted = [...entries].sort((a, b) => {
+    if (a.startMin !== b.startMin) return a.startMin - b.startMin;
+    if (a.endMin !== b.endMin) return a.endMin - b.endMin;
+    return String(a.student || "").localeCompare(String(b.student || ""), "id");
   });
+
+  const laneEnds = [];
+  const laidOut = sorted.map((entry) => {
+    let lane = laneEnds.findIndex((endMin) => endMin <= entry.startMin);
+    if (lane < 0) {
+      lane = laneEnds.length;
+      laneEnds.push(entry.endMin);
+    } else {
+      laneEnds[lane] = entry.endMin;
+    }
+    return { ...entry, lane };
+  });
+
+  return {
+    entries: laidOut,
+    laneCount: Math.max(1, laneEnds.length),
+  };
+}
+
+function buildCalendarViewModel(days, viewStart, viewEnd, rangeStart, rangeEnd) {
+  const rowMap = new Map();
+  const timedEntries = [];
+  const teachersInView = new Set();
+
+  const ensureRow = (dayKey, teacher, dayDate) => {
+    const rowKey = `${dayKey}__${teacher}`;
+    if (!rowMap.has(rowKey)) {
+      rowMap.set(rowKey, {
+        dayKey,
+        teacher,
+        dayDate,
+        timed: [],
+        noTime: [],
+      });
+    }
+    return rowMap.get(rowKey);
+  };
+
+  state.dashboardInvoices.forEach((item) => {
+    const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
+    const sessions = Array.isArray(item.items) ? item.items : [];
+
+    sessions.forEach((session) => {
+      const d = parseDateInput(String(session?.tanggal || ""));
+      if (!d) return;
+      if (d < rangeStart || d > rangeEnd) return;
+      if (d < viewStart || d > viewEnd) return;
+
+      const dayKey = toLocalDateInputValue(d);
+      const teacher = String(session?.pengajar || "Tanpa Pengajar").trim() || "Tanpa Pengajar";
+      teachersInView.add(teacher);
+
+      const startMin = parseTimeToMinutes(String(session?.jamMulai || ""));
+      const endMinRaw = parseTimeToMinutes(String(session?.jamSelesai || ""));
+      const durMinFallback = Math.max(15, Math.round(Number(session?.durasi || 0) * 60));
+      const endMin = endMinRaw > startMin ? endMinRaw : (startMin >= 0 ? startMin + durMinFallback : -1);
+
+      const row = ensureRow(dayKey, teacher, d);
+      const entry = {
+        invoiceNo: item.invoiceNo,
+        student: item.student,
+        status,
+        teacher,
+        startMin,
+        endMin,
+      };
+
+      if (startMin >= 0 && endMin > startMin) {
+        row.timed.push(entry);
+        timedEntries.push(entry);
+      } else {
+        row.noTime.push(entry);
+      }
+    });
+  });
+
+  let timelineStart = 8 * 60;
+  let timelineEnd = 21 * 60;
+  if (timedEntries.length > 0) {
+    timelineStart = roundDownToStep(Math.min(...timedEntries.map((e) => e.startMin)), 30);
+    timelineEnd = roundUpToStep(Math.max(...timedEntries.map((e) => e.endMin)), 30);
+    if (timelineEnd <= timelineStart) timelineEnd = timelineStart + 120;
+  }
+
+  const totalMinutes = timelineEnd - timelineStart;
+  const totalUnits = Math.max(2, Math.round(totalMinutes / 15));
+  const teachers = [...teachersInView].sort((a, b) => a.localeCompare(b, "id"));
+  if (teachers.length === 0) teachers.push("Tanpa Pengajar");
+
+  return {
+    days,
+    rangeStart,
+    rangeEnd,
+    ensureRow,
+    timelineStart,
+    timelineEnd,
+    totalMinutes,
+    totalUnits,
+    teachers,
+  };
+}
+
+function buildCalendarBoardHtml(model) {
+  const tickLabels = [];
+  for (let m = model.timelineStart; m <= model.timelineEnd; m += 30) {
+    const left = ((m - model.timelineStart) / model.totalMinutes) * 100;
+    tickLabels.push(`<span style="left:${left}%;">${escapeHtml(formatMinuteLabel(m))}</span>`);
+  }
+
+  const rowsHtml = model.days
+    .map((d) => {
+      const dayKey = toLocalDateInputValue(d);
+      const outRange = d < model.rangeStart || d > model.rangeEnd;
+      return model.teachers
+        .map((teacher, teacherIndex) => {
+          const row = model.ensureRow(dayKey, teacher, d);
+          const dayLabel = teacherIndex === 0
+            ? `<div class="cal-day-label ${outRange ? "out-range" : ""}"><em>${escapeHtml(formatMonthShort(d))}</em><span>${escapeHtml(HARI[d.getDay()])}</span><strong>${d.getDate()}</strong></div>`
+            : "<div class=\"cal-day-label-spacer\"></div>";
+
+          const laneLayout = assignCalendarEntryLanes(row.timed);
+          const blocks = laneLayout.entries
+            .map((entry) => {
+              const startOffset = Math.max(0, entry.startMin - model.timelineStart);
+              const widthMin = Math.max(15, entry.endMin - entry.startMin);
+              const left = (startOffset / model.totalMinutes) * 100;
+              const width = (widthMin / model.totalMinutes) * 100;
+              const tooltip = `Invoice: ${entry.invoiceNo || "INV"}\nStatus: ${String(entry.status || "issued").toUpperCase()}\nSiswa: ${entry.student || "-"}\nPengajar: ${entry.teacher || "-"}`;
+              return `<div class="cal-slot-item ${entry.status}" title="${escapeHtml(tooltip)}" style="left:${left}%;width:${width}%;--lane:${entry.lane};"><small>${escapeHtml(entry.student || "-")}</small></div>`;
+            })
+            .join("");
+
+          const noTimeBadges = row.noTime
+            .map((entry) => {
+              const tooltip = `Invoice: ${entry.invoiceNo || "INV"}\nStatus: ${String(entry.status || "issued").toUpperCase()}\nSiswa: ${entry.student || "-"}\nPengajar: ${entry.teacher || "-"}`;
+              return `<span class="cal-notime-badge ${entry.status}" title="${escapeHtml(tooltip)}">${escapeHtml(entry.student || "-")}</span>`;
+            })
+            .join("");
+
+          return `
+            <div class="cal-week-row ${teacherIndex === 0 ? "day-separator-top" : ""} ${outRange ? "out-range" : ""}">
+              ${dayLabel}
+              <div class="cal-teacher-axis ${outRange ? "out-range" : ""}">${escapeHtml(teacher)}</div>
+              <div class="cal-track-wrap ${outRange ? "out-range" : ""}" style="--total-units:${model.totalUnits};--lane-count:${laneLayout.laneCount};">
+                <div class="cal-track-grid"></div>
+                ${blocks}
+                ${noTimeBadges ? `<div class="cal-notime-wrap">${noTimeBadges}</div>` : ""}
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    })
+    .join("");
+
+  return `
+    <div class="calendar-weekly-board">
+      <div class="cal-header-row">
+        <div class="cal-header-day">Bulan / Hari</div>
+        <div class="cal-header-teacher">Pengajar</div>
+        <div class="cal-time-ruler" style="--total-units:${model.totalUnits};">
+          <div class="cal-track-grid"></div>
+          ${tickLabels.join("")}
+        </div>
+      </div>
+      ${rowsHtml}
+    </div>
+  `;
 }
 
 function renderInvoiceCalendar() {
@@ -3059,92 +3238,61 @@ function renderInvoiceCalendar() {
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const weekEnd = weekDays[6];
   if (el.calendarWeekLabel) {
-    el.calendarWeekLabel.textContent = `Minggu ${state.calendarWeekIndex + 1}/${totalWeeks} • ${formatTanggal(weekStart)} - ${formatTanggal(weekEnd)}`;
+    el.calendarWeekLabel.textContent = `Minggu ${state.calendarWeekIndex + 1}/${totalWeeks} | ${formatTanggal(weekStart)} - ${formatTanggal(weekEnd)}`;
   }
 
-  const slotMap = new Map();
-  const allTimeLabels = new Set();
-  const teacherSet = new Set();
-  state.dashboardInvoices.forEach((item) => {
-    const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
-    const sessions = Array.isArray(item.items) ? item.items : [];
+  const model = buildCalendarViewModel(weekDays, weekStart, weekEnd, start, end);
+  el.invoiceCalendarGrid.innerHTML = buildCalendarBoardHtml(model);
+}
 
-    sessions.forEach((session) => {
-      const d = parseDateInput(String(session?.tanggal || ""));
-      if (!d) return;
-      if (d < start || d > end) return;
-      if (d < weekStart || d > weekEnd) return;
-      const key = toLocalDateInputValue(d);
-      const timeLabel = getCalendarSessionTimeLabel(session);
-      const teacher = String(session?.pengajar || "Tanpa Pengajar").trim() || "Tanpa Pengajar";
-      teacherSet.add(teacher);
-      allTimeLabels.add(timeLabel);
-      const slotKey = `${key}__${timeLabel}__${teacher}`;
-      const list = slotMap.get(slotKey) || [];
-      list.push({
-        invoiceNo: item.invoiceNo,
-        student: item.student,
-        status,
-        teacher,
-      });
-      slotMap.set(slotKey, list);
+async function downloadCalendarMonthPng(monthOffset) {
+  if (typeof window.html2canvas !== "function") {
+    alert("Fitur Download PNG belum siap. Coba refresh halaman saat internet aktif.");
+    return;
+  }
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 0);
+  const days = [];
+  for (let d = new Date(monthStart); d <= monthEnd; d = addDays(d, 1)) {
+    days.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+  }
+
+  const model = buildCalendarViewModel(days, monthStart, monthEnd, monthStart, monthEnd);
+  const title = `Kalender ${new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(monthStart)}`;
+
+  const host = document.createElement("div");
+  host.style.position = "fixed";
+  host.style.left = "-99999px";
+  host.style.top = "0";
+  host.style.zIndex = "-1";
+  host.style.width = "1800px";
+
+  const sheet = document.createElement("div");
+  sheet.style.background = "#ffffff";
+  sheet.style.padding = "16px";
+  sheet.innerHTML = `<h3 style="margin:0 0 10px; color:#4c3d2a;">${escapeHtml(title)}</h3>${buildCalendarBoardHtml(model)}`;
+  host.appendChild(sheet);
+  document.body.appendChild(host);
+
+  try {
+    const canvas = await window.html2canvas(sheet, {
+      scale: 2,
+      useCORS: false,
+      allowTaint: false,
+      imageTimeout: 0,
+      backgroundColor: "#ffffff",
+      logging: false,
     });
-  });
-
-  const timeLabels = sortCalendarTimeLabels(allTimeLabels.size > 0 ? Array.from(allTimeLabels) : ["Tanpa Jam"]);
-  const teachers = [...teacherSet].sort((a, b) => a.localeCompare(b, "id"));
-  if (teachers.length === 0) teachers.push("Tanpa Pengajar");
-
-  const headerTimeCells = timeLabels
-    .map((timeLabel) => `<th class="cal-time-head-col">${escapeHtml(timeLabel)}</th>`)
-    .join("");
-
-  const bodyRows = weekDays
-    .map((d) => {
-      const outRange = d < start || d > end;
-      const dayKey = toLocalDateInputValue(d);
-      return teachers
-        .map((teacher, teacherIndex) => {
-          const dayLabelCell = teacherIndex === 0
-            ? `<th class="cal-day-axis ${outRange ? "out-range" : ""}" rowspan="${teachers.length}"><span>${escapeHtml(HARI[d.getDay()])}</span><strong>${d.getDate()}</strong></th>`
-            : "";
-
-          const timeCells = timeLabels
-            .map((timeLabel) => {
-              const slotKey = `${dayKey}__${timeLabel}__${teacher}`;
-              const entries = slotMap.get(slotKey) || [];
-              const cards = entries
-                .map((entry) => {
-                  const tooltip = `Invoice: ${entry.invoiceNo || "INV"}\nStatus: ${String(entry.status || "issued").toUpperCase()}\nSiswa: ${entry.student || "-"}\nPengajar: ${entry.teacher || "-"}`;
-                  return `<div class="cal-slot-item ${entry.status}" title="${escapeHtml(tooltip)}"><small>${escapeHtml(entry.student || "-")}</small></div>`;
-                })
-                .join("");
-              return `<td class="cal-slot-cell ${outRange ? "out-range" : ""}">${cards || ""}</td>`;
-            })
-            .join("");
-
-          return `<tr class="${teacherIndex === 0 ? "day-separator-top" : ""}">${dayLabelCell}<th class="cal-teacher-axis ${outRange ? "out-range" : ""}">${escapeHtml(teacher)}</th>${timeCells}</tr>`;
-        })
-        .join("");
-    })
-    .join("");
-
-  el.invoiceCalendarGrid.innerHTML = `
-    <div class="table-wrap">
-      <table class="calendar-week-table">
-        <thead>
-          <tr>
-            <th class="cal-day-head">Hari</th>
-            <th class="cal-teacher-head">Pengajar</th>
-            ${headerTimeCells}
-          </tr>
-        </thead>
-        <tbody>
-          ${bodyRows}
-        </tbody>
-      </table>
-    </div>
-  `;
+    const y = monthStart.getFullYear();
+    const m = String(monthStart.getMonth() + 1).padStart(2, "0");
+    downloadCanvas(canvas, `calendar-${y}-${m}.png`);
+  } catch {
+    alert("Gagal membuat PNG kalender bulanan.");
+  } finally {
+    host.remove();
+  }
 }
 
 function renderPaymentStatusTable() {

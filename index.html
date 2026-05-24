@@ -309,6 +309,8 @@
         <p class="sub">Menampilkan rentang 2 bulan: bulan sekarang sampai akhir bulan berikutnya, dalam tampilan mingguan (Senin-Minggu) dengan slot waktu tutor.</p>
         <div class="preview-actions history-pagination-actions">
           <button id="btnCalendarRefresh" type="button" class="btn" disabled>Muat Kalender dari Firebase</button>
+          <button id="btnDownloadCalendarCurrentMonth" type="button" class="btn" disabled>Download Bulan Ini</button>
+          <button id="btnDownloadCalendarNextMonth" type="button" class="btn" disabled>Download Bulan Depan</button>
           <span id="calendarRangeLabel" class="sub history-page-info">-</span>
         </div>
         <div class="preview-actions history-pagination-actions">
@@ -349,10 +351,6 @@
         </div>
       </section>
 
-      <div id="billingActionToolbar" class="toolbar">
-        <button id="btnGenerate" type="button" class="btn utama">Generate Invoice</button>
-        <button id="btnDownloadPng" type="button" class="btn" disabled>Download PNG</button>
-      </div>
     </section>
 
     <section id="sessionsPanel" class="panel panel-data">
@@ -381,6 +379,11 @@
         </table>
       </div>
     </section>
+
+    <div id="billingActionToolbar" class="toolbar">
+      <button id="btnGenerate" type="button" class="btn utama">Generate Invoice</button>
+      <button id="btnDownloadPng" type="button" class="btn" disabled>Download PNG</button>
+    </div>
 
     <section id="previewPanel" class="panel panel-invoice">
       <h2>Pratinjau Invoice</h2>
