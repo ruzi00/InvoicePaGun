@@ -304,12 +304,17 @@
 
       <section id="calendarSection" class="mode-section hidden">
         <h3>Kalender Invoice</h3>
-        <p class="sub">Menampilkan rentang 2 bulan: bulan sekarang sampai akhir bulan berikutnya. Status kartu: ISSUED (belum lunas) atau PAID.</p>
+        <p class="sub">Menampilkan rentang 2 bulan: bulan sekarang sampai akhir bulan berikutnya, dalam tampilan mingguan (Senin-Minggu) dengan slot waktu tutor.</p>
         <div class="preview-actions history-pagination-actions">
           <button id="btnCalendarRefresh" type="button" class="btn" disabled>Muat Kalender dari Firebase</button>
           <span id="calendarRangeLabel" class="sub history-page-info">-</span>
         </div>
-        <div id="invoiceCalendarGrid" class="invoice-calendar-grid"></div>
+        <div class="preview-actions history-pagination-actions">
+          <button id="btnCalendarPrevWeek" type="button" class="btn">Minggu Sebelumnya</button>
+          <button id="btnCalendarNextWeek" type="button" class="btn">Minggu Berikutnya</button>
+          <span id="calendarWeekLabel" class="sub history-page-info">-</span>
+        </div>
+        <div id="invoiceCalendarGrid" class="invoice-calendar-weekly"></div>
       </section>
 
       <section id="paymentStatusSection" class="mode-section hidden">

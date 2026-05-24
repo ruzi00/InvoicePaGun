@@ -44,6 +44,8 @@ const state = {
   lastInvoiceRecord: null,
   invoiceHistory: [],
   dashboardInvoices: [],
+  calendarWeekIndex: 0,
+  calendarWeekCount: 0,
   invoiceHistoryQuery: {
     pageSize: 20,
     studentFilter: "",
@@ -114,6 +116,9 @@ const el = {
   calendarSection: document.getElementById("calendarSection"),
   paymentStatusSection: document.getElementById("paymentStatusSection"),
   btnCalendarRefresh: document.getElementById("btnCalendarRefresh"),
+  btnCalendarPrevWeek: document.getElementById("btnCalendarPrevWeek"),
+  btnCalendarNextWeek: document.getElementById("btnCalendarNextWeek"),
+  calendarWeekLabel: document.getElementById("calendarWeekLabel"),
   calendarRangeLabel: document.getElementById("calendarRangeLabel"),
   invoiceCalendarGrid: document.getElementById("invoiceCalendarGrid"),
   btnPaymentStatusRefresh: document.getElementById("btnPaymentStatusRefresh"),
@@ -449,6 +454,18 @@ function bindEvents() {
       setFirebaseStatus(err.message || "Gagal memuat kalender invoice.", "error");
       alert(err.message);
     }
+  });
+
+  el.btnCalendarPrevWeek?.addEventListener("click", () => {
+    if (state.calendarWeekIndex <= 0) return;
+    state.calendarWeekIndex -= 1;
+    renderInvoiceCalendar();
+  });
+
+  el.btnCalendarNextWeek?.addEventListener("click", () => {
+    if (state.calendarWeekIndex >= Math.max(0, state.calendarWeekCount - 1)) return;
+    state.calendarWeekIndex += 1;
+    renderInvoiceCalendar();
   });
 
   el.btnPaymentStatusRefresh?.addEventListener("click", async () => {
@@ -2975,6 +2992,7 @@ async function refreshDashboardInvoices({ forceServer = false } = {}) {
     paymentStatus: String(doc.data()?.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued",
     ...doc.data(),
   }));
+  state.calendarWeekIndex = 0;
 
   renderPaymentStatusTable();
   renderInvoiceCalendar();
@@ -2987,57 +3005,129 @@ function getCalendarRangeBase() {
   return { start, end };
 }
 
+function getStartOfWeekMonday(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  return addDays(d, diff);
+}
+
+function getCalendarSessionTimeLabel(session) {
+  const jamMulai = String(session?.jamMulai || "").trim();
+  const jamSelesai = String(session?.jamSelesai || "").trim();
+  if (jamMulai && jamMulai !== "-" && jamSelesai && jamSelesai !== "-") {
+    return `${jamMulai}-${jamSelesai}`;
+  }
+  if (jamMulai && jamMulai !== "-") {
+    return jamMulai;
+  }
+  return "Tanpa Jam";
+}
+
+function sortCalendarTimeLabels(labels) {
+  return [...labels].sort((a, b) => {
+    if (a === "Tanpa Jam") return 1;
+    if (b === "Tanpa Jam") return -1;
+    const aStart = String(a || "").split("-")[0];
+    const bStart = String(b || "").split("-")[0];
+    const aMin = parseTimeToMinutes(aStart);
+    const bMin = parseTimeToMinutes(bStart);
+    if (aMin >= 0 && bMin >= 0) return aMin - bMin;
+    if (aMin >= 0) return -1;
+    if (bMin >= 0) return 1;
+    return a.localeCompare(b, "id");
+  });
+}
+
 function renderInvoiceCalendar() {
   if (!el.invoiceCalendarGrid || !el.calendarRangeLabel) return;
 
   const { start, end } = getCalendarRangeBase();
   el.calendarRangeLabel.textContent = `${formatTanggal(start)} - ${formatTanggal(end)}`;
 
-  const dayMap = new Map();
+  const viewStart = getStartOfWeekMonday(start);
+  const viewEnd = addDays(getStartOfWeekMonday(end), 6);
+  const totalWeeks = Math.max(1, Math.round((viewEnd - viewStart) / (7 * 24 * 60 * 60 * 1000)) + 1);
+  state.calendarWeekCount = totalWeeks;
+  state.calendarWeekIndex = Math.max(0, Math.min(state.calendarWeekIndex, totalWeeks - 1));
+  if (el.btnCalendarPrevWeek) el.btnCalendarPrevWeek.disabled = state.calendarWeekIndex <= 0;
+  if (el.btnCalendarNextWeek) el.btnCalendarNextWeek.disabled = state.calendarWeekIndex >= totalWeeks - 1;
+
+  const weekStart = addDays(viewStart, state.calendarWeekIndex * 7);
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const weekEnd = weekDays[6];
+  if (el.calendarWeekLabel) {
+    el.calendarWeekLabel.textContent = `Minggu ${state.calendarWeekIndex + 1}/${totalWeeks} • ${formatTanggal(weekStart)} - ${formatTanggal(weekEnd)}`;
+  }
+
+  const slotMap = new Map();
+  const allTimeLabels = new Set();
   state.dashboardInvoices.forEach((item) => {
     const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
     const sessions = Array.isArray(item.items) ? item.items : [];
-    const seenDates = new Set();
 
     sessions.forEach((session) => {
       const d = parseDateInput(String(session?.tanggal || ""));
       if (!d) return;
       if (d < start || d > end) return;
+      if (d < weekStart || d > weekEnd) return;
       const key = toLocalDateInputValue(d);
-      if (seenDates.has(key)) return;
-      seenDates.add(key);
-      const list = dayMap.get(key) || [];
+      const timeLabel = getCalendarSessionTimeLabel(session);
+      allTimeLabels.add(timeLabel);
+      const slotKey = `${key}__${timeLabel}`;
+      const list = slotMap.get(slotKey) || [];
       list.push({
         invoiceNo: item.invoiceNo,
         student: item.student,
         status,
+        teacher: String(session?.pengajar || "-").trim() || "-",
       });
-      dayMap.set(key, list);
+      slotMap.set(slotKey, list);
     });
   });
 
-  const cells = [];
-  for (let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)) {
-    const key = toLocalDateInputValue(cursor);
-    const booked = dayMap.get(key) || [];
-    const cards = booked
-      .map((entry) => {
-        return `<div class="cal-item ${entry.status}"><span>${escapeHtml(entry.invoiceNo || "INV")} • ${escapeHtml(entry.student || "-")}</span><strong>${entry.status.toUpperCase()}</strong></div>`;
-      })
-      .join("");
+  const timeLabels = sortCalendarTimeLabels(allTimeLabels.size > 0 ? Array.from(allTimeLabels) : ["Tanpa Jam"]);
+  const headerCells = weekDays
+    .map((d) => {
+      const outRange = d < start || d > end;
+      return `<th class="cal-week-day ${outRange ? "out-range" : ""}"><span>${escapeHtml(HARI[d.getDay()])}</span><strong>${d.getDate()}</strong></th>`;
+    })
+    .join("");
 
-    cells.push(`
-      <article class="cal-day ${cursor.getMonth() === start.getMonth() ? "month-a" : "month-b"}">
-        <header>
-          <span>${escapeHtml(HARI[cursor.getDay()])}</span>
-          <strong>${cursor.getDate()}</strong>
-        </header>
-        <div class="cal-body">${cards || '<div class="cal-empty">-</div>'}</div>
-      </article>
-    `);
-  }
+  const bodyRows = timeLabels
+    .map((timeLabel) => {
+      const rowCells = weekDays
+        .map((d) => {
+          const outRange = d < start || d > end;
+          const dayKey = toLocalDateInputValue(d);
+          const slotKey = `${dayKey}__${timeLabel}`;
+          const entries = slotMap.get(slotKey) || [];
+          const cards = entries
+            .map((entry) => `<div class="cal-slot-item ${entry.status}"><span>${escapeHtml(entry.invoiceNo || "INV")}</span><small>${escapeHtml(entry.student || "-")} • ${escapeHtml(entry.teacher || "-")}</small><strong>${entry.status.toUpperCase()}</strong></div>`)
+            .join("");
+          return `<td class="cal-slot-cell ${outRange ? "out-range" : ""}">${cards || ""}</td>`;
+        })
+        .join("");
 
-  el.invoiceCalendarGrid.innerHTML = cells.join("");
+      return `<tr><th class="cal-time-axis">${escapeHtml(timeLabel)}</th>${rowCells}</tr>`;
+    })
+    .join("");
+
+  el.invoiceCalendarGrid.innerHTML = `
+    <div class="table-wrap">
+      <table class="calendar-week-table">
+        <thead>
+          <tr>
+            <th class="cal-time-head">Jam Tutor</th>
+            ${headerCells}
+          </tr>
+        </thead>
+        <tbody>
+          ${bodyRows}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function renderPaymentStatusTable() {

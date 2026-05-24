@@ -308,80 +308,99 @@ textarea {
   color: #0e4f68;
 }
 
-.invoice-calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 10px;
+.invoice-calendar-weekly {
+  width: 100%;
 }
 
-.cal-day {
-  border: 1px solid #d8c4a0;
-  border-radius: 10px;
-  background: #fff9ee;
-  padding: 8px;
-  min-height: 124px;
+.calendar-week-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
 }
 
-.cal-day.month-b {
-  background: #f4fbff;
-  border-color: #b8d8e6;
+.calendar-week-table th,
+.calendar-week-table td {
+  border: 1px solid #e2cfad;
+  padding: 6px;
+  vertical-align: top;
 }
 
-.cal-day header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 8px;
-  color: #584a37;
+.cal-time-head,
+.cal-time-axis {
+  width: 110px;
+  min-width: 110px;
+  background: #f3e7cf;
+  color: #574730;
+  font-weight: 700;
 }
 
-.cal-day header span {
-  font-size: 0.8rem;
+.cal-week-day {
+  background: #f8efe0;
+  color: #5a4932;
 }
 
-.cal-day header strong {
-  font-size: 1.05rem;
+.cal-week-day span {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
-.cal-body {
-  display: grid;
-  gap: 6px;
+.cal-week-day strong {
+  display: block;
+  font-size: 1rem;
 }
 
-.cal-item {
+.cal-slot-cell {
+  min-width: 98px;
+  background: #fffdfa;
+}
+
+.cal-slot-cell.out-range,
+.cal-week-day.out-range {
+  background: #ececec !important;
+  color: #8a8a8a;
+}
+
+.cal-slot-item {
   display: grid;
   gap: 2px;
-  border: 1px solid #d6c39f;
+  border: 1px solid #dcc59c;
   border-radius: 8px;
-  padding: 6px;
+  padding: 5px;
+  margin-bottom: 5px;
   background: #fff;
 }
 
-.cal-item.issued {
+.cal-slot-item:last-child {
+  margin-bottom: 0;
+}
+
+.cal-slot-item span {
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: #4d3d2a;
+  word-break: break-word;
+}
+
+.cal-slot-item small {
+  font-size: 0.69rem;
+  color: #6b5b46;
+  word-break: break-word;
+}
+
+.cal-slot-item strong {
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+}
+
+.cal-slot-item.issued {
   border-color: #dfbe87;
   background: #fff5df;
 }
 
-.cal-item.paid {
+.cal-slot-item.paid {
   border-color: #a7d2ba;
   background: #edfbf2;
-}
-
-.cal-item span {
-  font-size: 0.78rem;
-  color: #5a4a34;
-  word-break: break-word;
-}
-
-.cal-item strong {
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-}
-
-.cal-empty {
-  color: #988972;
-  font-size: 0.84rem;
 }
 
 .mode-section {
