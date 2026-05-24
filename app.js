@@ -2995,7 +2995,6 @@ function renderInvoiceCalendar() {
 
   const dayMap = new Map();
   state.dashboardInvoices.forEach((item) => {
-    if (String(item.mode || "").toLowerCase() !== "after") return;
     const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
     const sessions = Array.isArray(item.items) ? item.items : [];
     const seenDates = new Set();
