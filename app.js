@@ -3064,6 +3064,7 @@ function renderInvoiceCalendar() {
 
   const slotMap = new Map();
   const allTimeLabels = new Set();
+  const teacherSet = new Set();
   state.dashboardInvoices.forEach((item) => {
     const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
     const sessions = Array.isArray(item.items) ? item.items : [];
@@ -3075,24 +3076,38 @@ function renderInvoiceCalendar() {
       if (d < weekStart || d > weekEnd) return;
       const key = toLocalDateInputValue(d);
       const timeLabel = getCalendarSessionTimeLabel(session);
+      const teacher = String(session?.pengajar || "Tanpa Pengajar").trim() || "Tanpa Pengajar";
+      teacherSet.add(teacher);
       allTimeLabels.add(timeLabel);
-      const slotKey = `${key}__${timeLabel}`;
+      const slotKey = `${key}__${timeLabel}__${teacher}`;
       const list = slotMap.get(slotKey) || [];
       list.push({
         invoiceNo: item.invoiceNo,
         student: item.student,
         status,
-        teacher: String(session?.pengajar || "-").trim() || "-",
+        teacher,
       });
       slotMap.set(slotKey, list);
     });
   });
 
   const timeLabels = sortCalendarTimeLabels(allTimeLabels.size > 0 ? Array.from(allTimeLabels) : ["Tanpa Jam"]);
-  const headerCells = weekDays
+  const teachers = [...teacherSet].sort((a, b) => a.localeCompare(b, "id"));
+  if (teachers.length === 0) teachers.push("Tanpa Pengajar");
+
+  const headerDayCells = weekDays
     .map((d) => {
       const outRange = d < start || d > end;
-      return `<th class="cal-week-day ${outRange ? "out-range" : ""}"><span>${escapeHtml(HARI[d.getDay()])}</span><strong>${d.getDate()}</strong></th>`;
+      return `<th class="cal-week-day-group ${outRange ? "out-range" : ""}" colspan="${teachers.length}"><span>${escapeHtml(HARI[d.getDay()])}</span><strong>${d.getDate()}</strong></th>`;
+    })
+    .join("");
+
+  const headerTeacherCells = weekDays
+    .map((d) => {
+      const outRange = d < start || d > end;
+      return teachers
+        .map((teacher) => `<th class="cal-teacher-head ${outRange ? "out-range" : ""}">${escapeHtml(teacher)}</th>`)
+        .join("");
     })
     .join("");
 
@@ -3102,12 +3117,19 @@ function renderInvoiceCalendar() {
         .map((d) => {
           const outRange = d < start || d > end;
           const dayKey = toLocalDateInputValue(d);
-          const slotKey = `${dayKey}__${timeLabel}`;
-          const entries = slotMap.get(slotKey) || [];
-          const cards = entries
-            .map((entry) => `<div class="cal-slot-item ${entry.status}"><span>${escapeHtml(entry.invoiceNo || "INV")}</span><small>${escapeHtml(entry.student || "-")} • ${escapeHtml(entry.teacher || "-")}</small><strong>${entry.status.toUpperCase()}</strong></div>`)
+          return teachers
+            .map((teacher) => {
+              const slotKey = `${dayKey}__${timeLabel}__${teacher}`;
+              const entries = slotMap.get(slotKey) || [];
+              const cards = entries
+                .map((entry) => {
+                  const tooltip = `Invoice: ${entry.invoiceNo || "INV"}\nStatus: ${String(entry.status || "issued").toUpperCase()}\nSiswa: ${entry.student || "-"}\nPengajar: ${entry.teacher || "-"}`;
+                  return `<div class="cal-slot-item ${entry.status}" title="${escapeHtml(tooltip)}"><small>${escapeHtml(entry.student || "-")}</small></div>`;
+                })
+                .join("");
+              return `<td class="cal-slot-cell ${outRange ? "out-range" : ""}">${cards || ""}</td>`;
+            })
             .join("");
-          return `<td class="cal-slot-cell ${outRange ? "out-range" : ""}">${cards || ""}</td>`;
         })
         .join("");
 
@@ -3121,7 +3143,11 @@ function renderInvoiceCalendar() {
         <thead>
           <tr>
             <th class="cal-time-head">Jam Tutor</th>
-            ${headerCells}
+            ${headerDayCells}
+          </tr>
+          <tr>
+            <th class="cal-time-head subhead">Pengajar</th>
+            ${headerTeacherCells}
           </tr>
         </thead>
         <tbody>
