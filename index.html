@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
-  <link rel="icon" type="image/svg+xml" href="favicon-invoice.svg" />
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon-invoice.svg" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -22,11 +22,21 @@
         <div id="settingsMenuContent" class="settings-menu-content"></div>
       </details>
 
+      <div class="workflow-groups" role="tablist" aria-label="Grup Menu">
+        <button type="button" class="workflow-group active" data-group="invoice" role="tab" aria-selected="true">Invoice Group</button>
+        <button type="button" class="workflow-group" data-group="data" role="tab" aria-selected="false">Data Management Group</button>
+      </div>
+
       <div class="workflow-tabs" role="tablist" aria-label="Mode dan Dashboard">
-        <button type="button" class="workflow-tab active" data-tab="front" role="tab" aria-selected="true">Payment in Front</button>
-        <button type="button" class="workflow-tab" data-tab="after" role="tab" aria-selected="false">Payment After</button>
-        <button type="button" class="workflow-tab" data-tab="calendar" role="tab" aria-selected="false">Calendar</button>
-        <button type="button" class="workflow-tab" data-tab="status" role="tab" aria-selected="false">Payment Status</button>
+        <button type="button" class="workflow-tab active" data-group="invoice" data-tab="front" role="tab" aria-selected="true">Payment in Front</button>
+        <button type="button" class="workflow-tab" data-group="invoice" data-tab="after" role="tab" aria-selected="false">Payment After</button>
+        <button type="button" class="workflow-tab" data-group="invoice" data-tab="calendar" role="tab" aria-selected="false">Calendar</button>
+        <button type="button" class="workflow-tab" data-group="invoice" data-tab="status" role="tab" aria-selected="false">Payment Status</button>
+        <button type="button" class="workflow-tab" data-group="data" data-tab="students" role="tab" aria-selected="false">Data Siswa</button>
+        <button type="button" class="workflow-tab" data-group="data" data-tab="pricing" role="tab" aria-selected="false">Tarif</button>
+        <button type="button" class="workflow-tab" data-group="data" data-tab="discount" role="tab" aria-selected="false">Diskon</button>
+        <button type="button" class="workflow-tab" data-group="data" data-tab="bank" role="tab" aria-selected="false">Bank Guru</button>
+        <button type="button" class="workflow-tab" data-group="data" data-tab="holiday" role="tab" aria-selected="false">Hari Libur</button>
       </div>
 
       <div class="grid-2">
@@ -358,6 +368,189 @@
         </div>
       </section>
 
+      <section id="studentManagementSection" class="mode-section hidden">
+        <h3>Manajemen Data Siswa</h3>
+        <p class="sub">Kelola data siswa terpisah dari workflow invoice: edit, tambah, hapus, upload CSV, dan download CSV.</p>
+        <div class="grid-3">
+          <label class="field">
+            <span>Filter Kelas/Grade</span>
+            <select id="studentManageGradeFilter">
+              <option value="">Semua Kelas</option>
+            </select>
+          </label>
+          <div class="field student-manage-pager-wrap" style="grid-column: span 2;">
+            <span>Pagination</span>
+            <div class="student-manage-pager" data-pager="top">
+              <button type="button" class="btn" data-page-action="first">&lt;&lt;</button>
+              <button type="button" class="btn" data-page-action="prev">&lt;</button>
+              <button type="button" class="btn" data-page-action="next">&gt;</button>
+              <button type="button" class="btn" data-page-action="last">&gt;&gt;</button>
+              <label class="goto-inline">
+                <span>Go to</span>
+                <input type="number" min="1" data-student-goto="top" />
+              </label>
+              <button type="button" class="btn" data-page-action="goto" data-page-go="top">Go</button>
+              <span class="sub student-manage-page-info" data-page-info="top">Halaman 1</span>
+            </div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button id="btnStudentManageAddRow" type="button" class="btn sekund">Tambah Siswa</button>
+          <button id="btnStudentManageDownloadCsv" type="button" class="btn">Download CSV Siswa</button>
+          <button id="btnStudentManageUploadCsv" type="button" class="btn">Upload CSV Siswa</button>
+          <button id="btnStudentManageSaveFirebase" type="button" class="btn" disabled>Simpan Siswa ke Firebase</button>
+          <input id="fileStudentManageUploadCsv" type="file" class="hidden-input" accept=".csv,text/csv" />
+        </div>
+        <div class="table-wrap">
+          <table id="studentManageTable">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Nama Panggilan</th>
+                <th>Nama Lengkap</th>
+                <th>Kelas</th>
+                <th>Sekolah</th>
+                <th>Nama Orang Tua/Wali</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="studentManageTableBody">
+              <tr><td colspan="7" class="empty">Belum ada data siswa.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="student-manage-pager" data-pager="bottom">
+          <button type="button" class="btn" data-page-action="first">&lt;&lt;</button>
+          <button type="button" class="btn" data-page-action="prev">&lt;</button>
+          <button type="button" class="btn" data-page-action="next">&gt;</button>
+          <button type="button" class="btn" data-page-action="last">&gt;&gt;</button>
+          <label class="goto-inline">
+            <span>Go to</span>
+            <input type="number" min="1" data-student-goto="bottom" />
+          </label>
+          <button type="button" class="btn" data-page-action="goto" data-page-go="bottom">Go</button>
+          <span class="sub student-manage-page-info" data-page-info="bottom">Halaman 1</span>
+        </div>
+      </section>
+
+      <section id="pricingManagementSection" class="mode-section hidden">
+        <h3>Manajemen Tarif</h3>
+        <p class="sub">Kelola tabel tarif berdasarkan jenis hari dan jumlah peserta.</p>
+        <div class="toolbar">
+          <button id="btnPricingManageAddRow" type="button" class="btn sekund">Tambah Baris</button>
+          <button id="btnPricingManageApply" type="button" class="btn">Apply ke App</button>
+          <button id="btnPricingManageDownloadCsv" type="button" class="btn">Download CSV</button>
+          <button id="btnPricingManageUploadCsv" type="button" class="btn">Upload CSV</button>
+          <button id="btnPricingManageSaveFirebase" type="button" class="btn" disabled>Simpan ke Firebase</button>
+          <input id="filePricingManageUploadCsv" type="file" class="hidden-input" accept=".csv,text/csv" />
+        </div>
+        <div class="table-wrap">
+          <table id="pricingManageTable">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Jenis Hari</th>
+                <th>Jumlah Peserta</th>
+                <th>Tarif per Jam</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="pricingManageTableBody">
+              <tr><td colspan="5" class="empty">Belum ada data tarif.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="discountManagementSection" class="mode-section hidden">
+        <h3>Manajemen Diskon</h3>
+        <p class="sub">Kelola aturan diskon berdasarkan rentang durasi.</p>
+        <div class="toolbar">
+          <button id="btnDiscountManageAddRow" type="button" class="btn sekund">Tambah Baris</button>
+          <button id="btnDiscountManageApply" type="button" class="btn">Apply ke App</button>
+          <button id="btnDiscountManageDownloadCsv" type="button" class="btn">Download CSV</button>
+          <button id="btnDiscountManageUploadCsv" type="button" class="btn">Upload CSV</button>
+          <button id="btnDiscountManageSaveFirebase" type="button" class="btn" disabled>Simpan ke Firebase</button>
+          <input id="fileDiscountManageUploadCsv" type="file" class="hidden-input" accept=".csv,text/csv" />
+        </div>
+        <div class="table-wrap">
+          <table id="discountManageTable">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Min Durasi</th>
+                <th>Max Durasi</th>
+                <th>Diskon Persen</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="discountManageTableBody">
+              <tr><td colspan="5" class="empty">Belum ada data diskon.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="bankManagementSection" class="mode-section hidden">
+        <h3>Manajemen Bank Guru</h3>
+        <p class="sub">Kelola rekening pengajar dan rekening kolaborasi.</p>
+        <div class="toolbar">
+          <button id="btnBankManageAddRow" type="button" class="btn sekund">Tambah Baris</button>
+          <button id="btnBankManageApply" type="button" class="btn">Apply ke App</button>
+          <button id="btnBankManageDownloadCsv" type="button" class="btn">Download CSV</button>
+          <button id="btnBankManageUploadCsv" type="button" class="btn">Upload CSV</button>
+          <button id="btnBankManageSaveFirebase" type="button" class="btn" disabled>Simpan ke Firebase</button>
+          <input id="fileBankManageUploadCsv" type="file" class="hidden-input" accept=".csv,text/csv" />
+        </div>
+        <div class="table-wrap">
+          <table id="bankManageTable">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Nama Pengajar</th>
+                <th>Label Rekening</th>
+                <th>Bank</th>
+                <th>Nomor Rekening</th>
+                <th>Atas Nama</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="bankManageTableBody">
+              <tr><td colspan="7" class="empty">Belum ada data bank guru.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="holidayManagementSection" class="mode-section hidden">
+        <h3>Manajemen Hari Libur</h3>
+        <p class="sub">Kelola tanggal libur nasional dan cuti bersama.</p>
+        <div class="toolbar">
+          <button id="btnHolidayManageAddRow" type="button" class="btn sekund">Tambah Baris</button>
+          <button id="btnHolidayManageApply" type="button" class="btn">Apply ke App</button>
+          <button id="btnHolidayManageDownloadCsv" type="button" class="btn">Download CSV</button>
+          <button id="btnHolidayManageUploadCsv" type="button" class="btn">Upload CSV</button>
+          <button id="btnHolidayManageSaveFirebase" type="button" class="btn" disabled>Simpan ke Firebase</button>
+          <input id="fileHolidayManageUploadCsv" type="file" class="hidden-input" accept=".csv,text/csv" />
+        </div>
+        <div class="table-wrap">
+          <table id="holidayManageTable">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Tanggal</th>
+                <th>Nama</th>
+                <th>Jenis</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="holidayManageTableBody">
+              <tr><td colspan="5" class="empty">Belum ada data hari libur.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
     </section>
 
     <section id="sessionsPanel" class="panel panel-data">
@@ -470,7 +663,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
-  <script src="html2canvas.min.js"></script>
+  <script src="assets/vendor/html2canvas.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

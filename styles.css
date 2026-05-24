@@ -345,6 +345,32 @@ textarea {
   border-bottom: 1px solid #c7b189;
 }
 
+.workflow-groups {
+  display: inline-flex;
+  gap: 8px;
+  margin: 10px 0 4px;
+  padding: 4px;
+  border: 1px solid #cbb28a;
+  border-radius: 12px;
+  background: #f3e7d1;
+}
+
+.workflow-group {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #5c4933;
+  border-radius: 9px;
+  padding: 6px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workflow-group.active {
+  border-color: #b99e70;
+  background: #fffdf8;
+  color: #3f3020;
+}
+
 .workflow-tab {
   border: 1px solid #c8b389;
   border-bottom: none;
@@ -362,6 +388,10 @@ textarea {
   background: #fffdf9;
   color: #3e3021;
   box-shadow: 0 -3px 0 #e1c894 inset;
+}
+
+.workflow-tab.hidden {
+  display: none;
 }
 
 .invoice-calendar-weekly {
@@ -749,6 +779,12 @@ h3 {
   border-color: #cbcbcb;
 }
 
+.holiday-chip.weekend {
+  background: #e5eef7;
+  color: #35516a;
+  border-color: #b6cbe0;
+}
+
 #sessionsTable tr.reschedule-anchor {
   outline: 2px solid #2e7da0;
   outline-offset: -2px;
@@ -799,6 +835,58 @@ h3 {
 
 .table-wrap {
   overflow: auto;
+}
+
+#studentManageTable {
+  min-width: 980px;
+}
+
+#studentManageTable input[type="text"] {
+  min-width: 140px;
+}
+
+#studentManagementSection .toolbar {
+  margin-bottom: 10px;
+}
+
+.data-management-grid > div {
+  min-height: 10px;
+}
+
+#studentManagementSection .grid-3 {
+  align-items: end;
+}
+
+.student-manage-pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.student-manage-pager .btn {
+  min-width: 46px;
+  padding: 8px 10px;
+}
+
+.goto-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.goto-inline span {
+  font-size: 0.86rem;
+  color: #5e5141;
+}
+
+.goto-inline input {
+  width: 78px;
+}
+
+.student-manage-page-info {
+  margin: 0;
 }
 
 @media (max-width: 900px) {
@@ -907,7 +995,7 @@ td .mini {
   width: 210mm;
   min-height: 297mm;
   margin: 0 auto;
-  background-image: url("Template INVOICE Background.png");
+  background-image: url("assets/images/Template INVOICE Background.png");
   background-size: cover;
   background-position: center;
   padding: 28mm 18mm 18mm;

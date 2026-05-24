@@ -14,9 +14,44 @@ const DEFAULT_FIREBASE_CONFIG = {
   appId: "1:1089600700256:web:1e99ba6cd2c2e88592a805",
 };
 
+const BUNDLED_SOURCE_FILES = {
+  students: ["data/REKAP DATA SISWA.csv", "REKAP DATA SISWA.csv"],
+  pricing: ["data/tarif.csv", "tarif.csv"],
+  discount: ["data/diskon_durasi.csv", "diskon_durasi.csv"],
+  bank: ["data/bank_guru.csv", "bank_guru.csv"],
+  holiday: ["data/hari_libur.csv", "hari_libur.csv"],
+  template_after: ["data/template_payment_after.csv", "template_payment_after.csv"],
+};
+
+const APP_ASSETS = {
+  logo: "assets/images/Logo.png",
+};
+
+const TAB_GROUP_MAP = {
+  front: "invoice",
+  after: "invoice",
+  calendar: "invoice",
+  status: "invoice",
+  students: "data",
+  pricing: "data",
+  discount: "data",
+  bank: "data",
+  holiday: "data",
+};
+
+const GROUP_TABS = {
+  invoice: ["front", "after", "calendar", "status"],
+  data: ["students", "pricing", "discount", "bank", "holiday"],
+};
+
 const state = {
   mode: "front",
+  activeGroup: "invoice",
   activeTab: "front",
+  lastTabByGroup: {
+    invoice: "front",
+    data: "students",
+  },
   currentInvoiceId: "",
   autoLoadTried: false,
   students: [],
@@ -58,6 +93,15 @@ const state = {
     currentPage: 1,
     activeOwnerUid: "",
   },
+  studentManageQuery: {
+    pageSize: 15,
+    currentPage: 1,
+    gradeFilter: "",
+  },
+  pricingManageRows: [],
+  discountManageRows: [],
+  bankManageRows: [],
+  holidayManageRows: [],
   firebase: {
     app: null,
     auth: null,
@@ -69,6 +113,7 @@ const state = {
 };
 
 const el = {
+  workflowGroupButtons: document.querySelectorAll(".workflow-group"),
   workflowTabs: document.querySelectorAll(".workflow-tab"),
   settingsMenu: document.getElementById("settingsMenu"),
   settingsMenuContent: document.getElementById("settingsMenuContent"),
@@ -120,6 +165,11 @@ const el = {
   btnApplyAfterInvoiceDate: document.getElementById("btnApplyAfterInvoiceDate"),
   calendarSection: document.getElementById("calendarSection"),
   paymentStatusSection: document.getElementById("paymentStatusSection"),
+  studentManagementSection: document.getElementById("studentManagementSection"),
+  pricingManagementSection: document.getElementById("pricingManagementSection"),
+  discountManagementSection: document.getElementById("discountManagementSection"),
+  bankManagementSection: document.getElementById("bankManagementSection"),
+  holidayManagementSection: document.getElementById("holidayManagementSection"),
   btnCalendarRefresh: document.getElementById("btnCalendarRefresh"),
   btnDownloadCalendarCurrentMonth: document.getElementById("btnDownloadCalendarCurrentMonth"),
   btnDownloadCalendarNextMonth: document.getElementById("btnDownloadCalendarNextMonth"),
@@ -131,6 +181,44 @@ const el = {
   btnPaymentStatusRefresh: document.getElementById("btnPaymentStatusRefresh"),
   paymentStatusSummary: document.getElementById("paymentStatusSummary"),
   paymentStatusTableBody: document.querySelector("#paymentStatusTable tbody"),
+  studentManageGradeFilter: document.getElementById("studentManageGradeFilter"),
+  studentManagePagers: document.querySelectorAll(".student-manage-pager"),
+  studentManagePageInfos: document.querySelectorAll(".student-manage-page-info"),
+  studentManageGotoInputs: document.querySelectorAll("input[data-student-goto]"),
+  studentManageTableBody: document.getElementById("studentManageTableBody"),
+  btnStudentManageAddRow: document.getElementById("btnStudentManageAddRow"),
+  btnStudentManageDownloadCsv: document.getElementById("btnStudentManageDownloadCsv"),
+  btnStudentManageUploadCsv: document.getElementById("btnStudentManageUploadCsv"),
+  fileStudentManageUploadCsv: document.getElementById("fileStudentManageUploadCsv"),
+  btnStudentManageSaveFirebase: document.getElementById("btnStudentManageSaveFirebase"),
+  pricingManageTableBody: document.getElementById("pricingManageTableBody"),
+  btnPricingManageAddRow: document.getElementById("btnPricingManageAddRow"),
+  btnPricingManageApply: document.getElementById("btnPricingManageApply"),
+  btnPricingManageDownloadCsv: document.getElementById("btnPricingManageDownloadCsv"),
+  btnPricingManageUploadCsv: document.getElementById("btnPricingManageUploadCsv"),
+  filePricingManageUploadCsv: document.getElementById("filePricingManageUploadCsv"),
+  btnPricingManageSaveFirebase: document.getElementById("btnPricingManageSaveFirebase"),
+  discountManageTableBody: document.getElementById("discountManageTableBody"),
+  btnDiscountManageAddRow: document.getElementById("btnDiscountManageAddRow"),
+  btnDiscountManageApply: document.getElementById("btnDiscountManageApply"),
+  btnDiscountManageDownloadCsv: document.getElementById("btnDiscountManageDownloadCsv"),
+  btnDiscountManageUploadCsv: document.getElementById("btnDiscountManageUploadCsv"),
+  fileDiscountManageUploadCsv: document.getElementById("fileDiscountManageUploadCsv"),
+  btnDiscountManageSaveFirebase: document.getElementById("btnDiscountManageSaveFirebase"),
+  bankManageTableBody: document.getElementById("bankManageTableBody"),
+  btnBankManageAddRow: document.getElementById("btnBankManageAddRow"),
+  btnBankManageApply: document.getElementById("btnBankManageApply"),
+  btnBankManageDownloadCsv: document.getElementById("btnBankManageDownloadCsv"),
+  btnBankManageUploadCsv: document.getElementById("btnBankManageUploadCsv"),
+  fileBankManageUploadCsv: document.getElementById("fileBankManageUploadCsv"),
+  btnBankManageSaveFirebase: document.getElementById("btnBankManageSaveFirebase"),
+  holidayManageTableBody: document.getElementById("holidayManageTableBody"),
+  btnHolidayManageAddRow: document.getElementById("btnHolidayManageAddRow"),
+  btnHolidayManageApply: document.getElementById("btnHolidayManageApply"),
+  btnHolidayManageDownloadCsv: document.getElementById("btnHolidayManageDownloadCsv"),
+  btnHolidayManageUploadCsv: document.getElementById("btnHolidayManageUploadCsv"),
+  fileHolidayManageUploadCsv: document.getElementById("fileHolidayManageUploadCsv"),
+  btnHolidayManageSaveFirebase: document.getElementById("btnHolidayManageSaveFirebase"),
   sessionsPanel: document.getElementById("sessionsPanel"),
   previewPanel: document.getElementById("previewPanel"),
   billingActionToolbar: document.getElementById("billingActionToolbar"),
@@ -219,17 +307,27 @@ function initialize() {
   el.invoiceDate.value = toLocalDateInputValue(today);
   el.frontStartDate.value = toLocalDateInputValue(today);
 
-  state.activeTab = getTabFromLocation() || state.activeTab;
+  const locationState = getLocationState();
+  if (locationState) {
+    state.activeGroup = locationState.group;
+    state.activeTab = locationState.tab;
+    state.lastTabByGroup[locationState.group] = locationState.tab;
+  }
   bindEvents();
   applyRuntimeModeHints();
   moveSettingsIntoMenu();
   hydrateFirebaseConfigInputs();
   parseHolidaySetFromInput();
-  setActiveTab(state.activeTab, { force: true });
+  setActiveTab(state.activeTab, { force: true, group: state.activeGroup });
   refreshWeeklyTeacherOptions();
   applyDefaultTeacherToWeekTable();
   refreshFirebaseButtons();
   syncCsvEditorsFromState();
+  renderStudentManagementTable();
+  renderPricingManagementTable();
+  renderDiscountManagementTable();
+  renderBankManagementTable();
+  renderHolidayManagementTable();
   renderInvoiceHistoryTable();
   void initializeDataSources();
 }
@@ -246,18 +344,30 @@ async function initializeDataSources() {
 }
 
 function bindEvents() {
+  el.workflowGroupButtons.forEach((groupBtn) => {
+    groupBtn.addEventListener("click", async () => {
+      const nextGroup = normalizeGroup(groupBtn.dataset.group);
+      if (!nextGroup) return;
+      const preferredTab = state.lastTabByGroup[nextGroup] || GROUP_TABS[nextGroup][0];
+      await setActiveTab(preferredTab, { group: nextGroup });
+      clearPreview();
+    });
+  });
+
   el.workflowTabs.forEach((tabBtn) => {
     tabBtn.addEventListener("click", async () => {
       const nextTab = String(tabBtn.dataset.tab || "front");
-      await setActiveTab(nextTab);
+      const nextGroup = normalizeGroup(tabBtn.dataset.group);
+      await setActiveTab(nextTab, { group: nextGroup });
       clearPreview();
     });
   });
 
   window.addEventListener("hashchange", async () => {
-    const nextTab = getTabFromLocation();
-    if (!nextTab || nextTab === state.activeTab) return;
-    await setActiveTab(nextTab);
+    const next = getLocationState();
+    if (!next) return;
+    if (next.tab === state.activeTab && next.group === state.activeGroup) return;
+    await setActiveTab(next.tab, { group: next.group });
   });
 
   el.packageFiles.addEventListener("change", async (event) => {
@@ -289,7 +399,7 @@ function bindEvents() {
 
   el.btnSiswaContoh?.addEventListener("click", async () => {
     try {
-      loadMasterStudentsCsv(await fetchCsv("REKAP DATA SISWA.csv", "Tidak bisa memuat REKAP DATA SISWA.csv"));
+      loadMasterStudentsCsv(await fetchBundledSource("students", "Tidak bisa memuat REKAP DATA SISWA.csv"));
     } catch (err) {
       alert(err.message);
     }
@@ -303,7 +413,7 @@ function bindEvents() {
 
   el.btnTarifContoh?.addEventListener("click", async () => {
     try {
-      applyPricingCsv(await fetchCsv("tarif.csv", "Tidak bisa memuat tarif.csv"));
+      applyPricingCsv(await fetchBundledSource("pricing", "Tidak bisa memuat tarif.csv"));
     } catch (err) {
       alert(err.message);
     }
@@ -317,7 +427,7 @@ function bindEvents() {
 
   el.btnDiskonContoh?.addEventListener("click", async () => {
     try {
-      applyDiscountCsv(await fetchCsv("diskon_durasi.csv", "Tidak bisa memuat diskon_durasi.csv"));
+      applyDiscountCsv(await fetchBundledSource("discount", "Tidak bisa memuat diskon_durasi.csv"));
     } catch (err) {
       alert(err.message);
     }
@@ -333,7 +443,7 @@ function bindEvents() {
 
   el.btnBankContoh?.addEventListener("click", async () => {
     try {
-      const text = await fetchCsv("bank_guru.csv", "Tidak bisa memuat bank_guru.csv");
+      const text = await fetchBundledSource("bank", "Tidak bisa memuat bank_guru.csv");
       applyBankRows(parseCsv(text), true, text);
     } catch (err) {
       alert(err.message);
@@ -348,7 +458,7 @@ function bindEvents() {
 
   el.btnHolidayContoh?.addEventListener("click", async () => {
     try {
-      const text = await fetchCsv("hari_libur.csv", "Tidak bisa memuat hari_libur.csv");
+      const text = await fetchBundledSource("holiday", "Tidak bisa memuat hari_libur.csv");
       applyHolidayCsv(text);
     } catch (err) {
       alert(err.message);
@@ -505,6 +615,284 @@ function bindEvents() {
       alert(err.message);
     }
   });
+
+  el.btnStudentManageAddRow?.addEventListener("click", () => {
+    state.students.push({
+      fullName: "",
+      nickname: "Siswa Baru",
+      kelas: "",
+      sekolah: "",
+      parentName: "",
+    });
+    normalizeStudentsState({ sort: false, syncEditors: true });
+    state.studentManageQuery.currentPage = 1;
+    renderStudentManagementTable();
+  });
+
+  el.studentManageGradeFilter?.addEventListener("change", () => {
+    state.studentManageQuery.gradeFilter = String(el.studentManageGradeFilter?.value || "").trim();
+    state.studentManageQuery.currentPage = 1;
+    renderStudentManagementTable();
+  });
+
+  el.studentManagementSection?.addEventListener("click", (event) => {
+    const pagerBtn = event.target.closest("button[data-page-action]");
+    if (!pagerBtn) return;
+    const action = String(pagerBtn.dataset.pageAction || "").toLowerCase();
+    if (!action) return;
+    if (action === "goto") {
+      const source = String(pagerBtn.dataset.pageGo || "top").toLowerCase();
+      const input = el.studentManagementSection?.querySelector(`input[data-student-goto="${source}"]`);
+      const page = Number.parseInt(String(input?.value || ""), 10);
+      if (!Number.isFinite(page) || page <= 0) return;
+      applyStudentPageAction("goto", page);
+      return;
+    }
+    applyStudentPageAction(action);
+  });
+
+  el.btnStudentManageDownloadCsv?.addEventListener("click", () => {
+    if (state.students.length === 0) {
+      alert("Belum ada data siswa untuk diunduh.");
+      return;
+    }
+    normalizeStudentsState({ sort: false, syncEditors: true });
+    downloadSourceCsv("students");
+  });
+
+  el.btnStudentManageUploadCsv?.addEventListener("click", () => {
+    el.fileStudentManageUploadCsv?.click();
+  });
+
+  el.fileStudentManageUploadCsv?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    loadMasterStudentsCsv(await file.text());
+    renderStudentManagementTable();
+    event.target.value = "";
+  });
+
+  el.btnStudentManageSaveFirebase?.addEventListener("click", async () => {
+    if (!state.firebase.ready) {
+      alert("Hubungkan Firebase terlebih dahulu.");
+      return;
+    }
+    normalizeStudentsState({ sort: false, syncEditors: true });
+    await saveSingleSourceToFirebase("students");
+  });
+
+  el.studentManageTableBody?.addEventListener("input", (event) => {
+    const input = event.target.closest("input[data-row][data-field]");
+    if (!input) return;
+    const rowIndex = Number.parseInt(String(input.dataset.row || "-1"), 10);
+    const field = String(input.dataset.field || "");
+    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.students.length) return;
+    if (!field) return;
+
+    state.students[rowIndex][field] = String(input.value || "");
+    if (field === "fullName") {
+      const row = state.students[rowIndex];
+      if (!String(row.nickname || "").trim()) {
+        row.nickname = deriveNicknameFromFullName(row.fullName);
+      }
+    }
+    normalizeStudentsState({ sort: false, syncEditors: true });
+  });
+
+  el.studentManageTableBody?.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("button[data-remove-student]");
+    if (!removeBtn) return;
+    const rowIndex = Number.parseInt(String(removeBtn.dataset.removeStudent || "-1"), 10);
+    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.students.length) return;
+    state.students.splice(rowIndex, 1);
+    normalizeStudentsState({ sort: false, syncEditors: true });
+    renderStudentManagementTable();
+  });
+
+  el.btnPricingManageAddRow?.addEventListener("click", () => {
+    state.pricingManageRows.push({ jenis_hari: "weekdays", jumlah_peserta: "1", tarif_per_jam: "1" });
+    renderPricingManagementTable();
+  });
+  el.btnPricingManageApply?.addEventListener("click", () => applyPricingFromManagement());
+  el.btnPricingManageDownloadCsv?.addEventListener("click", () => {
+    let csv;
+    try {
+      csv = serializePricingManageRows(state.pricingManageRows);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    if (el.csvEditorPricing) el.csvEditorPricing.value = csv;
+    state.sourceTexts.pricing = csv;
+    downloadSourceCsv("pricing");
+  });
+  el.btnPricingManageUploadCsv?.addEventListener("click", () => el.filePricingManageUploadCsv?.click());
+  el.filePricingManageUploadCsv?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    applyPricingCsv(await file.text(), false);
+    renderPricingManagementTable();
+    event.target.value = "";
+  });
+  el.btnPricingManageSaveFirebase?.addEventListener("click", async () => {
+    if (!applyPricingFromManagement(false)) return;
+    await saveSingleSourceToFirebase("pricing");
+  });
+  el.pricingManageTableBody?.addEventListener("input", (event) => {
+    const input = event.target.closest("input[data-row][data-field]");
+    if (!input) return;
+    const rowIndex = Number.parseInt(String(input.dataset.row || "-1"), 10);
+    const field = String(input.dataset.field || "");
+    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.pricingManageRows.length) return;
+    state.pricingManageRows[rowIndex][field] = String(input.value || "");
+  });
+  el.pricingManageTableBody?.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("button[data-remove-pricing]");
+    if (!removeBtn) return;
+    const rowIndex = Number.parseInt(String(removeBtn.dataset.removePricing || "-1"), 10);
+    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.pricingManageRows.length) return;
+    state.pricingManageRows.splice(rowIndex, 1);
+    renderPricingManagementTable();
+  });
+
+  el.btnDiscountManageAddRow?.addEventListener("click", () => {
+    state.discountManageRows.push({ min_durasi: "0", max_durasi: "0", diskon_persen: "0" });
+    renderDiscountManagementTable();
+  });
+  el.btnDiscountManageApply?.addEventListener("click", () => applyDiscountFromManagement());
+  el.btnDiscountManageDownloadCsv?.addEventListener("click", () => {
+    let csv;
+    try {
+      csv = serializeDiscountManageRows(state.discountManageRows);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    if (el.csvEditorDiscount) el.csvEditorDiscount.value = csv;
+    state.sourceTexts.discount = csv;
+    downloadSourceCsv("discount");
+  });
+  el.btnDiscountManageUploadCsv?.addEventListener("click", () => el.fileDiscountManageUploadCsv?.click());
+  el.fileDiscountManageUploadCsv?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    applyDiscountCsv(await file.text(), false);
+    renderDiscountManagementTable();
+    event.target.value = "";
+  });
+  el.btnDiscountManageSaveFirebase?.addEventListener("click", async () => {
+    if (!applyDiscountFromManagement(false)) return;
+    await saveSingleSourceToFirebase("discount");
+  });
+  el.discountManageTableBody?.addEventListener("input", (event) => {
+    const input = event.target.closest("input[data-row][data-field]");
+    if (!input) return;
+    const rowIndex = Number.parseInt(String(input.dataset.row || "-1"), 10);
+    const field = String(input.dataset.field || "");
+    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.discountManageRows.length) return;
+    state.discountManageRows[rowIndex][field] = String(input.value || "");
+  });
+  el.discountManageTableBody?.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("button[data-remove-discount]");
+    if (!removeBtn) return;
+    const rowIndex = Number.parseInt(String(removeBtn.dataset.removeDiscount || "-1"), 10);
+    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.discountManageRows.length) return;
+    state.discountManageRows.splice(rowIndex, 1);
+    renderDiscountManagementTable();
+  });
+
+  el.btnBankManageAddRow?.addEventListener("click", () => {
+    state.bankManageRows.push({ nama_pengajar: "", label_rekening: "Utama", bank: "", nomor_rekening: "", atas_nama: "" });
+    renderBankManagementTable();
+  });
+  el.btnBankManageApply?.addEventListener("click", () => applyBankFromManagement());
+  el.btnBankManageDownloadCsv?.addEventListener("click", () => {
+    let csv;
+    try {
+      csv = serializeBankManageRows(state.bankManageRows);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    if (el.csvEditorBank) el.csvEditorBank.value = csv;
+    state.sourceTexts.bank = csv;
+    downloadSourceCsv("bank");
+  });
+  el.btnBankManageUploadCsv?.addEventListener("click", () => el.fileBankManageUploadCsv?.click());
+  el.fileBankManageUploadCsv?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    applyBankRows(parseCsv(text), false, text);
+    renderBankManagementTable();
+    event.target.value = "";
+  });
+  el.btnBankManageSaveFirebase?.addEventListener("click", async () => {
+    if (!applyBankFromManagement(false)) return;
+    await saveSingleSourceToFirebase("bank");
+  });
+  el.bankManageTableBody?.addEventListener("input", (event) => {
+    const input = event.target.closest("input[data-row][data-field]");
+    if (!input) return;
+    const rowIndex = Number.parseInt(String(input.dataset.row || "-1"), 10);
+    const field = String(input.dataset.field || "");
+    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.bankManageRows.length) return;
+    state.bankManageRows[rowIndex][field] = String(input.value || "");
+  });
+  el.bankManageTableBody?.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("button[data-remove-bank]");
+    if (!removeBtn) return;
+    const rowIndex = Number.parseInt(String(removeBtn.dataset.removeBank || "-1"), 10);
+    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.bankManageRows.length) return;
+    state.bankManageRows.splice(rowIndex, 1);
+    renderBankManagementTable();
+  });
+
+  el.btnHolidayManageAddRow?.addEventListener("click", () => {
+    state.holidayManageRows.push({ tanggal: "", nama: "", jenis: "libur nasional" });
+    renderHolidayManagementTable();
+  });
+  el.btnHolidayManageApply?.addEventListener("click", () => applyHolidayFromManagement());
+  el.btnHolidayManageDownloadCsv?.addEventListener("click", () => {
+    let csv;
+    try {
+      csv = serializeHolidayManageRows(state.holidayManageRows);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    if (el.csvEditorHoliday) el.csvEditorHoliday.value = csv;
+    state.sourceTexts.holiday = csv;
+    downloadSourceCsv("holiday");
+  });
+  el.btnHolidayManageUploadCsv?.addEventListener("click", () => el.fileHolidayManageUploadCsv?.click());
+  el.fileHolidayManageUploadCsv?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    applyHolidayCsv(await file.text(), false);
+    renderHolidayManagementTable();
+    event.target.value = "";
+  });
+  el.btnHolidayManageSaveFirebase?.addEventListener("click", async () => {
+    if (!applyHolidayFromManagement(false)) return;
+    await saveSingleSourceToFirebase("holiday");
+  });
+  el.holidayManageTableBody?.addEventListener("input", (event) => {
+    const input = event.target.closest("input[data-row][data-field], select[data-row][data-field]");
+    if (!input) return;
+    const rowIndex = Number.parseInt(String(input.dataset.row || "-1"), 10);
+    const field = String(input.dataset.field || "");
+    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.holidayManageRows.length) return;
+    state.holidayManageRows[rowIndex][field] = String(input.value || "");
+  });
+  el.holidayManageTableBody?.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("button[data-remove-holiday]");
+    if (!removeBtn) return;
+    const rowIndex = Number.parseInt(String(removeBtn.dataset.removeHoliday || "-1"), 10);
+    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.holidayManageRows.length) return;
+    state.holidayManageRows.splice(rowIndex, 1);
+    renderHolidayManagementTable();
+  });
   el.btnRefreshInvoiceHistory?.addEventListener("click", async () => {
     try {
       await loadInvoiceHistory({ direction: "reset" });
@@ -628,14 +1016,49 @@ function moveSettingsIntoMenu() {
   });
 }
 
-function getTabFromLocation() {
-  const raw = String(window.location.hash || "").replace(/^#/, "").toLowerCase();
-  const token = raw.replace(/^\//, "").replace(/^tab\//, "");
-  return ["front", "after", "calendar", "status"].includes(token) ? token : null;
+async function fetchBundledSource(kind, errorMessage = "") {
+  const candidates = BUNDLED_SOURCE_FILES[kind] || [];
+  let lastError = null;
+
+  for (const path of candidates) {
+    try {
+      return await fetchCsv(path, "");
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (errorMessage) throw new Error(errorMessage);
+  throw lastError || new Error(`Gagal memuat sumber data: ${kind}`);
 }
 
-function updateLocationForTab(tab) {
-  const target = `#/tab/${tab}`;
+function normalizeGroup(group) {
+  const key = String(group || "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(GROUP_TABS, key) ? key : "";
+}
+
+function getLocationState() {
+  const raw = String(window.location.hash || "").replace(/^#/, "").toLowerCase();
+  const normalized = raw.replace(/^\//, "");
+  const groupMatch = normalized.match(/^group\/([^/]+)\/tab\/([^/]+)/);
+  if (groupMatch) {
+    const group = normalizeGroup(groupMatch[1]);
+    const tab = String(groupMatch[2] || "").trim().toLowerCase();
+    if (group && TAB_GROUP_MAP[tab] && GROUP_TABS[group].includes(tab)) {
+      return { group, tab };
+    }
+  }
+
+  const token = normalized.replace(/^tab\//, "");
+  if (TAB_GROUP_MAP[token]) {
+    return { group: TAB_GROUP_MAP[token], tab: token };
+  }
+
+  return null;
+}
+
+function updateLocationForView(group, tab) {
+  const target = `#/group/${group}/tab/${tab}`;
   if (window.location.hash === target) return;
   window.history.replaceState(null, "", target);
 }
@@ -722,39 +1145,39 @@ async function preloadDefaults() {
 
   if (state.students.length === 0) {
     try {
-      loadMasterStudentsCsv(await fetchCsv("REKAP DATA SISWA.csv", ""));
+      loadMasterStudentsCsv(await fetchBundledSource("students", ""));
     } catch {
       // ignore
     }
   }
 
   try {
-    applyPricingCsv(await fetchCsv("tarif.csv", ""), false);
+    applyPricingCsv(await fetchBundledSource("pricing", ""), false);
   } catch {
     // ignore
   }
 
   try {
-    applyDiscountCsv(await fetchCsv("diskon_durasi.csv", ""), false);
+    applyDiscountCsv(await fetchBundledSource("discount", ""), false);
   } catch {
     // ignore
   }
 
   try {
-    const bankText = await fetchCsv("bank_guru.csv", "");
+    const bankText = await fetchBundledSource("bank", "");
     applyBankRows(parseCsv(bankText), false, bankText);
   } catch {
     // ignore
   }
 
   try {
-    applyHolidayCsv(await fetchCsv("hari_libur.csv", ""), false);
+    applyHolidayCsv(await fetchBundledSource("holiday", ""), false);
   } catch {
     // ignore
   }
 
   try {
-    state.sourceTexts.template_after = await fetchCsv("template_payment_after.csv", "");
+    state.sourceTexts.template_after = await fetchBundledSource("template_after", "");
   } catch {
     // ignore
   }
@@ -767,7 +1190,7 @@ async function loadBundledFallbackSources() {
 
   if (state.students.length === 0) {
     try {
-      loadMasterStudentsCsv(await fetchCsv("REKAP DATA SISWA.csv", ""));
+      loadMasterStudentsCsv(await fetchBundledSource("students", ""));
       loaded.push("siswa");
     } catch {
       // ignore
@@ -776,7 +1199,7 @@ async function loadBundledFallbackSources() {
 
   if (!hasTarif(state.tarif)) {
     try {
-      applyPricingCsv(await fetchCsv("tarif.csv", ""), false);
+      applyPricingCsv(await fetchBundledSource("pricing", ""), false);
       loaded.push("tarif");
     } catch {
       // ignore
@@ -785,7 +1208,7 @@ async function loadBundledFallbackSources() {
 
   if ((state.diskonDurasi || []).length === 0) {
     try {
-      applyDiscountCsv(await fetchCsv("diskon_durasi.csv", ""), false);
+      applyDiscountCsv(await fetchBundledSource("discount", ""), false);
       loaded.push("diskon");
     } catch {
       // ignore
@@ -794,7 +1217,7 @@ async function loadBundledFallbackSources() {
 
   if ((state.bankGuru || []).length === 0) {
     try {
-      const bankText = await fetchCsv("bank_guru.csv", "");
+      const bankText = await fetchBundledSource("bank", "");
       applyBankRows(parseCsv(bankText), false, bankText);
       loaded.push("rekening");
     } catch {
@@ -804,7 +1227,7 @@ async function loadBundledFallbackSources() {
 
   if ((state.holidaySet || new Set()).size === 0) {
     try {
-      applyHolidayCsv(await fetchCsv("hari_libur.csv", ""), false);
+      applyHolidayCsv(await fetchBundledSource("holiday", ""), false);
       loaded.push("libur");
     } catch {
       // ignore
@@ -813,7 +1236,7 @@ async function loadBundledFallbackSources() {
 
   if (!String(state.sourceTexts.template_after || "").trim()) {
     try {
-      state.sourceTexts.template_after = await fetchCsv("template_payment_after.csv", "");
+      state.sourceTexts.template_after = await fetchBundledSource("template_after", "");
       loaded.push("template payment after");
     } catch {
       // ignore
@@ -829,18 +1252,18 @@ async function autoLoadFromCurrentFolder(silent) {
   state.autoLoadTried = true;
 
   const loaders = [
-    { file: "REKAP DATA SISWA.csv", kind: "siswa", run: async (text) => loadMasterStudentsCsv(text) },
-    { file: "tarif.csv", kind: "tarif", run: async (text) => applyPricingCsv(text, false) },
-    { file: "diskon_durasi.csv", kind: "diskon", run: async (text) => applyDiscountCsv(text, false) },
-    { file: "bank_guru.csv", kind: "rekening", run: async (text) => applyBankRows(parseCsv(text), false, text) },
-    { file: "hari_libur.csv", kind: "libur", run: async (text) => applyHolidayCsv(text, false) },
-    { file: "template_payment_after.csv", kind: "template_after", run: async (text) => { state.sourceTexts.template_after = text; } },
+    { sourceKind: "students", kind: "siswa", run: async (text) => loadMasterStudentsCsv(text) },
+    { sourceKind: "pricing", kind: "tarif", run: async (text) => applyPricingCsv(text, false) },
+    { sourceKind: "discount", kind: "diskon", run: async (text) => applyDiscountCsv(text, false) },
+    { sourceKind: "bank", kind: "rekening", run: async (text) => applyBankRows(parseCsv(text), false, text) },
+    { sourceKind: "holiday", kind: "libur", run: async (text) => applyHolidayCsv(text, false) },
+    { sourceKind: "template_after", kind: "template_after", run: async (text) => { state.sourceTexts.template_after = text; } },
   ];
 
   const loaded = [];
   for (const item of loaders) {
     try {
-      const text = await fetchCsv(item.file, "");
+      const text = await fetchBundledSource(item.sourceKind, "");
       await item.run(text);
       loaded.push(item.kind);
     } catch {
@@ -978,13 +1401,32 @@ function detectFileKind(fileName) {
   return null;
 }
 
-async function setActiveTab(nextTab, { force = false } = {}) {
-  const tab = ["front", "after", "calendar", "status"].includes(nextTab) ? nextTab : "front";
-  if (!force && state.activeTab === tab) return;
+async function setActiveTab(nextTab, { force = false, group = "" } = {}) {
+  let tab = TAB_GROUP_MAP[nextTab] ? String(nextTab) : "front";
+  let activeGroup = normalizeGroup(group) || TAB_GROUP_MAP[tab] || "invoice";
+
+  if (!GROUP_TABS[activeGroup].includes(tab)) {
+    const preferred = state.lastTabByGroup[activeGroup];
+    tab = GROUP_TABS[activeGroup].includes(preferred) ? preferred : GROUP_TABS[activeGroup][0];
+  }
+
+  if (!force && state.activeTab === tab && state.activeGroup === activeGroup) return;
 
   state.activeTab = tab;
-  updateLocationForTab(tab);
+  state.activeGroup = activeGroup;
+  state.lastTabByGroup[activeGroup] = tab;
+  updateLocationForView(activeGroup, tab);
+
+  el.workflowGroupButtons.forEach((btn) => {
+    const isActive = normalizeGroup(btn.dataset.group) === activeGroup;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
   el.workflowTabs.forEach((btn) => {
+    const btnGroup = normalizeGroup(btn.dataset.group) || TAB_GROUP_MAP[String(btn.dataset.tab || "")];
+    const showByGroup = btnGroup === activeGroup;
+    btn.classList.toggle("hidden", !showByGroup);
     const isActive = String(btn.dataset.tab || "") === tab;
     btn.classList.toggle("active", isActive);
     btn.setAttribute("aria-selected", isActive ? "true" : "false");
@@ -995,6 +1437,11 @@ async function setActiveTab(nextTab, { force = false } = {}) {
   el.afterSection.classList.toggle("hidden", tab !== "after");
   el.calendarSection?.classList.toggle("hidden", tab !== "calendar");
   el.paymentStatusSection?.classList.toggle("hidden", tab !== "status");
+  el.studentManagementSection?.classList.toggle("hidden", tab !== "students");
+  el.pricingManagementSection?.classList.toggle("hidden", tab !== "pricing");
+  el.discountManagementSection?.classList.toggle("hidden", tab !== "discount");
+  el.bankManagementSection?.classList.toggle("hidden", tab !== "bank");
+  el.holidayManagementSection?.classList.toggle("hidden", tab !== "holiday");
 
   if (el.sessionsPanel) el.sessionsPanel.classList.toggle("hidden", !billingTab);
   if (el.previewPanel) el.previewPanel.classList.toggle("hidden", !billingTab);
@@ -1004,6 +1451,36 @@ async function setActiveTab(nextTab, { force = false } = {}) {
   if (tab === "front" || tab === "after") {
     state.mode = tab;
     applyModeUI();
+    return;
+  }
+
+  if (tab === "students") {
+    renderStudentManagementTable();
+    refreshFirebaseButtons();
+    return;
+  }
+
+  if (tab === "pricing") {
+    renderPricingManagementTable();
+    refreshFirebaseButtons();
+    return;
+  }
+
+  if (tab === "discount") {
+    renderDiscountManagementTable();
+    refreshFirebaseButtons();
+    return;
+  }
+
+  if (tab === "bank") {
+    renderBankManagementTable();
+    refreshFirebaseButtons();
+    return;
+  }
+
+  if (tab === "holiday") {
+    renderHolidayManagementTable();
+    refreshFirebaseButtons();
     return;
   }
 
@@ -1048,6 +1525,7 @@ function loadMasterStudentsCsv(text) {
   state.sourceTexts.students = text;
   fillStudentSelect(parsed.map((s) => s.nickname));
   renderStudentDetail();
+  renderStudentManagementTable();
 
   if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
 }
@@ -1074,8 +1552,10 @@ function applyPricingCsv(text, notify = true) {
   }
 
   state.tarif = map;
+  state.pricingManageRows = tarifMapToManageRows(map);
   state.sourceTexts.pricing = text;
   recalcSessions();
+  renderPricingManagementTable();
   if (notify) alert("Tarif berhasil dimuat.");
 }
 
@@ -1087,8 +1567,10 @@ function applyDiscountCsv(text, notify = true) {
   }
 
   state.diskonDurasi = list;
+  state.discountManageRows = discountListToManageRows(list);
   state.sourceTexts.discount = text;
   recalcSessions();
+  renderDiscountManagementTable();
   if (notify) alert("Diskon durasi berhasil dimuat.");
 }
 
@@ -1100,9 +1582,11 @@ function applyBankRows(rows, notify = true, rawText = "") {
   }
 
   state.bankGuru = parsed;
+  state.bankManageRows = bankListToManageRows(parsed);
   state.sourceTexts.bank = rawText || serializeRowsToCsv(rows);
   refreshWeeklyTeacherOptions();
   applyDefaultTeacherToWeekTable();
+  renderBankManagementTable();
   if (notify) alert("Data rekening guru berhasil dimuat.");
 }
 
@@ -1116,10 +1600,12 @@ function applyHolidayCsv(text, notify = true) {
   }
 
   el.holidayDates.value = dates.join("\n");
+  state.holidayManageRows = holidayEntriesToManageRows(entries);
   state.holidayInfoMap = buildHolidayInfoMap(entries);
   state.sourceTexts.holiday = text;
   parseHolidaySetFromInput();
   recalcSessions();
+  renderHolidayManagementTable();
   if (notify) alert("Hari libur berhasil dimuat.");
 }
 
@@ -1448,7 +1934,7 @@ function renderSessionsTable(emptyMsg = "Belum ada sesi. Muat data terlebih dahu
   el.tableBody.innerHTML = state.sessions
     .map(
       (s) => `
-      <tr data-id="${s.id}" class="${isPublicHoliday(s.tanggal) ? "holiday-row" : ""} ${s.id === state.rescheduleAnchorId ? "reschedule-anchor" : ""}">
+      <tr data-id="${s.id}" class="${isHolidayLikeDate(s.tanggal) ? "holiday-row" : ""} ${s.id === state.rescheduleAnchorId ? "reschedule-anchor" : ""}">
         <td><input type="checkbox" class="pick" ${s.dipilih ? "checked" : ""} /></td>
         <td>${escapeHtml(s.hari)}</td>
         <td>${formatTanggal(s.tanggal)}${buildHolidayBadgeHtml(s.tanggal)}</td>
@@ -1554,7 +2040,7 @@ function generateInvoice() {
   const rowsHtml = selected
     .map(
       (s, i) => `
-      <tr class="${isPublicHoliday(s.tanggal) ? "invoice-holiday-row" : ""}">
+      <tr class="${isHolidayLikeDate(s.tanggal) ? "invoice-holiday-row" : ""}">
         <td>${i + 1}</td>
         <td>${escapeHtml(s.hari)}</td>
         <td>${formatTanggal(s.tanggal)}</td>
@@ -1575,7 +2061,7 @@ function generateInvoice() {
     <article class="invoice-sheet landscape">
       <div class="print-page-header">
         <div><strong>${escapeHtml(invoiceNo)}</strong></div>
-        <div class="print-header-logo"><img src="Logo.png" alt="Logo" /></div>
+        <div class="print-header-logo"><img src="${escapeHtml(APP_ASSETS.logo)}" alt="Logo" /></div>
       </div>
 
       <div class="invoice-top">
@@ -1588,7 +2074,7 @@ function generateInvoice() {
         </div>
         <div class="invoice-right">
           <div class="invoice-logo" aria-label="Logo Rumah Belajar Pak Gun">
-            <img src="Logo.png" alt="Logo Rumah Belajar Pak Gun" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+            <img src="${escapeHtml(APP_ASSETS.logo)}" alt="Logo Rumah Belajar Pak Gun" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
             <span class="logo-fallback">LOGO</span>
           </div>
         </div>
@@ -2267,9 +2753,11 @@ function getHolidayLabels(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return [];
   const key = toLocalDateInputValue(date);
   const info = state.holidayInfoMap?.get(key);
-  if (info?.labels?.length) return info.labels;
-  if (state.holidaySet?.has(key)) return ["libur nasional"];
-  return [];
+  const labels = info?.labels?.length ? [...info.labels] : (state.holidaySet?.has(key) ? ["libur nasional"] : []);
+  if (isWeekendDate(date) && !labels.includes("akhir pekan")) {
+    labels.push("akhir pekan");
+  }
+  return labels;
 }
 
 function buildHolidayBadgeHtml(date) {
@@ -2277,9 +2765,22 @@ function buildHolidayBadgeHtml(date) {
   if (labels.length === 0) return "";
   return `
     <div class="holiday-badges">${labels
-      .map((label) => `<span class="holiday-chip ${label === "cuti bersama" ? "cuti" : "nasional"}">${escapeHtml(label)}</span>`)
+      .map((label) => {
+        const klass = label === "cuti bersama" ? "cuti" : (label === "akhir pekan" ? "weekend" : "nasional");
+        return `<span class="holiday-chip ${klass}">${escapeHtml(label)}</span>`;
+      })
       .join("")}</div>
   `;
+}
+
+function isWeekendDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function isHolidayLikeDate(date) {
+  return isPublicHoliday(date) || isWeekendDate(date);
 }
 
 function pickTarif(hari, pesertaCount, date) {
@@ -2844,6 +3345,11 @@ function refreshFirebaseButtons() {
     el.btnCsvSaveHoliday,
     el.btnCsvSaveAttendance,
     el.btnCsvSaveTemplateAfter,
+    el.btnStudentManageSaveFirebase,
+    el.btnPricingManageSaveFirebase,
+    el.btnDiscountManageSaveFirebase,
+    el.btnBankManageSaveFirebase,
+    el.btnHolidayManageSaveFirebase,
   ];
   saveButtons.forEach((btn) => {
     if (btn) btn.disabled = !ready;
@@ -3359,7 +3865,7 @@ function assignCalendarEntryLanes(entries) {
 function buildCalendarViewModel(days, viewStart, viewEnd, rangeStart, rangeEnd) {
   const rowMap = new Map();
   const timedEntries = [];
-  const teachersInView = new Set();
+  const teachersByDay = new Map();
 
   const ensureRow = (dayKey, teacher, dayDate) => {
     const rowKey = `${dayKey}__${teacher}`;
@@ -3388,7 +3894,8 @@ function buildCalendarViewModel(days, viewStart, viewEnd, rangeStart, rangeEnd) 
 
       const dayKey = toLocalDateInputValue(d);
       const teacher = String(session?.pengajar || "Tanpa Pengajar").trim() || "Tanpa Pengajar";
-      teachersInView.add(teacher);
+      if (!teachersByDay.has(dayKey)) teachersByDay.set(dayKey, new Set());
+      teachersByDay.get(dayKey).add(teacher);
 
       const startMin = parseTimeToMinutes(String(session?.jamMulai || ""));
       const endMinRaw = parseTimeToMinutes(String(session?.jamSelesai || ""));
@@ -3426,19 +3933,23 @@ function buildCalendarViewModel(days, viewStart, viewEnd, rangeStart, rangeEnd) 
 
   const totalMinutes = timelineEnd - timelineStart;
   const totalUnits = Math.max(2, Math.round(totalMinutes / 15));
-  const teachers = [...teachersInView].sort((a, b) => a.localeCompare(b, "id"));
-  if (teachers.length === 0) teachers.push("Tanpa Pengajar");
+
+  const getTeachersForDay = (dayKey) => {
+    const teacherSet = teachersByDay.get(dayKey);
+    if (!teacherSet || teacherSet.size === 0) return ["Tanpa Pengajar"];
+    return [...teacherSet].sort((a, b) => a.localeCompare(b, "id"));
+  };
 
   return {
     days,
     rangeStart,
     rangeEnd,
     ensureRow,
+    getTeachersForDay,
     timelineStart,
     timelineEnd,
     totalMinutes,
     totalUnits,
-    teachers,
   };
 }
 
@@ -3457,7 +3968,8 @@ function buildCalendarBoardHtml(model) {
     .map((d) => {
       const dayKey = toLocalDateInputValue(d);
       const outRange = d < model.rangeStart || d > model.rangeEnd;
-      return model.teachers
+      const teachersForDay = model.getTeachersForDay(dayKey);
+      return teachersForDay
         .map((teacher, teacherIndex) => {
           const row = model.ensureRow(dayKey, teacher, d);
           const dayLabel = teacherIndex === 0
@@ -3631,6 +4143,517 @@ function renderPaymentStatusTable() {
       </tr>`;
     })
     .join("");
+}
+
+function renderStudentManagementTable() {
+  if (!el.studentManageTableBody) return;
+
+  const gradeOptions = [...new Set((state.students || []).map((s) => String(s?.kelas || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "id"));
+  if (el.studentManageGradeFilter) {
+    const selected = String(state.studentManageQuery.gradeFilter || "");
+    el.studentManageGradeFilter.innerHTML = ['<option value="">Semua Kelas</option>']
+      .concat(gradeOptions.map((grade) => `<option value="${escapeHtml(grade)}">${escapeHtml(grade)}</option>`))
+      .join("");
+    el.studentManageGradeFilter.value = selected;
+  }
+
+  const view = getStudentManagementViewModel();
+  const { pageItems, totalItems, currentPage, totalPages } = view;
+
+  el.studentManagePagers?.forEach((pager) => {
+    const btnFirst = pager.querySelector('button[data-page-action="first"]');
+    const btnPrev = pager.querySelector('button[data-page-action="prev"]');
+    const btnNext = pager.querySelector('button[data-page-action="next"]');
+    const btnLast = pager.querySelector('button[data-page-action="last"]');
+    if (btnFirst) btnFirst.disabled = currentPage <= 1;
+    if (btnPrev) btnPrev.disabled = currentPage <= 1;
+    if (btnNext) btnNext.disabled = currentPage >= totalPages;
+    if (btnLast) btnLast.disabled = currentPage >= totalPages;
+  });
+
+  const pageInfoText = `Halaman ${currentPage}/${totalPages} | ${totalItems} siswa | 15 per halaman`;
+  el.studentManagePageInfos?.forEach((info) => {
+    info.textContent = pageInfoText;
+  });
+  el.studentManageGotoInputs?.forEach((input) => {
+    input.value = String(currentPage);
+  });
+
+  if (!Array.isArray(state.students) || state.students.length === 0 || pageItems.length === 0) {
+    const message = state.students.length === 0 ? "Belum ada data siswa." : "Tidak ada siswa untuk filter kelas ini.";
+    el.studentManageTableBody.innerHTML = `<tr><td colspan="7" class="empty">${message}</td></tr>`;
+    return;
+  }
+
+  el.studentManageTableBody.innerHTML = pageItems
+    .map((row, pageIndex) => {
+      const { student: s, sourceIndex } = row;
+      const rowNumber = ((currentPage - 1) * state.studentManageQuery.pageSize) + pageIndex + 1;
+      return `
+      <tr>
+        <td>${rowNumber}</td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="nickname" value="${escapeHtml(s.nickname || "")}" /></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="fullName" value="${escapeHtml(s.fullName || "")}" /></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="kelas" value="${escapeHtml(s.kelas || "")}" /></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="sekolah" value="${escapeHtml(s.sekolah || "")}" /></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="parentName" value="${escapeHtml(s.parentName || "")}" /></td>
+        <td><button type="button" class="btn" data-remove-student="${sourceIndex}">Hapus</button></td>
+      </tr>
+    `;
+    })
+    .join("");
+}
+
+function tarifMapToManageRows(map) {
+  const out = [];
+  const appendRows = (key, dayLabel) => {
+    const entries = Object.entries(map?.[key] || {}).map(([count, tariff]) => ({ count: Number(count), tariff: Number(tariff) }));
+    entries.sort((a, b) => a.count - b.count).forEach((entry) => {
+      out.push({
+        jenis_hari: dayLabel,
+        jumlah_peserta: String(entry.count),
+        tarif_per_jam: String(entry.tariff),
+      });
+    });
+  };
+  appendRows("weekdays", "weekdays");
+  appendRows("saturday", "sabtu");
+  appendRows("sunday", "minggu");
+  return out;
+}
+
+function normalizeTarifDayLabel(text) {
+  const value = String(text || "").trim().toLowerCase();
+  if (["weekdays", "weekday", "weekdays", "senin-jumat", "senin sampai jumat", "hari kerja"].includes(value)) return "weekdays";
+  if (["sabtu", "saturday"].includes(value)) return "sabtu";
+  if (["minggu", "sunday"].includes(value)) return "minggu";
+  return "";
+}
+
+function validatePricingManageRows(rows) {
+  const normalized = [];
+  const seen = new Set();
+
+  for (let index = 0; index < (rows || []).length; index += 1) {
+    const row = rows[index] || {};
+    const day = normalizeTarifDayLabel(row.jenis_hari);
+    const peserta = Number.parseInt(String(row.jumlah_peserta || "").trim(), 10);
+    const tarif = Number.parseInt(String(row.tarif_per_jam || "").trim(), 10);
+
+    if (!day) {
+      return { ok: false, message: `Baris ${index + 1}: jenis hari harus weekdays, sabtu, atau minggu.` };
+    }
+    if (!Number.isInteger(peserta) || peserta <= 0) {
+      return { ok: false, message: `Baris ${index + 1}: jumlah peserta harus bilangan bulat positif.` };
+    }
+    if (!Number.isInteger(tarif) || tarif <= 0) {
+      return { ok: false, message: `Baris ${index + 1}: tarif per jam harus bilangan bulat positif.` };
+    }
+
+    const key = `${day}:${peserta}`;
+    if (seen.has(key)) {
+      return { ok: false, message: `Baris ${index + 1}: kombinasi hari dan jumlah peserta duplikat.` };
+    }
+    seen.add(key);
+    normalized.push({ jenis_hari: day, jumlah_peserta: String(peserta), tarif_per_jam: String(tarif) });
+  }
+
+  return { ok: true, rows: normalized };
+}
+
+function serializePricingManageRows(rows) {
+  const validation = validatePricingManageRows(rows);
+  if (!validation.ok) throw new Error(validation.message);
+  const normalized = validation.rows;
+
+  return serializeRowsToCsv([
+    ["jenis_hari", "jumlah_peserta", "tarif_per_jam"],
+    ...normalized.map((r) => [r.jenis_hari, r.jumlah_peserta, r.tarif_per_jam]),
+  ]);
+}
+
+function applyPricingFromManagement(notify = true) {
+  let csv;
+  try {
+    csv = serializePricingManageRows(state.pricingManageRows);
+  } catch (err) {
+    alert(err.message);
+    return false;
+  }
+  if (el.csvEditorPricing) el.csvEditorPricing.value = csv;
+  applyPricingCsv(csv, notify);
+  syncCsvEditorsFromState();
+  return true;
+}
+
+function renderPricingManagementTable() {
+  if (!el.pricingManageTableBody) return;
+  if (!state.pricingManageRows.length) {
+    el.pricingManageTableBody.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data tarif.</td></tr>';
+    return;
+  }
+
+  el.pricingManageTableBody.innerHTML = state.pricingManageRows
+    .map((row, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td>
+          <select data-row="${index}" data-field="jenis_hari">
+            <option value="weekdays" ${normalizeTarifDayLabel(row.jenis_hari || "") === "weekdays" ? "selected" : ""}>weekdays</option>
+            <option value="sabtu" ${normalizeTarifDayLabel(row.jenis_hari || "") === "sabtu" ? "selected" : ""}>sabtu</option>
+            <option value="minggu" ${normalizeTarifDayLabel(row.jenis_hari || "") === "minggu" ? "selected" : ""}>minggu</option>
+          </select>
+        </td>
+        <td><input type="number" min="1" data-row="${index}" data-field="jumlah_peserta" value="${escapeHtml(row.jumlah_peserta || "")}" /></td>
+        <td><input type="number" min="0" data-row="${index}" data-field="tarif_per_jam" value="${escapeHtml(row.tarif_per_jam || "")}" /></td>
+        <td><button type="button" class="btn" data-remove-pricing="${index}">Hapus</button></td>
+      </tr>
+    `)
+    .join("");
+}
+
+function discountListToManageRows(list) {
+  return (list || []).map((d) => ({
+    min_durasi: String(d.min),
+    max_durasi: String(d.max),
+    diskon_persen: String(d.persen),
+  }));
+}
+
+function validateDiscountManageRows(rows) {
+  const normalized = [];
+  let previousMax = -Infinity;
+  const ordered = (rows || [])
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const minA = Number.parseFloat(String(a.row?.min_durasi || "").trim().replace(",", "."));
+      const minB = Number.parseFloat(String(b.row?.min_durasi || "").trim().replace(",", "."));
+      return minA - minB;
+    });
+
+  for (const item of ordered) {
+    const row = item.row || {};
+    const index = item.index;
+    const min = Number.parseFloat(String(row.min_durasi || "").trim().replace(",", "."));
+    const max = Number.parseFloat(String(row.max_durasi || "").trim().replace(",", "."));
+    const persen = Number.parseFloat(String(row.diskon_persen || "").trim().replace(",", "."));
+
+    if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(persen)) {
+      return { ok: false, message: `Baris ${index + 1}: min, max, dan persen harus angka yang valid.` };
+    }
+    if (min < 0 || max < 0) {
+      return { ok: false, message: `Baris ${index + 1}: durasi tidak boleh negatif.` };
+    }
+    if (min > max) {
+      return { ok: false, message: `Baris ${index + 1}: min durasi tidak boleh lebih besar dari max durasi.` };
+    }
+    if (persen < 0 || persen > 100) {
+      return { ok: false, message: `Baris ${index + 1}: diskon persen harus di antara 0 dan 100.` };
+    }
+    if (min <= previousMax) {
+      return { ok: false, message: `Baris ${index + 1}: rentang diskon tumpang tindih dengan baris sebelumnya.` };
+    }
+
+    previousMax = max;
+    normalized.push({ min, max, persen });
+  }
+
+  return { ok: true, rows: normalized };
+}
+
+function serializeDiscountManageRows(rows) {
+  const validation = validateDiscountManageRows(rows);
+  if (!validation.ok) throw new Error(validation.message);
+  const normalized = validation.rows;
+
+  return serializeRowsToCsv([
+    ["min_durasi", "max_durasi", "diskon_persen"],
+    ...normalized.map((r) => [String(r.min_durasi), String(r.max_durasi), String(r.persen)]),
+  ]);
+}
+
+function applyDiscountFromManagement(notify = true) {
+  let csv;
+  try {
+    csv = serializeDiscountManageRows(state.discountManageRows);
+  } catch (err) {
+    alert(err.message);
+    return false;
+  }
+  if (el.csvEditorDiscount) el.csvEditorDiscount.value = csv;
+  applyDiscountCsv(csv, notify);
+  syncCsvEditorsFromState();
+  return true;
+}
+
+function renderDiscountManagementTable() {
+  if (!el.discountManageTableBody) return;
+  if (!state.discountManageRows.length) {
+    el.discountManageTableBody.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data diskon.</td></tr>';
+    return;
+  }
+
+  el.discountManageTableBody.innerHTML = state.discountManageRows
+    .map((row, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td><input type="number" min="0" step="0.01" data-row="${index}" data-field="min_durasi" value="${escapeHtml(row.min_durasi || "")}" /></td>
+        <td><input type="number" min="0" step="0.01" data-row="${index}" data-field="max_durasi" value="${escapeHtml(row.max_durasi || "")}" /></td>
+        <td><input type="number" min="0" step="0.01" data-row="${index}" data-field="diskon_persen" value="${escapeHtml(row.diskon_persen || "")}" /></td>
+        <td><button type="button" class="btn" data-remove-discount="${index}">Hapus</button></td>
+      </tr>
+    `)
+    .join("");
+}
+
+function bankListToManageRows(list) {
+  return (list || []).map((b) => ({
+    nama_pengajar: String(b.namaPengajar || ""),
+    label_rekening: String(b.label || "Utama"),
+    bank: String(b.bank || ""),
+    nomor_rekening: String(b.nomor || ""),
+    atas_nama: String(b.atasNama || ""),
+  }));
+}
+
+function validateBankManageRows(rows) {
+  const normalized = [];
+
+  for (let index = 0; index < (rows || []).length; index += 1) {
+    const row = rows[index] || {};
+    const namaPengajar = String(row.nama_pengajar || "").trim();
+    const label = String(row.label_rekening || "Utama").trim() || "Utama";
+    const bank = String(row.bank || "").trim();
+    const nomor = String(row.nomor_rekening || "").replace(/[^0-9]/g, "");
+    const atasNama = String(row.atas_nama || "").trim() || namaPengajar;
+
+    if (!namaPengajar) {
+      return { ok: false, message: `Baris ${index + 1}: nama pengajar wajib diisi.` };
+    }
+    if (!bank) {
+      return { ok: false, message: `Baris ${index + 1}: nama bank wajib diisi.` };
+    }
+    if (nomor.length < 5) {
+      return { ok: false, message: `Baris ${index + 1}: nomor rekening harus berisi minimal 5 digit angka.` };
+    }
+
+    normalized.push({ nama_pengajar: namaPengajar, label_rekening: label, bank, nomor_rekening: nomor, atas_nama: atasNama });
+  }
+
+  return { ok: true, rows: normalized };
+}
+
+function serializeBankManageRows(rows) {
+  const validation = validateBankManageRows(rows);
+  if (!validation.ok) throw new Error(validation.message);
+  const normalized = validation.rows;
+
+  return serializeRowsToCsv([
+    ["nama_pengajar", "label_rekening", "bank", "nomor_rekening", "atas_nama"],
+    ...normalized.map((r) => [r.nama_pengajar, r.label_rekening, r.bank, r.nomor_rekening, r.atas_nama]),
+  ]);
+}
+
+function applyBankFromManagement(notify = true) {
+  let csv;
+  try {
+    csv = serializeBankManageRows(state.bankManageRows);
+  } catch (err) {
+    alert(err.message);
+    return false;
+  }
+  if (el.csvEditorBank) el.csvEditorBank.value = csv;
+  applyBankRows(parseCsv(csv), notify, csv);
+  syncCsvEditorsFromState();
+  return true;
+}
+
+function renderBankManagementTable() {
+  if (!el.bankManageTableBody) return;
+  if (!state.bankManageRows.length) {
+    el.bankManageTableBody.innerHTML = '<tr><td colspan="7" class="empty">Belum ada data bank guru.</td></tr>';
+    return;
+  }
+
+  el.bankManageTableBody.innerHTML = state.bankManageRows
+    .map((row, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td><input type="text" data-row="${index}" data-field="nama_pengajar" value="${escapeHtml(row.nama_pengajar || "")}" /></td>
+        <td><input type="text" data-row="${index}" data-field="label_rekening" value="${escapeHtml(row.label_rekening || "")}" /></td>
+        <td><input type="text" data-row="${index}" data-field="bank" value="${escapeHtml(row.bank || "")}" /></td>
+        <td><input type="text" data-row="${index}" data-field="nomor_rekening" value="${escapeHtml(row.nomor_rekening || "")}" /></td>
+        <td><input type="text" data-row="${index}" data-field="atas_nama" value="${escapeHtml(row.atas_nama || "")}" /></td>
+        <td><button type="button" class="btn" data-remove-bank="${index}">Hapus</button></td>
+      </tr>
+    `)
+    .join("");
+}
+
+function holidayEntriesToManageRows(entries) {
+  return (entries || []).map((item) => ({
+    tanggal: String(item.date || ""),
+    nama: String(item.name || ""),
+    jenis: String(item.label || "libur nasional"),
+  }));
+}
+
+function validateHolidayManageRows(rows) {
+  const normalized = [];
+  const seenDates = new Set();
+
+  for (let index = 0; index < (rows || []).length; index += 1) {
+    const row = rows[index] || {};
+    const tanggal = String(row.tanggal || "").trim();
+    const nama = String(row.nama || "").trim();
+    const jenisRaw = String(row.jenis || "libur nasional").trim().toLowerCase();
+    const jenis = jenisRaw === "cuti bersama" ? "cuti bersama" : (jenisRaw === "libur nasional" ? "libur nasional" : "");
+
+    if (!isValidIsoDate(tanggal)) {
+      return { ok: false, message: `Baris ${index + 1}: tanggal harus format YYYY-MM-DD yang valid.` };
+    }
+    if (!nama) {
+      return { ok: false, message: `Baris ${index + 1}: nama hari libur wajib diisi.` };
+    }
+    if (!jenis) {
+      return { ok: false, message: `Baris ${index + 1}: jenis harus libur nasional atau cuti bersama.` };
+    }
+    if (seenDates.has(tanggal)) {
+      return { ok: false, message: `Baris ${index + 1}: tanggal hari libur duplikat.` };
+    }
+
+    seenDates.add(tanggal);
+    normalized.push({ tanggal, nama, jenis });
+  }
+
+  return { ok: true, rows: normalized };
+}
+
+function serializeHolidayManageRows(rows) {
+  const validation = validateHolidayManageRows(rows);
+  if (!validation.ok) throw new Error(validation.message);
+  const normalized = validation.rows;
+
+  return serializeRowsToCsv([
+    ["tanggal", "nama", "jenis"],
+    ...normalized.map((r) => [r.tanggal, r.nama, r.jenis]),
+  ]);
+}
+
+function applyHolidayFromManagement(notify = true) {
+  let csv;
+  try {
+    csv = serializeHolidayManageRows(state.holidayManageRows);
+  } catch (err) {
+    alert(err.message);
+    return false;
+  }
+  if (el.csvEditorHoliday) el.csvEditorHoliday.value = csv;
+  applyHolidayCsv(csv, notify);
+  syncCsvEditorsFromState();
+  return true;
+}
+
+function renderHolidayManagementTable() {
+  if (!el.holidayManageTableBody) return;
+  if (!state.holidayManageRows.length) {
+    el.holidayManageTableBody.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data hari libur.</td></tr>';
+    return;
+  }
+
+  el.holidayManageTableBody.innerHTML = state.holidayManageRows
+    .map((row, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td><input type="date" data-row="${index}" data-field="tanggal" value="${escapeHtml(row.tanggal || "")}" /></td>
+        <td><input type="text" data-row="${index}" data-field="nama" value="${escapeHtml(row.nama || "")}" /></td>
+        <td>
+          <select data-row="${index}" data-field="jenis">
+            <option value="libur nasional" ${String(row.jenis || "") === "libur nasional" ? "selected" : ""}>libur nasional</option>
+            <option value="cuti bersama" ${String(row.jenis || "") === "cuti bersama" ? "selected" : ""}>cuti bersama</option>
+          </select>
+        </td>
+        <td><button type="button" class="btn" data-remove-holiday="${index}">Hapus</button></td>
+      </tr>
+    `)
+    .join("");
+}
+
+function applyStudentPageAction(action, targetPage = null) {
+  const { totalPages } = getStudentManagementViewModel();
+  const current = state.studentManageQuery.currentPage;
+  let next = current;
+
+  if (action === "first") next = 1;
+  if (action === "prev") next = Math.max(1, current - 1);
+  if (action === "next") next = Math.min(totalPages, current + 1);
+  if (action === "last") next = totalPages;
+  if (action === "goto") next = Math.min(totalPages, Math.max(1, Number(targetPage || 1)));
+
+  if (next === current) return;
+  state.studentManageQuery.currentPage = next;
+  renderStudentManagementTable();
+}
+
+function getStudentManagementViewModel() {
+  const filter = String(state.studentManageQuery.gradeFilter || "").trim().toLowerCase();
+  const filtered = (state.students || [])
+    .map((student, index) => ({ student, sourceIndex: index }))
+    .filter(({ student }) => {
+      if (!filter) return true;
+      return String(student?.kelas || "").trim().toLowerCase() === filter;
+    });
+
+  const pageSize = Math.max(1, Number.parseInt(String(state.studentManageQuery.pageSize || "15"), 10) || 15);
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const currentPage = Math.min(Math.max(1, state.studentManageQuery.currentPage || 1), totalPages);
+  state.studentManageQuery.currentPage = currentPage;
+
+  const startIndex = (currentPage - 1) * pageSize;
+  const pageItems = filtered.slice(startIndex, startIndex + pageSize);
+
+  return { pageItems, totalItems, currentPage, totalPages };
+}
+
+function normalizeStudentsState({ sort = false, syncEditors = false } = {}) {
+  let list = (state.students || [])
+    .map((s) => ({
+      fullName: String(s?.fullName || "").trim(),
+      nickname: String(s?.nickname || "").trim() || deriveNicknameFromFullName(String(s?.fullName || "")),
+      kelas: String(s?.kelas || "").trim(),
+      sekolah: String(s?.sekolah || "").trim(),
+      parentName: String(s?.parentName || "").trim(),
+    }))
+    .filter((s) => s.nickname || s.fullName || s.kelas || s.sekolah || s.parentName);
+
+  list = makeNicknamesUnique(list);
+  if (sort) list = sortStudentsByNickname(list);
+
+  state.students = list;
+  state.studentsByNickname = new Map(list.map((s) => [normalizeName(s.nickname), s]));
+  state.studentsByFullName = new Map(list.filter((s) => s.fullName).map((s) => [normalizeName(s.fullName), s]));
+  fillStudentSelect(list.map((s) => s.nickname));
+  renderStudentDetail();
+
+  state.sourceTexts.students = serializeStudentsToCsv(list);
+  if (syncEditors) syncCsvEditorsFromState();
+}
+
+function serializeStudentsToCsv(students) {
+  const rows = [
+    ["No.", "Nama Lengkap Siswa", "Nama Panggilan Siswa", "Kelas", "Sekolah", "Nama Orang Tua/Wali"],
+    ...(students || []).map((s, index) => [
+      String(index + 1),
+      String(s?.fullName || ""),
+      String(s?.nickname || ""),
+      String(s?.kelas || ""),
+      String(s?.sekolah || ""),
+      String(s?.parentName || ""),
+    ]),
+  ];
+  return serializeRowsToCsv(rows);
 }
 
 async function updateInvoicePaymentStatus(historyId, status) {
@@ -3847,7 +4870,7 @@ function redownloadInvoiceFromHistory(item) {
     <article class="invoice-sheet landscape">
       <div class="print-page-header">
         <div><strong>${escapeHtml(invoiceNo)}</strong></div>
-        <div class="print-header-logo"><img src="Logo.png" alt="Logo" /></div>
+        <div class="print-header-logo"><img src="${escapeHtml(APP_ASSETS.logo)}" alt="Logo" /></div>
       </div>
 
       <div class="invoice-top">
@@ -3860,7 +4883,7 @@ function redownloadInvoiceFromHistory(item) {
         </div>
         <div class="invoice-right">
           <div class="invoice-logo" aria-label="Logo Rumah Belajar Pak Gun">
-            <img src="Logo.png" alt="Logo Rumah Belajar Pak Gun" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+            <img src="${escapeHtml(APP_ASSETS.logo)}" alt="Logo Rumah Belajar Pak Gun" onload="this.nextElementSibling.style.display='none';" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
             <span class="logo-fallback">LOGO</span>
           </div>
         </div>
