@@ -2,6 +2,7 @@ const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const FIREBASE_CONFIG_STORAGE_KEY = "invoice-firebase-config";
 const DEFAULT_TEACHER_STORAGE_KEY = "invoice-default-teacher";
 const FIREBASE_SOURCE_COLLECTION = "invoice_sources";
+const FIREBASE_STUDENT_COLLECTION = "student_details";
 const FIREBASE_INVOICE_COLLECTION = "invoice_records";
 const FIREBASE_SOURCE_KINDS = ["students", "pricing", "discount", "bank", "holiday", "attendance", "template_after"];
 const FIREBASE_SHARED_OWNER_UID = "bimbelpakgun-shared";
@@ -57,6 +58,7 @@ const state = {
   students: [],
   studentsByNickname: new Map(),
   studentsByFullName: new Map(),
+  studentsById: new Map(),
   absensiRows: [],
   absensiHeaders: [],
   sessions: [],
@@ -678,7 +680,7 @@ function bindEvents() {
       return;
     }
     normalizeStudentsState({ sort: false, syncEditors: true });
-    await saveSingleSourceToFirebase("students");
+    await saveStudentsToFirebase({ applyEditor: false });
   });
 
   el.studentManageTableBody?.addEventListener("input", (event) => {
@@ -697,6 +699,9 @@ function bindEvents() {
       }
     }
     normalizeStudentsState({ sort: false, syncEditors: true });
+    if (state.firebase.ready) {
+      void saveStudentRecordToFirebase(state.students[rowIndex]).catch((err) => setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error"));
+    }
   });
 
   el.studentManageTableBody?.addEventListener("click", (event) => {
@@ -704,9 +709,13 @@ function bindEvents() {
     if (!removeBtn) return;
     const rowIndex = Number.parseInt(String(removeBtn.dataset.removeStudent || "-1"), 10);
     if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.students.length) return;
+    const removed = state.students[rowIndex];
     state.students.splice(rowIndex, 1);
     normalizeStudentsState({ sort: false, syncEditors: true });
     renderStudentManagementTable();
+    if (state.firebase.ready && removed) {
+      void softDeleteStudentRecord(removed).catch((err) => setFirebaseStatus(err.message || "Gagal menghapus data siswa.", "error"));
+    }
   });
 
   el.btnPricingManageAddRow?.addEventListener("click", () => {
@@ -1072,7 +1081,7 @@ function bindCsvEditorActions() {
     [el.btnCsvApplyHoliday, () => applyCsvFromEditor("holiday")],
     [el.btnCsvApplyAttendance, () => applyCsvFromEditor("attendance")],
     [el.btnCsvApplyTemplateAfter, () => applyCsvFromEditor("template_after")],
-    [el.btnCsvSaveStudents, () => saveSingleSourceToFirebase("students")],
+    [el.btnCsvSaveStudents, () => saveStudentsToFirebase({ applyEditor: true })],
     [el.btnCsvSavePricing, () => saveSingleSourceToFirebase("pricing")],
     [el.btnCsvSaveDiscount, () => saveSingleSourceToFirebase("discount")],
     [el.btnCsvSaveBank, () => saveSingleSourceToFirebase("bank")],
@@ -1511,17 +1520,17 @@ function applyModeUI() {
 
 function loadMasterStudentsCsv(text) {
   const rows = parseCsv(text);
-  const parsed = sortStudentsByNickname(parseMasterStudents(rows));
+  const existingByFingerprint = new Map((state.students || []).map((student) => [studentFingerprint(student), student.studentId]));
+  const parsed = sortStudentsByNickname(
+    parseMasterStudents(rows).map((student) => normalizeStudentRecord(student, existingByFingerprint.get(studentFingerprint(student)) || ""))
+  );
   if (parsed.length === 0) {
     alert("Data siswa tidak valid. Pastikan ada kolom nama siswa.");
     return;
   }
 
   state.students = parsed;
-  state.studentsByNickname = new Map(parsed.map((s) => [normalizeName(s.nickname), s]));
-  state.studentsByFullName = new Map(
-    parsed.filter((s) => String(s.fullName || "").trim()).map((s) => [normalizeName(s.fullName), s])
-  );
+  rebuildStudentIndexes(parsed);
   state.sourceTexts.students = text;
   fillStudentSelect(parsed.map((s) => s.nickname));
   renderStudentDetail();
@@ -2036,7 +2045,8 @@ function generateInvoice() {
   ).padStart(2, "0")}-${student.replace(/\s+/g, "").slice(0, 6).toUpperCase()}`;
   state.currentInvoiceId = invoiceNo;
 
-  const detail = state.studentsByNickname.get(normalizeName(student));
+  const detail = getSelectedStudentRecord();
+  const studentId = String(detail?.studentId || "").trim();
   const rowsHtml = selected
     .map(
       (s, i) => `
@@ -2178,7 +2188,9 @@ function generateInvoice() {
     teachers,
     teacherPortions,
     totals,
+    studentId,
     studentDetail: {
+      studentId,
       fullName: detail?.fullName || "",
       parentName: detail?.parentName || "",
       kelas: detail?.kelas || "",
@@ -2413,7 +2425,7 @@ function getTeacherOptionsHtml(selectedTeacher = "-") {
 }
 
 function renderStudentDetail() {
-  const s = state.studentsByNickname.get(normalizeName(getSelectedStudentName()));
+  const s = getSelectedStudentRecord();
   if (!s) {
     el.studentDetail.textContent = "Detail siswa akan muncul di sini.";
     return;
@@ -2610,6 +2622,83 @@ function makeNicknamesUnique(students) {
     used.add(normalizeName(next));
     return { ...student, nickname: next };
   });
+}
+
+function generateStudentId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `stu_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function studentFingerprint(student) {
+  return [student?.fullName || "", student?.nickname || "", student?.kelas || "", student?.sekolah || "", student?.parentName || ""]
+    .map((x) => normalizeName(x))
+    .join("|");
+}
+
+function createStudentRecord(student = {}, fallbackId = "") {
+  return {
+    studentId: String(student.studentId || fallbackId || generateStudentId()).trim(),
+    fullName: String(student.fullName || "").trim(),
+    nickname: String(student.nickname || "").trim() || deriveNicknameFromFullName(String(student.fullName || "")),
+    kelas: String(student.kelas || "").trim(),
+    sekolah: String(student.sekolah || "").trim(),
+    parentName: String(student.parentName || "").trim(),
+  };
+}
+
+function normalizeStudentRecord(student = {}, fallbackId = "") {
+  const normalized = createStudentRecord(student, fallbackId);
+  return {
+    ...normalized,
+    studentId: normalized.studentId || generateStudentId(),
+  };
+}
+
+function rebuildStudentIndexes(list) {
+  state.studentsByNickname = new Map(list.map((s) => [normalizeName(s.nickname), s]));
+  state.studentsByFullName = new Map(list.filter((s) => s.fullName).map((s) => [normalizeName(s.fullName), s]));
+  state.studentsById = new Map(list.filter((s) => s.studentId).map((s) => [String(s.studentId), s]));
+}
+
+function syncStudentCsvSnapshot(list, { syncEditors = false } = {}) {
+  state.sourceTexts.students = serializeStudentsToCsv(list);
+  fillStudentSelect(list.map((s) => s.nickname));
+  renderStudentDetail();
+  if (syncEditors) syncCsvEditorsFromState();
+}
+
+function setStudentList(list, { sort = false, syncEditors = false } = {}) {
+  let next = (list || [])
+    .map((student) => normalizeStudentRecord(student))
+    .filter((student) => student.nickname || student.fullName || student.kelas || student.sekolah || student.parentName);
+
+  next = makeNicknamesUnique(next);
+  if (sort) next = sortStudentsByNickname(next);
+
+  state.students = next;
+  rebuildStudentIndexes(next);
+  syncStudentCsvSnapshot(next, { syncEditors });
+}
+
+function getStudentRecordById(studentId) {
+  return state.studentsById.get(String(studentId || "")) || null;
+}
+
+function getSelectedStudentRecord() {
+  const raw = String(el.studentSelect?.value || "").trim();
+  if (!raw) return null;
+  return state.studentsByNickname.get(normalizeName(raw))
+    || state.studentsByFullName.get(normalizeName(raw))
+    || state.studentsById.get(raw)
+    || null;
+}
+
+function getStudentRecordFromInvoice(item) {
+  return getStudentRecordById(item?.studentId)
+    || getStudentRecordById(item?.studentDetail?.studentId)
+    || state.studentsByNickname.get(normalizeName(item?.student || ""))
+    || state.studentsByFullName.get(normalizeName(item?.studentDetail?.fullName || ""))
+    || null;
 }
 
 function getStudentDisplayName(studentName, detail = null) {
@@ -3456,7 +3545,7 @@ async function connectFirebase({ saveConfig = false, loadSources = false, silent
 }
 
 function collectFirebaseSourcePayloads() {
-  return FIREBASE_SOURCE_KINDS.map((kind) => {
+  return FIREBASE_SOURCE_KINDS.filter((kind) => kind !== "students").map((kind) => {
     if (kind === "bank") {
       return { kind, csvText: state.sourceTexts.bank || serializeRowsToCsv(bankGuruToRows(state.bankGuru)) };
     }
@@ -3465,6 +3554,160 @@ function collectFirebaseSourcePayloads() {
     }
     return { kind, csvText: state.sourceTexts[kind] || "" };
   }).filter((item) => String(item.csvText || "").trim().length > 0);
+}
+
+async function loadStudentsFromFirebase({ silent = false, forceServer = false, legacyCsvText = "" } = {}) {
+  const ownerUid = getFirebaseReadOwnerUidCandidates()[0];
+  const snapshot = await firestoreGet(
+    state.firebase.db.collection(FIREBASE_STUDENT_COLLECTION).where("ownerUid", "==", ownerUid),
+    { forceServer }
+  );
+
+  if (snapshot.empty) {
+    if (legacyCsvText.trim()) {
+      loadMasterStudentsCsv(legacyCsvText);
+      await saveStudentsToFirebase({ applyEditor: false, preserveLegacy: false, silent: true });
+      if (!silent) alert("Data siswa dimigrasikan dari CSV lama ke koleksi student_details.");
+      return true;
+    }
+    return false;
+  }
+
+  const rows = [];
+  snapshot.forEach((doc) => {
+    const data = doc.data() || {};
+    const deletedAt = String(data.deletedAt || "").trim();
+    if (deletedAt) return;
+    rows.push(normalizeStudentRecord({
+      studentId: String(data.studentId || doc.id.split("__").slice(1).join("__") || "").trim(),
+      fullName: String(data.fullName || "").trim(),
+      nickname: String(data.nickname || "").trim(),
+      kelas: String(data.kelas || "").trim(),
+      sekolah: String(data.sekolah || "").trim(),
+      parentName: String(data.parentName || "").trim(),
+    }, String(data.studentId || doc.id.split("__").slice(1).join("__") || "").trim()));
+  });
+
+  if (rows.length === 0 && legacyCsvText.trim()) {
+    loadMasterStudentsCsv(legacyCsvText);
+    await saveStudentsToFirebase({ applyEditor: false, preserveLegacy: false, silent: true });
+    return true;
+  }
+
+  setStudentList(sortStudentsByNickname(rows), { sort: false, syncEditors: false });
+  syncCsvEditorsFromState();
+  return true;
+}
+
+async function saveStudentRecordToFirebase(student, { deleted = false } = {}) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    throw new Error("Firebase belum terhubung.");
+  }
+
+  const ownerUid = getFirebaseWriteOwnerUid();
+  const next = normalizeStudentRecord(student, student?.studentId || "");
+  const ref = state.firebase.db.collection(FIREBASE_STUDENT_COLLECTION).doc(`${ownerUid}__${next.studentId}`);
+  const existing = await ref.get();
+  const existingData = existing.exists ? (existing.data() || {}) : {};
+  await ref.set(
+    {
+      studentId: next.studentId,
+      fullName: next.fullName,
+      nickname: next.nickname,
+      kelas: next.kelas,
+      sekolah: next.sekolah,
+      parentName: next.parentName,
+      deletedAt: deleted ? new Date().toISOString() : "",
+      deletedBy: deleted ? ownerUid : "",
+      ownerUid,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdAt: existingData.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+async function softDeleteStudentRecord(student) {
+  const current = normalizeStudentRecord(student, student?.studentId || "");
+  if (!current.studentId) return;
+  await saveStudentRecordToFirebase(current, { deleted: true });
+}
+
+async function saveStudentsToFirebase({ applyEditor = true, silent = false } = {}) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    throw new Error("Firebase belum terhubung.");
+  }
+
+  if (applyEditor) {
+    applyCsvFromEditor("students");
+  } else {
+    normalizeStudentsState({ sort: false, syncEditors: true });
+  }
+
+  const ownerUid = getFirebaseWriteOwnerUid();
+  const activeStudents = (state.students || []).map((student) => normalizeStudentRecord(student, student?.studentId || ""));
+  const existingSnapshot = await firestoreGet(
+    state.firebase.db.collection(FIREBASE_STUDENT_COLLECTION).where("ownerUid", "==", ownerUid),
+    { forceServer: false }
+  );
+
+  const existingDocs = new Map();
+  existingSnapshot.forEach((doc) => {
+    const data = doc.data() || {};
+    const id = String(data.studentId || doc.id.split("__").slice(1).join("__") || "").trim();
+    if (!id) return;
+    existingDocs.set(id, { id, data });
+  });
+
+  const batch = state.firebase.db.batch();
+  const currentIds = new Set();
+
+  activeStudents.forEach((student) => {
+    const normalized = normalizeStudentRecord(student, student.studentId);
+    currentIds.add(normalized.studentId);
+    const ref = state.firebase.db.collection(FIREBASE_STUDENT_COLLECTION).doc(`${ownerUid}__${normalized.studentId}`);
+    const existing = existingDocs.get(normalized.studentId)?.data || {};
+    batch.set(
+      ref,
+      {
+        studentId: normalized.studentId,
+        fullName: normalized.fullName,
+        nickname: normalized.nickname,
+        kelas: normalized.kelas,
+        sekolah: normalized.sekolah,
+        parentName: normalized.parentName,
+        deletedAt: "",
+        deletedBy: "",
+        ownerUid,
+        createdAt: existing.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
+
+  existingDocs.forEach(({ data }, id) => {
+    if (currentIds.has(id)) return;
+    if (String(data.deletedAt || "").trim()) return;
+    const ref = state.firebase.db.collection(FIREBASE_STUDENT_COLLECTION).doc(`${ownerUid}__${id}`);
+    batch.set(
+      ref,
+      {
+        studentId: id,
+        deletedAt: new Date().toISOString(),
+        deletedBy: ownerUid,
+        ownerUid,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
+
+  await batch.commit();
+  setFirebaseStatus(`Data siswa tersimpan ke Firebase: ${activeStudents.length} baris aktif.`, "ok");
+  refreshFirebaseButtons();
+  if (!silent) return true;
+  return true;
 }
 
 async function firestoreGet(queryRef, { forceServer = false } = {}) {
@@ -3534,8 +3777,7 @@ async function loadSourcesFromFirebase({ silent = false, forceServer = false } =
   });
 
   const loaded = [];
-  if (docsByKind.students?.csvText) {
-    loadMasterStudentsCsv(docsByKind.students.csvText);
+  if (await loadStudentsFromFirebase({ silent: true, forceServer, legacyCsvText: docsByKind.students?.csvText || "" })) {
     loaded.push("siswa");
   }
   if (docsByKind.pricing?.csvText) {
@@ -3581,8 +3823,12 @@ async function saveSourcesToFirebase() {
   }
 
   const payloads = collectFirebaseSourcePayloads();
-  if (payloads.length === 0) {
+  if (payloads.length === 0 && (!state.students || state.students.length === 0)) {
     throw new Error("Belum ada source data yang bisa disimpan ke Firebase.");
+  }
+
+  if (state.students && state.students.length > 0) {
+    await saveStudentsToFirebase({ applyEditor: false, silent: true });
   }
 
   const ownerUid = getFirebaseWriteOwnerUid();
@@ -3610,6 +3856,10 @@ async function saveSourcesToFirebase() {
 async function saveSingleSourceToFirebase(kind) {
   if (!state.firebase.ready || !state.firebase.db) {
     throw new Error("Firebase belum terhubung.");
+  }
+  if (kind === "students") {
+    await saveStudentsToFirebase({ applyEditor: true });
+    return;
   }
   if (!FIREBASE_SOURCE_KINDS.includes(kind)) {
     throw new Error("Jenis CSV tidak valid.");
@@ -4148,12 +4398,21 @@ function renderPaymentStatusTable() {
 function renderStudentManagementTable() {
   if (!el.studentManageTableBody) return;
 
-  const gradeOptions = [...new Set((state.students || []).map((s) => String(s?.kelas || "").trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, "id"));
+  const gradeOptionMap = new Map();
+  (state.students || []).forEach((student) => {
+    const grade = normalizeStudentGradeValue(student?.kelas || "");
+    if (!grade.value || gradeOptionMap.has(grade.value)) return;
+    gradeOptionMap.set(grade.value, grade);
+  });
+  const gradeOptions = [...gradeOptionMap.values()].sort(compareStudentGradeValues);
+  if (!gradeOptions.some((item) => item.value === "alumni")) {
+    gradeOptions.push({ value: "alumni", label: "Alumni" });
+    gradeOptions.sort(compareStudentGradeValues);
+  }
   if (el.studentManageGradeFilter) {
     const selected = String(state.studentManageQuery.gradeFilter || "");
     el.studentManageGradeFilter.innerHTML = ['<option value="">Semua Kelas</option>']
-      .concat(gradeOptions.map((grade) => `<option value="${escapeHtml(grade)}">${escapeHtml(grade)}</option>`))
+      .concat(gradeOptions.map((grade) => `<option value="${escapeHtml(grade.value)}">${escapeHtml(grade.label)}</option>`))
       .join("");
     el.studentManageGradeFilter.value = selected;
   }
@@ -4602,7 +4861,7 @@ function getStudentManagementViewModel() {
     .map((student, index) => ({ student, sourceIndex: index }))
     .filter(({ student }) => {
       if (!filter) return true;
-      return String(student?.kelas || "").trim().toLowerCase() === filter;
+      return normalizeStudentGradeValue(student?.kelas || "").value === filter;
     });
 
   const pageSize = Math.max(1, Number.parseInt(String(state.studentManageQuery.pageSize || "15"), 10) || 15);
@@ -4617,28 +4876,61 @@ function getStudentManagementViewModel() {
   return { pageItems, totalItems, currentPage, totalPages };
 }
 
+function normalizeStudentGradeValue(value) {
+  if (value && typeof value === "object" && "value" in value && "label" in value) {
+    return {
+      value: String(value.value || "").trim().toLowerCase(),
+      label: String(value.label || "").trim() || String(value.value || "").trim(),
+    };
+  }
+  const raw = String(value || "").trim();
+  const lower = raw.toLowerCase();
+  if (!raw || raw === "-" || lower === "alumni") {
+    return { value: "alumni", label: "Alumni" };
+  }
+  return { value: lower, label: raw };
+}
+
+function compareStudentGradeValues(a, b) {
+  const left = normalizeStudentGradeValue(a);
+  const right = normalizeStudentGradeValue(b);
+
+  if (left.value === right.value) return 0;
+  if (left.value === "alumni") return 1;
+  if (right.value === "alumni") return -1;
+
+  const leftNumeric = Number.parseFloat(left.label);
+  const rightNumeric = Number.parseFloat(right.label);
+  const leftIsNumeric = Number.isFinite(leftNumeric) && String(left.label).trim() !== "" && /^\d+(?:[.,]\d+)?$/.test(String(left.label).trim());
+  const rightIsNumeric = Number.isFinite(rightNumeric) && String(right.label).trim() !== "" && /^\d+(?:[.,]\d+)?$/.test(String(right.label).trim());
+
+  if (leftIsNumeric && rightIsNumeric) {
+    return leftNumeric - rightNumeric;
+  }
+  if (leftIsNumeric) return -1;
+  if (rightIsNumeric) return 1;
+
+  const leftMatch = left.label.match(/^(.*?)(\d+)$/);
+  const rightMatch = right.label.match(/^(.*?)(\d+)$/);
+
+  if (leftMatch && rightMatch && leftMatch[1].trim().toLowerCase() === rightMatch[1].trim().toLowerCase()) {
+    return Number.parseInt(leftMatch[2], 10) - Number.parseInt(rightMatch[2], 10);
+  }
+
+  return left.label.localeCompare(right.label, "id", { numeric: true, sensitivity: "base" });
+}
+
 function normalizeStudentsState({ sort = false, syncEditors = false } = {}) {
   let list = (state.students || [])
-    .map((s) => ({
-      fullName: String(s?.fullName || "").trim(),
-      nickname: String(s?.nickname || "").trim() || deriveNicknameFromFullName(String(s?.fullName || "")),
-      kelas: String(s?.kelas || "").trim(),
-      sekolah: String(s?.sekolah || "").trim(),
-      parentName: String(s?.parentName || "").trim(),
-    }))
+    .map((s) => normalizeStudentRecord(s, s?.studentId || ""))
     .filter((s) => s.nickname || s.fullName || s.kelas || s.sekolah || s.parentName);
 
   list = makeNicknamesUnique(list);
   if (sort) list = sortStudentsByNickname(list);
 
   state.students = list;
-  state.studentsByNickname = new Map(list.map((s) => [normalizeName(s.nickname), s]));
-  state.studentsByFullName = new Map(list.filter((s) => s.fullName).map((s) => [normalizeName(s.fullName), s]));
-  fillStudentSelect(list.map((s) => s.nickname));
-  renderStudentDetail();
-
-  state.sourceTexts.students = serializeStudentsToCsv(list);
-  if (syncEditors) syncCsvEditorsFromState();
+  rebuildStudentIndexes(list);
+  syncStudentCsvSnapshot(list, { syncEditors });
 }
 
 function serializeStudentsToCsv(students) {
@@ -4758,7 +5050,8 @@ async function loadInvoiceForEditing(item) {
     el.invoiceDate.value = String(item.invoiceDate || "").slice(0, 10);
   }
   if (el.studentSelect) {
-    el.studentSelect.value = getStudentDisplayName(item.student, item.studentDetail || {});
+    const studentRecord = getStudentRecordFromInvoice(item);
+    el.studentSelect.value = studentRecord?.nickname || getStudentDisplayName(item.student, item.studentDetail || {});
     renderStudentDetail();
   }
 
