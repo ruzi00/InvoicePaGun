@@ -16,9 +16,11 @@
       <h1>Pembuat Invoice Les (2 Mode)</h1>
       <p class="sub">Payment in Front dan Payment After dalam satu workflow, plus sumber data dari Google Sheet.</p>
 
-      <div class="mode-switch">
-        <label><input type="radio" name="modePembayaran" value="front" checked /> Payment in Front</label>
-        <label><input type="radio" name="modePembayaran" value="after" /> Payment After</label>
+      <div class="workflow-tabs" role="tablist" aria-label="Mode dan Dashboard">
+        <button type="button" class="workflow-tab active" data-tab="front" role="tab" aria-selected="true">Payment in Front</button>
+        <button type="button" class="workflow-tab" data-tab="after" role="tab" aria-selected="false">Payment After</button>
+        <button type="button" class="workflow-tab" data-tab="calendar" role="tab" aria-selected="false">Calendar</button>
+        <button type="button" class="workflow-tab" data-tab="status" role="tab" aria-selected="false">Payment Status</button>
       </div>
 
       <div class="grid-2">
@@ -300,13 +302,49 @@
         </div>
       </section>
 
-      <div class="toolbar">
+      <section id="calendarSection" class="mode-section hidden">
+        <h3>Kalender Invoice</h3>
+        <p class="sub">Menampilkan rentang 2 bulan: bulan sekarang sampai akhir bulan berikutnya. Status kartu: ISSUED (belum lunas) atau PAID.</p>
+        <div class="preview-actions history-pagination-actions">
+          <button id="btnCalendarRefresh" type="button" class="btn" disabled>Muat Kalender dari Firebase</button>
+          <span id="calendarRangeLabel" class="sub history-page-info">-</span>
+        </div>
+        <div id="invoiceCalendarGrid" class="invoice-calendar-grid"></div>
+      </section>
+
+      <section id="paymentStatusSection" class="mode-section hidden">
+        <h3>Status Pembayaran Invoice</h3>
+        <p class="sub">Ubah status invoice menjadi ISSUED (terbit, belum bayar) atau PAID (sudah lunas). Perubahan otomatis tercermin di tab Calendar.</p>
+        <div class="preview-actions history-pagination-actions">
+          <button id="btnPaymentStatusRefresh" type="button" class="btn" disabled>Muat Data Status</button>
+          <span id="paymentStatusSummary" class="sub history-page-info">Hubungkan Firebase untuk memuat data.</span>
+        </div>
+        <div class="table-wrap">
+          <table id="paymentStatusTable">
+            <thead>
+              <tr>
+                <th>No Invoice</th>
+                <th>Siswa</th>
+                <th>Tanggal Invoice</th>
+                <th>Deadline</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" class="empty">Belum ada data invoice.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div id="billingActionToolbar" class="toolbar">
         <button id="btnGenerate" type="button" class="btn utama">Generate Invoice</button>
         <button id="btnDownloadPng" type="button" class="btn" disabled>Download PNG</button>
       </div>
     </section>
 
-    <section class="panel panel-data">
+    <section id="sessionsPanel" class="panel panel-data">
       <h2 id="sessionsTitle">Daftar Sesi Tagihan</h2>
       <p class="sub">Pratinjau mayoritas read-only. Centang baris dan edit kolom catatan bila perlu.</p>
       <div class="table-wrap">
@@ -333,7 +371,7 @@
       </div>
     </section>
 
-    <section class="panel panel-invoice">
+    <section id="previewPanel" class="panel panel-invoice">
       <h2>Pratinjau Invoice</h2>
       <div id="invoicePreview" class="invoice-preview">
         <div class="placeholder">Pratinjau invoice akan muncul di sini.</div>

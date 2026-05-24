@@ -16,6 +16,7 @@ const DEFAULT_FIREBASE_CONFIG = {
 
 const state = {
   mode: "front",
+  activeTab: "front",
   currentInvoiceId: "",
   autoLoadTried: false,
   students: [],
@@ -42,6 +43,7 @@ const state = {
   },
   lastInvoiceRecord: null,
   invoiceHistory: [],
+  dashboardInvoices: [],
   invoiceHistoryQuery: {
     pageSize: 20,
     studentFilter: "",
@@ -62,7 +64,7 @@ const state = {
 };
 
 const el = {
-  modeRadios: document.querySelectorAll('input[name="modePembayaran"]'),
+  workflowTabs: document.querySelectorAll(".workflow-tab"),
   runtimeNotice: document.getElementById("runtimeNotice"),
   cloudReadyNotice: document.getElementById("cloudReadyNotice"),
   autoLoadSection: document.getElementById("autoLoadSection"),
@@ -109,6 +111,17 @@ const el = {
   btnMuatSheet: document.getElementById("btnMuatSheet"),
   afterInvoiceDateSelect: document.getElementById("afterInvoiceDateSelect"),
   btnApplyAfterInvoiceDate: document.getElementById("btnApplyAfterInvoiceDate"),
+  calendarSection: document.getElementById("calendarSection"),
+  paymentStatusSection: document.getElementById("paymentStatusSection"),
+  btnCalendarRefresh: document.getElementById("btnCalendarRefresh"),
+  calendarRangeLabel: document.getElementById("calendarRangeLabel"),
+  invoiceCalendarGrid: document.getElementById("invoiceCalendarGrid"),
+  btnPaymentStatusRefresh: document.getElementById("btnPaymentStatusRefresh"),
+  paymentStatusSummary: document.getElementById("paymentStatusSummary"),
+  paymentStatusTableBody: document.querySelector("#paymentStatusTable tbody"),
+  sessionsPanel: document.getElementById("sessionsPanel"),
+  previewPanel: document.getElementById("previewPanel"),
+  billingActionToolbar: document.getElementById("billingActionToolbar"),
 
   sessionsTitle: document.getElementById("sessionsTitle"),
   tableBody: document.querySelector("#sessionsTable tbody"),
@@ -194,7 +207,7 @@ function initialize() {
   applyRuntimeModeHints();
   hydrateFirebaseConfigInputs();
   parseHolidaySetFromInput();
-  applyModeUI();
+  setActiveTab(state.activeTab, { force: true });
   refreshWeeklyTeacherOptions();
   applyDefaultTeacherToWeekTable();
   refreshFirebaseButtons();
@@ -215,10 +228,10 @@ async function initializeDataSources() {
 }
 
 function bindEvents() {
-  el.modeRadios.forEach((radio) => {
-    radio.addEventListener("change", () => {
-      state.mode = radio.value;
-      applyModeUI();
+  el.workflowTabs.forEach((tabBtn) => {
+    tabBtn.addEventListener("click", async () => {
+      const nextTab = String(tabBtn.dataset.tab || "front");
+      await setActiveTab(nextTab);
       clearPreview();
     });
   });
@@ -428,6 +441,25 @@ function bindEvents() {
   el.btnGenerate.addEventListener("click", generateInvoice);
   el.btnDownloadPng.addEventListener("click", downloadPng);
   if (el.btnPreviewPng) el.btnPreviewPng.addEventListener("click", downloadPng);
+  el.btnCalendarRefresh?.addEventListener("click", async () => {
+    try {
+      await refreshDashboardInvoices({ forceServer: true });
+      renderInvoiceCalendar();
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal memuat kalender invoice.", "error");
+      alert(err.message);
+    }
+  });
+
+  el.btnPaymentStatusRefresh?.addEventListener("click", async () => {
+    try {
+      await refreshDashboardInvoices({ forceServer: true });
+      renderPaymentStatusTable();
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal memuat status pembayaran.", "error");
+      alert(err.message);
+    }
+  });
   el.btnRefreshInvoiceHistory?.addEventListener("click", async () => {
     try {
       await loadInvoiceHistory({ direction: "reset" });
@@ -496,6 +528,25 @@ function bindEvents() {
       return;
     }
     showInvoiceHistoryPreview(item);
+  });
+
+  el.paymentStatusTableBody?.addEventListener("click", async (event) => {
+    const btn = event.target.closest("button[data-payment-save]");
+    if (!btn) return;
+    const historyId = String(btn.dataset.paymentSave || "");
+    if (!historyId) return;
+    const row = btn.closest("tr");
+    const statusSelect = row?.querySelector("select[data-payment-status]");
+    const status = String(statusSelect?.value || "issued");
+    try {
+      await updateInvoicePaymentStatus(historyId, status);
+      await refreshDashboardInvoices({ forceServer: true });
+      renderPaymentStatusTable();
+      renderInvoiceCalendar();
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal menyimpan status pembayaran.", "error");
+      alert(err.message);
+    }
   });
 }
 
@@ -837,10 +888,46 @@ function detectFileKind(fileName) {
   return null;
 }
 
+async function setActiveTab(nextTab, { force = false } = {}) {
+  const tab = ["front", "after", "calendar", "status"].includes(nextTab) ? nextTab : "front";
+  if (!force && state.activeTab === tab) return;
+
+  state.activeTab = tab;
+  el.workflowTabs.forEach((btn) => {
+    const isActive = String(btn.dataset.tab || "") === tab;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
+  const billingTab = tab === "front" || tab === "after";
+  el.frontSection.classList.toggle("hidden", tab !== "front");
+  el.afterSection.classList.toggle("hidden", tab !== "after");
+  el.calendarSection?.classList.toggle("hidden", tab !== "calendar");
+  el.paymentStatusSection?.classList.toggle("hidden", tab !== "status");
+
+  if (el.sessionsPanel) el.sessionsPanel.classList.toggle("hidden", !billingTab);
+  if (el.previewPanel) el.previewPanel.classList.toggle("hidden", !billingTab);
+  if (el.billingActionToolbar) el.billingActionToolbar.classList.toggle("hidden", !billingTab);
+
+  if (tab === "front" || tab === "after") {
+    state.mode = tab;
+    applyModeUI();
+    return;
+  }
+
+  if (!state.firebase.ready) {
+    if (tab === "calendar") renderInvoiceCalendar();
+    if (tab === "status") renderPaymentStatusTable();
+    return;
+  }
+
+  await refreshDashboardInvoices({ forceServer: true });
+  if (tab === "calendar") renderInvoiceCalendar();
+  if (tab === "status") renderPaymentStatusTable();
+}
+
 function applyModeUI() {
   const isFront = state.mode === "front";
-  el.frontSection.classList.toggle("hidden", !isFront);
-  el.afterSection.classList.toggle("hidden", isFront);
   el.sessionsTitle.textContent = isFront ? "Daftar Sesi Mingguan (Payment in Front)" : "Daftar Sesi Unpaid (Payment After)";
 
   if (!isFront) {
@@ -848,11 +935,9 @@ function applyModeUI() {
     return;
   }
 
-  if (isFront) {
-    state.sessions = [];
-    renderSessionsTable();
-    updateTotal();
-  }
+  state.sessions = [];
+  renderSessionsTable();
+  updateTotal();
 }
 
 function loadMasterStudentsCsv(text) {
@@ -1409,6 +1494,8 @@ function generateInvoice() {
   state.lastInvoiceRecord = {
     invoiceNo,
     createdAt: new Date().toISOString(),
+    paymentStatus: "issued",
+    paidAt: "",
     mode: state.mode,
     title: String(el.invoiceTitle.value || "INVOICE LES").trim(),
     student,
@@ -2448,6 +2535,8 @@ function refreshFirebaseButtons() {
   if (el.invoiceHistoryPageSize) el.invoiceHistoryPageSize.disabled = !ready;
   if (el.btnInvoiceHistoryPrev) el.btnInvoiceHistoryPrev.disabled = !ready || state.invoiceHistoryQuery.cursorStack.length === 0;
   if (el.btnInvoiceHistoryNext) el.btnInvoiceHistoryNext.disabled = !ready || !state.invoiceHistoryQuery.hasNext;
+  if (el.btnCalendarRefresh) el.btnCalendarRefresh.disabled = !ready;
+  if (el.btnPaymentStatusRefresh) el.btnPaymentStatusRefresh.disabled = !ready;
   const saveButtons = [
     el.btnCsvSaveStudents,
     el.btnCsvSavePricing,
@@ -2558,6 +2647,7 @@ async function connectFirebase({ saveConfig = false, loadSources = false, silent
   }
 
   await loadInvoiceHistory({ silent: true, forceServer });
+  await refreshDashboardInvoices({ forceServer });
 }
 
 function collectFirebaseSourcePayloads() {
@@ -2753,12 +2843,15 @@ async function saveInvoiceRecordToFirebase({ silent = false } = {}) {
 
   const record = {
     ...state.lastInvoiceRecord,
+    paymentStatus: String(state.lastInvoiceRecord.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued",
+    paidAt: String(state.lastInvoiceRecord.paidAt || ""),
     ownerUid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
   const docId = `${ownerUid}__${sanitizeFileName(state.lastInvoiceRecord.invoiceNo || "INV")}`;
   await state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(docId).set(record, { merge: true });
+  await refreshDashboardInvoices({ forceServer: true });
   if (!silent) setFirebaseStatus(`Invoice ${state.lastInvoiceRecord.invoiceNo} tersimpan ke Firebase.`, "ok");
 }
 
@@ -2852,6 +2945,147 @@ async function loadInvoiceHistory({ silent = false, forceServer = false, directi
   if (!silent && state.invoiceHistory.length > 0) {
     setFirebaseStatus(`Riwayat invoice dimuat (${state.invoiceHistory.length} data).`, "ok");
   }
+}
+
+async function refreshDashboardInvoices({ forceServer = false } = {}) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    state.dashboardInvoices = [];
+    renderPaymentStatusTable();
+    renderInvoiceCalendar();
+    return;
+  }
+
+  const ownerUid = getFirebaseWriteOwnerUid();
+  const buildQuery = (orderField) => state.firebase.db
+    .collection(FIREBASE_INVOICE_COLLECTION)
+    .where("ownerUid", "==", ownerUid)
+    .orderBy(orderField, "desc")
+    .limit(300);
+
+  let snapshot;
+  try {
+    snapshot = await firestoreGet(buildQuery("updatedAt"), { forceServer });
+  } catch {
+    snapshot = await firestoreGet(buildQuery("createdAt"), { forceServer });
+  }
+
+  state.dashboardInvoices = (snapshot.docs || []).map((doc) => ({
+    historyId: doc.id,
+    invoiceNo: doc.data()?.invoiceNo || doc.id,
+    paymentStatus: String(doc.data()?.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued",
+    ...doc.data(),
+  }));
+
+  renderPaymentStatusTable();
+  renderInvoiceCalendar();
+}
+
+function getCalendarRangeBase() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+  return { start, end };
+}
+
+function renderInvoiceCalendar() {
+  if (!el.invoiceCalendarGrid || !el.calendarRangeLabel) return;
+
+  const { start, end } = getCalendarRangeBase();
+  el.calendarRangeLabel.textContent = `${formatTanggal(start)} - ${formatTanggal(end)}`;
+
+  const dayMap = new Map();
+  state.dashboardInvoices.forEach((item) => {
+    const d = parseDateInput(String(item.paymentDeadline || item.invoiceDate || ""));
+    if (!d) return;
+    if (d < start || d > end) return;
+    const key = toLocalDateInputValue(d);
+    const list = dayMap.get(key) || [];
+    list.push(item);
+    dayMap.set(key, list);
+  });
+
+  const cells = [];
+  for (let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)) {
+    const key = toLocalDateInputValue(cursor);
+    const invoices = dayMap.get(key) || [];
+    const cards = invoices
+      .map((item) => {
+        const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
+        return `<div class="cal-item ${status}"><span>${escapeHtml(item.invoiceNo || "INV")}</span><strong>${status.toUpperCase()}</strong></div>`;
+      })
+      .join("");
+
+    cells.push(`
+      <article class="cal-day ${cursor.getMonth() === start.getMonth() ? "month-a" : "month-b"}">
+        <header>
+          <span>${escapeHtml(HARI[cursor.getDay()])}</span>
+          <strong>${cursor.getDate()}</strong>
+        </header>
+        <div class="cal-body">${cards || '<div class="cal-empty">-</div>'}</div>
+      </article>
+    `);
+  }
+
+  el.invoiceCalendarGrid.innerHTML = cells.join("");
+}
+
+function renderPaymentStatusTable() {
+  if (!el.paymentStatusTableBody || !el.paymentStatusSummary) return;
+
+  if (!state.firebase.ready) {
+    el.paymentStatusSummary.textContent = "Hubungkan Firebase untuk memuat data.";
+    el.paymentStatusTableBody.innerHTML = '<tr><td colspan="6" class="empty">Firebase belum terhubung.</td></tr>';
+    return;
+  }
+
+  if (state.dashboardInvoices.length === 0) {
+    el.paymentStatusSummary.textContent = "Belum ada invoice di cloud.";
+    el.paymentStatusTableBody.innerHTML = '<tr><td colspan="6" class="empty">Belum ada data invoice.</td></tr>';
+    return;
+  }
+
+  const paidCount = state.dashboardInvoices.filter((x) => String(x.paymentStatus || "").toLowerCase() === "paid").length;
+  const issuedCount = state.dashboardInvoices.length - paidCount;
+  el.paymentStatusSummary.textContent = `Total ${state.dashboardInvoices.length} invoice | ISSUED: ${issuedCount} | PAID: ${paidCount}`;
+
+  el.paymentStatusTableBody.innerHTML = state.dashboardInvoices
+    .map((item) => {
+      const invoiceDate = parseDateInput(String(item.invoiceDate || ""));
+      const deadlineDate = parseDateInput(String(item.paymentDeadline || ""));
+      const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
+      return `
+      <tr>
+        <td>${escapeHtml(item.invoiceNo || "-")}</td>
+        <td>${escapeHtml(item.student || "-")}</td>
+        <td>${invoiceDate ? escapeHtml(formatTanggal(invoiceDate)) : "-"}</td>
+        <td>${deadlineDate ? escapeHtml(formatTanggalWaktu(deadlineDate)) : "-"}</td>
+        <td>
+          <select data-payment-status>
+            <option value="issued" ${status === "issued" ? "selected" : ""}>ISSUED</option>
+            <option value="paid" ${status === "paid" ? "selected" : ""}>PAID</option>
+          </select>
+        </td>
+        <td><button type="button" class="btn" data-payment-save="${escapeHtml(item.historyId || "")}">Simpan</button></td>
+      </tr>`;
+    })
+    .join("");
+}
+
+async function updateInvoicePaymentStatus(historyId, status) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    throw new Error("Firebase belum terhubung.");
+  }
+  const normalized = String(status || "issued").toLowerCase() === "paid" ? "paid" : "issued";
+  const ref = state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(historyId);
+  await ref.set(
+    {
+      paymentStatus: normalized,
+      paidAt: normalized === "paid" ? new Date().toISOString() : "",
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+  setFirebaseStatus(`Status invoice diubah ke ${normalized.toUpperCase()}.`, "ok");
 }
 
 function renderInvoiceHistoryTable() {
