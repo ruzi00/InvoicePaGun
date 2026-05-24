@@ -363,6 +363,23 @@
     <section id="sessionsPanel" class="panel panel-data">
       <h2 id="sessionsTitle">Daftar Sesi Tagihan</h2>
       <p class="sub">Pratinjau mayoritas read-only. Centang baris dan edit kolom catatan bila perlu.</p>
+      <div class="reschedule-toolbar">
+        <label class="field">
+          <span>Tanggal Sesi Pengganti</span>
+          <input id="rescheduleDate" type="date" />
+        </label>
+        <div class="field checkbox-field">
+          <span>&nbsp;</span>
+          <div class="check-inline">
+            <input id="rescheduleUncheckAnchor" type="checkbox" checked />
+            <label for="rescheduleUncheckAnchor">Tandai sesi acuan jadi tidak dipilih saat insert</label>
+          </div>
+        </div>
+        <div class="field actions-inline">
+          <span>&nbsp;</span>
+          <button id="btnAddRescheduleSession" type="button" class="btn sekund">Insert Sesi Pengganti</button>
+        </div>
+      </div>
       <div class="table-wrap">
         <table id="sessionsTable">
           <thead>

@@ -21,6 +21,7 @@ const state = {
   autoLoadTried: false,
   students: [],
   studentsByNickname: new Map(),
+  studentsByFullName: new Map(),
   absensiRows: [],
   absensiHeaders: [],
   sessions: [],
@@ -32,6 +33,7 @@ const state = {
   diskonDurasi: [],
   bankGuru: [],
   holidaySet: new Set(),
+  holidayInfoMap: new Map(),
   sourceTexts: {
     students: "",
     pricing: "",
@@ -44,6 +46,7 @@ const state = {
   lastInvoiceRecord: null,
   invoiceHistory: [],
   dashboardInvoices: [],
+  rescheduleAnchorId: "",
   calendarWeekIndex: 0,
   calendarWeekCount: 0,
   invoiceHistoryQuery: {
@@ -134,6 +137,9 @@ const el = {
   billingInvoiceInfoSection: document.getElementById("billingInvoiceInfoSection"),
 
   sessionsTitle: document.getElementById("sessionsTitle"),
+  rescheduleDate: document.getElementById("rescheduleDate"),
+  rescheduleUncheckAnchor: document.getElementById("rescheduleUncheckAnchor"),
+  btnAddRescheduleSession: document.getElementById("btnAddRescheduleSession"),
   tableBody: document.querySelector("#sessionsTable tbody"),
   btnGenerate: document.getElementById("btnGenerate"),
   btnDownloadPng: document.getElementById("btnDownloadPng"),
@@ -457,6 +463,7 @@ function bindEvents() {
     alert(`Default pengajar disimpan: ${teacher}`);
   });
   el.btnGenerate.addEventListener("click", generateInvoice);
+  el.btnAddRescheduleSession?.addEventListener("click", insertRescheduleSession);
   el.btnDownloadPng.addEventListener("click", downloadPng);
   if (el.btnPreviewPng) el.btnPreviewPng.addEventListener("click", downloadPng);
   el.btnCalendarRefresh?.addEventListener("click", async () => {
@@ -1035,6 +1042,9 @@ function loadMasterStudentsCsv(text) {
 
   state.students = parsed;
   state.studentsByNickname = new Map(parsed.map((s) => [normalizeName(s.nickname), s]));
+  state.studentsByFullName = new Map(
+    parsed.filter((s) => String(s.fullName || "").trim()).map((s) => [normalizeName(s.fullName), s])
+  );
   state.sourceTexts.students = text;
   fillStudentSelect(parsed.map((s) => s.nickname));
   renderStudentDetail();
@@ -1097,13 +1107,16 @@ function applyBankRows(rows, notify = true, rawText = "") {
 }
 
 function applyHolidayCsv(text, notify = true) {
-  const dates = parseHolidayCsv(parseCsv(text));
+  const rows = parseCsv(text);
+  const entries = parseHolidayEntries(rows);
+  const dates = parseHolidayCsv(rows);
   if (dates.length === 0) {
     alert("Format hari libur tidak valid. Gunakan kolom tanggal atau isi tanggal di kolom pertama.");
     return;
   }
 
   el.holidayDates.value = dates.join("\n");
+  state.holidayInfoMap = buildHolidayInfoMap(entries);
   state.sourceTexts.holiday = text;
   parseHolidaySetFromInput();
   recalcSessions();
@@ -1117,7 +1130,11 @@ function parseHolidaySetFromInput() {
     .map((x) => x.trim())
     .filter(Boolean);
 
-  state.holidaySet = new Set(parts.filter(isValidIsoDate));
+  const dates = parts.filter(isValidIsoDate);
+  state.holidaySet = new Set(dates);
+  if ((state.holidayInfoMap || new Map()).size === 0) {
+    state.holidayInfoMap = new Map(dates.map((d) => [d, { labels: ["libur nasional"] }]));
+  }
 }
 
 function generateFrontWeeklySessions() {
@@ -1341,23 +1358,100 @@ function recalcSessions() {
     dipilih: s.dipilih,
   }));
 
+  sortSessionsAscending();
+  renderSessionsTable();
+  updateTotal();
+}
+
+function sortSessionsAscending() {
+  state.sessions.sort((a, b) => {
+    const dateDiff = (a?.tanggal?.getTime?.() || 0) - (b?.tanggal?.getTime?.() || 0);
+    if (dateDiff !== 0) return dateDiff;
+    const aStart = parseTimeToMinutes(a?.jamMulai || "");
+    const bStart = parseTimeToMinutes(b?.jamMulai || "");
+    if (aStart >= 0 && bStart >= 0 && aStart !== bStart) return aStart - bStart;
+    return String(a?.pengajar || "").localeCompare(String(b?.pengajar || ""), "id");
+  });
+}
+
+function hasDuplicateSession(candidate, ignoreId = "") {
+  const candidateDate = toLocalDateInputValue(candidate.tanggal);
+  return state.sessions.some((s) => {
+    if (ignoreId && s.id === ignoreId) return false;
+    return (
+      toLocalDateInputValue(s.tanggal) === candidateDate
+      && String(s.jamMulai || "") === String(candidate.jamMulai || "")
+      && String(s.jamSelesai || "") === String(candidate.jamSelesai || "")
+      && String(s.pengajar || "") === String(candidate.pengajar || "")
+      && String(s.topik || "") === String(candidate.topik || "")
+    );
+  });
+}
+
+function insertRescheduleSession() {
+  if (!Array.isArray(state.sessions) || state.sessions.length === 0) {
+    alert("Belum ada sesi yang bisa dijadwalkan ulang.");
+    return;
+  }
+  const anchor = state.sessions.find((s) => s.id === state.rescheduleAnchorId) || state.sessions[0];
+  if (!anchor) {
+    alert("Pilih satu sesi dulu sebagai acuan reschedule (klik baris sesi).");
+    return;
+  }
+
+  const rawDate = String(el.rescheduleDate?.value || "").trim();
+  const nextDate = parseDateInput(rawDate);
+  if (!nextDate) {
+    alert("Isi tanggal sesi pengganti terlebih dahulu.");
+    return;
+  }
+
+  const nextHari = HARI[nextDate.getDay()];
+  const cloned = buildSession({
+    date: nextDate,
+    hari: nextHari,
+    jamMulai: anchor.jamMulai,
+    jamSelesai: anchor.jamSelesai,
+    pengajar: anchor.pengajar,
+    pesertaCount: anchor.pesertaCount,
+    topik: anchor.topik,
+    catatan: anchor.catatan,
+    source: anchor.source || state.mode,
+  });
+
+  if (hasDuplicateSession(cloned)) {
+    alert("Sesi pengganti duplikat: kombinasi tanggal/jam/pengajar/topik sudah ada.");
+    return;
+  }
+
+  state.sessions.push(cloned);
+  if (el.rescheduleUncheckAnchor?.checked) {
+    anchor.dipilih = false;
+  }
+  state.rescheduleAnchorId = cloned.id;
+  sortSessionsAscending();
   renderSessionsTable();
   updateTotal();
 }
 
 function renderSessionsTable(emptyMsg = "Belum ada sesi. Muat data terlebih dahulu.") {
   if (state.sessions.length === 0) {
+    state.rescheduleAnchorId = "";
     el.tableBody.innerHTML = `<tr><td colspan="11" class="empty">${escapeHtml(emptyMsg)}</td></tr>`;
     return;
+  }
+
+  if (!state.sessions.some((s) => s.id === state.rescheduleAnchorId)) {
+    state.rescheduleAnchorId = state.sessions[0]?.id || "";
   }
 
   el.tableBody.innerHTML = state.sessions
     .map(
       (s) => `
-      <tr data-id="${s.id}" class="${isPublicHoliday(s.tanggal) ? "holiday-row" : ""}">
+      <tr data-id="${s.id}" class="${isPublicHoliday(s.tanggal) ? "holiday-row" : ""} ${s.id === state.rescheduleAnchorId ? "reschedule-anchor" : ""}">
         <td><input type="checkbox" class="pick" ${s.dipilih ? "checked" : ""} /></td>
         <td>${escapeHtml(s.hari)}</td>
-        <td>${formatTanggal(s.tanggal)}</td>
+        <td>${formatTanggal(s.tanggal)}${buildHolidayBadgeHtml(s.tanggal)}</td>
         <td>${escapeHtml(formatJamRange(s.jamMulai, s.jamSelesai))}</td>
         <td><select class="teacher-input">${getTeacherOptionsHtml(s.pengajar)}</select></td>
         <td><input type="text" class="topic-input" value="${escapeHtml(s.topik || "-")}" /></td>
@@ -1380,6 +1474,11 @@ function renderSessionsTable(emptyMsg = "Belum ada sesi. Muat data terlebih dahu
     const topicInput = row.querySelector(".topic-input");
     const participantInput = row.querySelector(".participant-input");
     const catatan = row.querySelector(".catatan");
+    row.addEventListener("click", (event) => {
+      if (event.target.closest("input,select,textarea,button,label")) return;
+      state.rescheduleAnchorId = session.id;
+      renderSessionsTable();
+    });
     checkbox.addEventListener("change", () => {
       session.dipilih = checkbox.checked;
       updateTotal();
@@ -1981,7 +2080,7 @@ function parseMasterStudents(rows) {
   for (let i = 1; i < rows.length; i += 1) {
     const row = rows[i] || [];
     const fullName = String(row[idxFullName] || "").trim();
-    const nickname = String(row[idxNick] || "").trim() || fullName;
+    const nickname = String(row[idxNick] || "").trim() || deriveNicknameFromFullName(fullName);
     if (!nickname) continue;
 
     out.push({
@@ -1993,7 +2092,53 @@ function parseMasterStudents(rows) {
     });
   }
 
-  return dedupeByNickname(out);
+  return dedupeByNickname(makeNicknamesUnique(out));
+}
+
+function deriveNicknameFromFullName(fullName) {
+  const words = String(fullName || "")
+    .trim()
+    .split(/\s+/)
+    .map((x) => x.replace(/[^A-Za-z0-9'.-]/g, "").trim())
+    .filter(Boolean);
+  if (words.length === 0) return "";
+  const candidate = words.find((w) => w.length > 2) || words[0];
+  return candidate || "";
+}
+
+function makeNicknamesUnique(students) {
+  const used = new Set();
+  return students.map((student) => {
+    const base = String(student.nickname || deriveNicknameFromFullName(student.fullName) || student.fullName || "").trim();
+    let next = base || "Siswa";
+    let bump = 2;
+    while (used.has(normalizeName(next))) {
+      const words = String(student.fullName || "").trim().split(/\s+/).filter(Boolean);
+      if (bump === 2 && words.length > 1) {
+        next = `${words[0]} ${words[1]}`;
+      } else {
+        next = `${base} ${bump - 1}`;
+      }
+      bump += 1;
+    }
+    used.add(normalizeName(next));
+    return { ...student, nickname: next };
+  });
+}
+
+function getStudentDisplayName(studentName, detail = null) {
+  const raw = String(studentName || "").trim();
+  if (!raw) return "-";
+
+  const byNick = state.studentsByNickname.get(normalizeName(raw));
+  if (byNick?.nickname) return byNick.nickname;
+
+  const detailFullName = String(detail?.fullName || "").trim();
+  const byFullName = state.studentsByFullName.get(normalizeName(raw))
+    || state.studentsByFullName.get(normalizeName(detailFullName));
+  if (byFullName?.nickname) return byFullName.nickname;
+
+  return deriveNicknameFromFullName(raw) || raw;
 }
 
 function parseTarifCsv(rows) {
@@ -2072,21 +2217,69 @@ function parseBankRows(rows) {
 }
 
 function parseHolidayCsv(rows) {
+  const entries = parseHolidayEntries(rows);
+  const set = new Set(entries.filter((x) => x.label === "libur nasional").map((x) => x.date));
+  return [...set].sort();
+}
+
+function parseHolidayEntries(rows) {
   if (!rows || rows.length === 0) return [];
 
   const header = (rows[0] || []).map((x) => String(x || "").trim().toLowerCase());
   const idxTanggal = header.findIndex((h) => h.includes("tanggal") || h.includes("date"));
-  const start = idxTanggal >= 0 ? 1 : 0;
+  const idxNama = header.findIndex((h) => h === "nama" || h.includes("name") || h.includes("libur"));
+  const idxJenis = header.findIndex((h) => h.includes("jenis") || h.includes("type"));
+  const hasHeader = idxTanggal >= 0 || idxNama >= 0 || idxJenis >= 0;
+  const start = hasHeader ? 1 : 0;
 
-  const set = new Set();
+  const out = [];
   for (let i = start; i < rows.length; i += 1) {
     const row = rows[i] || [];
-    const raw = String(idxTanggal >= 0 ? row[idxTanggal] : row[0] || "").trim();
-    if (!raw) continue;
-    if (isValidIsoDate(raw)) set.add(raw);
+    const rawDate = String(idxTanggal >= 0 ? row[idxTanggal] : row[0] || "").trim();
+    if (!isValidIsoDate(rawDate)) continue;
+    const rawName = String(idxNama >= 0 ? row[idxNama] : row[1] || "").trim();
+    const rawJenis = String(idxJenis >= 0 ? row[idxJenis] : "").trim();
+    const label = normalizeHolidayLabel(rawJenis || rawName);
+    out.push({ date: rawDate, name: rawName, label });
   }
 
-  return [...set].sort();
+  return out;
+}
+
+function normalizeHolidayLabel(text) {
+  const key = String(text || "").trim().toLowerCase();
+  if (key.includes("cuti") || key.includes("collective")) return "cuti bersama";
+  return "libur nasional";
+}
+
+function buildHolidayInfoMap(entries) {
+  const map = new Map();
+  for (const item of entries || []) {
+    if (!item?.date) continue;
+    const prev = map.get(item.date) || { labels: [] };
+    if (!prev.labels.includes(item.label)) prev.labels.push(item.label);
+    map.set(item.date, prev);
+  }
+  return map;
+}
+
+function getHolidayLabels(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return [];
+  const key = toLocalDateInputValue(date);
+  const info = state.holidayInfoMap?.get(key);
+  if (info?.labels?.length) return info.labels;
+  if (state.holidaySet?.has(key)) return ["libur nasional"];
+  return [];
+}
+
+function buildHolidayBadgeHtml(date) {
+  const labels = getHolidayLabels(date);
+  if (labels.length === 0) return "";
+  return `
+    <div class="holiday-badges">${labels
+      .map((label) => `<span class="holiday-chip ${label === "cuti bersama" ? "cuti" : "nasional"}">${escapeHtml(label)}</span>`)
+      .join("")}</div>
+  `;
 }
 
 function pickTarif(hari, pesertaCount, date) {
@@ -3133,7 +3326,7 @@ function isCalendarVisibleStatus(status) {
 }
 
 function formatCalendarStudentLabel(studentName, gradeLabel) {
-  const name = String(studentName || "-").trim() || "-";
+  const name = getStudentDisplayName(studentName);
   const grade = String(gradeLabel || "").trim();
   return grade ? `${name} (${grade})` : name;
 }
@@ -3424,7 +3617,7 @@ function renderPaymentStatusTable() {
       return `
       <tr>
         <td>${escapeHtml(item.invoiceNo || "-")}</td>
-        <td>${escapeHtml(item.student || "-")}</td>
+        <td>${escapeHtml(getStudentDisplayName(item.student, item.studentDetail || {}))}</td>
         <td>${invoiceDate ? escapeHtml(formatTanggal(invoiceDate)) : "-"}</td>
         <td>${deadlineDate ? escapeHtml(formatTanggalWaktu(deadlineDate)) : "-"}</td>
         <td>
@@ -3474,7 +3667,7 @@ function renderInvoiceHistoryTable() {
         <td>${escapeHtml(item.invoiceNo || "-")}</td>
         <td>${invoiceDate ? escapeHtml(formatTanggal(invoiceDate)) : "-"}</td>
         <td>${paymentDeadline ? escapeHtml(formatTanggalWaktu(paymentDeadline)) : "-"}</td>
-        <td>${escapeHtml(item.student || "-")}</td>
+        <td>${escapeHtml(getStudentDisplayName(item.student, item.studentDetail || {}))}</td>
         <td>${escapeHtml(item.mode || "-")}</td>
         <td>${formatRupiah(grandTotal)}</td>
         <td>
@@ -3514,7 +3707,7 @@ function showInvoiceHistoryPreview(item) {
   el.invoiceHistoryPreview.classList.remove("hidden");
   el.invoiceHistoryPreview.innerHTML = `
     <h4>${escapeHtml(item.invoiceNo || "Invoice")}</h4>
-    <div><strong>Siswa:</strong> ${escapeHtml(item.student || "-")}</div>
+    <div><strong>Siswa:</strong> ${escapeHtml(getStudentDisplayName(item.student, item.studentDetail || {}))}</div>
     <div><strong>Tanggal:</strong> ${escapeHtml(item.invoiceDate || "-")}</div>
     <div><strong>Deadline Pembayaran:</strong> ${escapeHtml(paymentDeadlineText)}</div>
     <div><strong>Mode:</strong> ${escapeHtml(item.mode || "-")}</div>
@@ -3542,7 +3735,7 @@ async function loadInvoiceForEditing(item) {
     el.invoiceDate.value = String(item.invoiceDate || "").slice(0, 10);
   }
   if (el.studentSelect) {
-    el.studentSelect.value = String(item.student || "").trim();
+    el.studentSelect.value = getStudentDisplayName(item.student, item.studentDetail || {});
     renderStudentDetail();
   }
 
