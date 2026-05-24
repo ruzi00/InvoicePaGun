@@ -322,14 +322,13 @@
           <span class="legend-item issued"><i></i>Issued (Belum Bayar)</span>
           <span class="legend-item paid"><i></i>Paid (Lunas)</span>
           <span class="legend-item cancelled"><i></i>Cancelled (disimpan, tidak tampil di kalender)</span>
-          <span class="legend-item aborted"><i></i>Aborted (disimpan, tidak tampil di kalender)</span>
         </div>
         <div id="invoiceCalendarGrid" class="invoice-calendar-weekly"></div>
       </section>
 
       <section id="paymentStatusSection" class="mode-section hidden">
         <h3>Status Pembayaran Invoice</h3>
-        <p class="sub">Ubah status invoice menjadi ISSUED, PAID, CANCELLED, atau ABORTED. Invoice cancelled/aborted tetap tersimpan, tetapi tidak ditampilkan di tab Calendar.</p>
+        <p class="sub">Ubah status invoice menjadi ISSUED, PAID, atau CANCELLED. Invoice cancelled tetap tersimpan, tetapi tidak ditampilkan di tab Calendar.</p>
         <div class="preview-actions history-pagination-actions">
           <button id="btnPaymentStatusRefresh" type="button" class="btn" disabled>Muat Data Status</button>
           <span id="paymentStatusSummary" class="sub history-page-info">Hubungkan Firebase untuk memuat data.</span>

@@ -351,11 +351,6 @@ textarea {
   border-color: #d6a2a2;
 }
 
-.legend-item.aborted i {
-  background: #e8eef8;
-  border-color: #9fb5d8;
-}
-
 .calendar-weekly-board {
   min-width: 980px;
   border: 1px solid #dfccaa;
@@ -558,11 +553,6 @@ textarea {
   background: #f8e9e9;
 }
 
-.cal-notime-badge.aborted {
-  border-color: #9fb5d8;
-  background: #e8eef8;
-}
-
 .payment-status-select.issued {
   border-color: #dfbe87;
   background: #fff5df;
@@ -581,13 +571,6 @@ textarea {
   border-color: #d6a2a2;
   background: #f8e9e9;
   color: #8a2f2f;
-  font-weight: 700;
-}
-
-.payment-status-select.aborted {
-  border-color: #9fb5d8;
-  background: #e8eef8;
-  color: #2b537d;
   font-weight: 700;
 }
 

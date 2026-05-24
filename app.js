@@ -3075,13 +3075,19 @@ function normalizeInvoiceStatus(status) {
   const normalized = String(status || "issued").trim().toLowerCase();
   if (normalized === "paid") return "paid";
   if (normalized === "cancelled" || normalized === "canceled") return "cancelled";
-  if (normalized === "aborted") return "aborted";
+  if (normalized === "aborted") return "cancelled";
   return "issued";
 }
 
 function isCalendarVisibleStatus(status) {
   const normalized = normalizeInvoiceStatus(status);
   return normalized === "issued" || normalized === "paid";
+}
+
+function formatCalendarStudentLabel(studentName, gradeLabel) {
+  const name = String(studentName || "-").trim() || "-";
+  const grade = String(gradeLabel || "").trim();
+  return grade ? `${name} (${grade})` : name;
 }
 
 function assignCalendarEntryLanes(entries) {
@@ -3149,9 +3155,11 @@ function buildCalendarViewModel(days, viewStart, viewEnd, rangeStart, rangeEnd) 
       const endMin = endMinRaw > startMin ? endMinRaw : (startMin >= 0 ? startMin + durMinFallback : -1);
 
       const row = ensureRow(dayKey, teacher, d);
+      const gradeLabel = String(item?.studentDetail?.kelas || "").trim();
       const entry = {
         invoiceNo: item.invoiceNo,
         student: item.student,
+        studentLabel: formatCalendarStudentLabel(item.student, gradeLabel),
         status,
         teacher,
         startMin,
@@ -3222,15 +3230,15 @@ function buildCalendarBoardHtml(model) {
               const widthMin = Math.max(15, entry.endMin - entry.startMin);
               const left = (startOffset / model.totalMinutes) * 100;
               const width = (widthMin / model.totalMinutes) * 100;
-              const tooltip = `Invoice: ${entry.invoiceNo || "INV"}\nStatus: ${String(entry.status || "issued").toUpperCase()}\nSiswa: ${entry.student || "-"}\nPengajar: ${entry.teacher || "-"}`;
-              return `<div class="cal-slot-item ${entry.status}" title="${escapeHtml(tooltip)}" style="left:${left}%;width:${width}%;--lane:${entry.lane};"><small>${escapeHtml(entry.student || "-")}</small></div>`;
+              const tooltip = `Invoice: ${entry.invoiceNo || "INV"}\nStatus: ${String(entry.status || "issued").toUpperCase()}\nSiswa: ${entry.studentLabel || entry.student || "-"}\nPengajar: ${entry.teacher || "-"}`;
+              return `<div class="cal-slot-item ${entry.status}" title="${escapeHtml(tooltip)}" style="left:${left}%;width:${width}%;--lane:${entry.lane};"><small>${escapeHtml(entry.studentLabel || entry.student || "-")}</small></div>`;
             })
             .join("");
 
           const noTimeBadges = row.noTime
             .map((entry) => {
-              const tooltip = `Invoice: ${entry.invoiceNo || "INV"}\nStatus: ${String(entry.status || "issued").toUpperCase()}\nSiswa: ${entry.student || "-"}\nPengajar: ${entry.teacher || "-"}`;
-              return `<span class="cal-notime-badge ${entry.status}" title="${escapeHtml(tooltip)}">${escapeHtml(entry.student || "-")}</span>`;
+              const tooltip = `Invoice: ${entry.invoiceNo || "INV"}\nStatus: ${String(entry.status || "issued").toUpperCase()}\nSiswa: ${entry.studentLabel || entry.student || "-"}\nPengajar: ${entry.teacher || "-"}`;
+              return `<span class="cal-notime-badge ${entry.status}" title="${escapeHtml(tooltip)}">${escapeHtml(entry.studentLabel || entry.student || "-")}</span>`;
             })
             .join("");
 
@@ -3358,8 +3366,7 @@ function renderPaymentStatusTable() {
   const paidCount = state.dashboardInvoices.filter((x) => String(x.paymentStatus || "").toLowerCase() === "paid").length;
   const issuedCount = state.dashboardInvoices.filter((x) => normalizeInvoiceStatus(x.paymentStatus) === "issued").length;
   const cancelledCount = state.dashboardInvoices.filter((x) => normalizeInvoiceStatus(x.paymentStatus) === "cancelled").length;
-  const abortedCount = state.dashboardInvoices.filter((x) => normalizeInvoiceStatus(x.paymentStatus) === "aborted").length;
-  el.paymentStatusSummary.textContent = `Total ${state.dashboardInvoices.length} invoice | ISSUED: ${issuedCount} | PAID: ${paidCount} | CANCELLED: ${cancelledCount} | ABORTED: ${abortedCount}`;
+  el.paymentStatusSummary.textContent = `Total ${state.dashboardInvoices.length} invoice | ISSUED: ${issuedCount} | PAID: ${paidCount} | CANCELLED: ${cancelledCount}`;
 
   el.paymentStatusTableBody.innerHTML = state.dashboardInvoices
     .map((item) => {
@@ -3377,7 +3384,6 @@ function renderPaymentStatusTable() {
             <option value="issued" ${status === "issued" ? "selected" : ""}>ISSUED</option>
             <option value="paid" ${status === "paid" ? "selected" : ""}>PAID</option>
             <option value="cancelled" ${status === "cancelled" ? "selected" : ""}>CANCELLED</option>
-            <option value="aborted" ${status === "aborted" ? "selected" : ""}>ABORTED</option>
           </select>
         </td>
         <td><button type="button" class="btn" data-payment-save="${escapeHtml(item.historyId || "")}">Simpan</button></td>
