@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Invoice Icon">
+  <rect width="64" height="64" rx="12" fill="#f4e9d3"/>
+  <path d="M18 10h22l10 10v34H18z" fill="#fffdf9" stroke="#7b6241" stroke-width="2"/>
+  <path d="M40 10v10h10" fill="#efe4cf" stroke="#7b6241" stroke-width="2"/>
+  <path d="M24 30h20M24 36h16M24 42h20" stroke="#b99353" stroke-width="2" stroke-linecap="round"/>
+  <text x="24" y="24" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="9" font-weight="700" fill="#255f75">INV</text>
+</svg>

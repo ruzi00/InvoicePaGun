@@ -67,6 +67,8 @@ const state = {
 
 const el = {
   workflowTabs: document.querySelectorAll(".workflow-tab"),
+  settingsMenu: document.getElementById("settingsMenu"),
+  settingsMenuContent: document.getElementById("settingsMenuContent"),
   runtimeNotice: document.getElementById("runtimeNotice"),
   cloudReadyNotice: document.getElementById("cloudReadyNotice"),
   autoLoadSection: document.getElementById("autoLoadSection"),
@@ -211,8 +213,10 @@ function initialize() {
   el.invoiceDate.value = toLocalDateInputValue(today);
   el.frontStartDate.value = toLocalDateInputValue(today);
 
+  state.activeTab = getTabFromLocation() || state.activeTab;
   bindEvents();
   applyRuntimeModeHints();
+  moveSettingsIntoMenu();
   hydrateFirebaseConfigInputs();
   parseHolidaySetFromInput();
   setActiveTab(state.activeTab, { force: true });
@@ -242,6 +246,12 @@ function bindEvents() {
       await setActiveTab(nextTab);
       clearPreview();
     });
+  });
+
+  window.addEventListener("hashchange", async () => {
+    const nextTab = getTabFromLocation();
+    if (!nextTab || nextTab === state.activeTab) return;
+    await setActiveTab(nextTab);
   });
 
   el.packageFiles.addEventListener("change", async (event) => {
@@ -551,6 +561,14 @@ function bindEvents() {
     const action = String(btn.dataset.historyAction || "view").toLowerCase();
     const item = state.invoiceHistory.find((row) => row.historyId === historyId);
     if (!item) return;
+    if (action === "edit") {
+      void loadInvoiceForEditing(item);
+      return;
+    }
+    if (action === "delete") {
+      void confirmAndDeleteInvoice(item);
+      return;
+    }
     if (action === "download") {
       redownloadInvoiceFromHistory(item);
       return;
@@ -584,6 +602,35 @@ function bindEvents() {
     statusSelect.value = normalized;
     statusSelect.className = `payment-status-select ${normalized}`;
   });
+}
+
+function moveSettingsIntoMenu() {
+  if (!el.settingsMenuContent) return;
+  const settingBlocks = [
+    el.defaultTeacherSelect?.closest(".grid-2"),
+    el.runtimeNotice,
+    el.cloudReadyNotice,
+    el.autoLoadSection,
+    el.firebaseSyncSection,
+  ].filter(Boolean);
+
+  settingBlocks.forEach((node) => {
+    if (node.parentElement !== el.settingsMenuContent) {
+      el.settingsMenuContent.appendChild(node);
+    }
+  });
+}
+
+function getTabFromLocation() {
+  const raw = String(window.location.hash || "").replace(/^#/, "").toLowerCase();
+  const token = raw.replace(/^\//, "").replace(/^tab\//, "");
+  return ["front", "after", "calendar", "status"].includes(token) ? token : null;
+}
+
+function updateLocationForTab(tab) {
+  const target = `#/tab/${tab}`;
+  if (window.location.hash === target) return;
+  window.history.replaceState(null, "", target);
 }
 
 function bindCsvEditorActions() {
@@ -929,6 +976,7 @@ async function setActiveTab(nextTab, { force = false } = {}) {
   if (!force && state.activeTab === tab) return;
 
   state.activeTab = tab;
+  updateLocationForTab(tab);
   el.workflowTabs.forEach((btn) => {
     const isActive = String(btn.dataset.tab || "") === tab;
     btn.classList.toggle("active", isActive);
@@ -3430,8 +3478,10 @@ function renderInvoiceHistoryTable() {
         <td>${escapeHtml(item.mode || "-")}</td>
         <td>${formatRupiah(grandTotal)}</td>
         <td>
+          <button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="edit">Edit</button>
           <button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="view">Lihat</button>
           <button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="download">Download PNG</button>
+          <button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="delete">Hapus</button>
         </td>
       </tr>`;
     })
@@ -3474,6 +3524,81 @@ function showInvoiceHistoryPreview(item) {
     <div><strong>Rincian Sesi:</strong></div>
     <ol class="history-items">${htmlItems || "<li>Tidak ada rincian sesi.</li>"}</ol>
   `;
+}
+
+async function loadInvoiceForEditing(item) {
+  const items = Array.isArray(item.items) ? item.items : [];
+  if (items.length === 0) {
+    alert("Invoice ini tidak punya sesi untuk diedit.");
+    return;
+  }
+
+  await setActiveTab("front");
+
+  if (el.invoiceTitle) {
+    el.invoiceTitle.value = String(item.title || "INVOICE LES").trim() || "INVOICE LES";
+  }
+  if (el.invoiceDate && item.invoiceDate) {
+    el.invoiceDate.value = String(item.invoiceDate || "").slice(0, 10);
+  }
+  if (el.studentSelect) {
+    el.studentSelect.value = String(item.student || "").trim();
+    renderStudentDetail();
+  }
+
+  const editableSessions = items
+    .map((s) => {
+      const rawDate = parseDateFlex(String(s.tanggal || "")) || parseDateInput(String(s.tanggal || ""));
+      if (!rawDate) return null;
+      return buildSession({
+        date: rawDate,
+        hari: String(s.hari || HARI[rawDate.getDay()] || "-"),
+        jamMulai: String(s.jamMulai || "-"),
+        jamSelesai: String(s.jamSelesai || "-"),
+        pengajar: String(s.pengajar || "-").trim() || "-",
+        pesertaCount: Math.max(1, Number.parseInt(String(s.pesertaCount || "1"), 10) || 1),
+        durasiOverride: Number(s.durasi || 0),
+        topik: String(s.topik || "-").trim() || "-",
+        catatan: String(s.catatan || ""),
+        source: "front",
+      });
+    })
+    .filter(Boolean);
+
+  if (editableSessions.length === 0) {
+    alert("Tidak ada data sesi valid untuk diedit.");
+    return;
+  }
+
+  state.mode = "front";
+  state.sessions = editableSessions;
+  renderSessionsTable();
+  updateTotal();
+  alert("Invoice dimuat ke editor. Ubah sesi yang diperlukan lalu klik Generate Invoice untuk memperbarui.");
+}
+
+async function confirmAndDeleteInvoice(item) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    alert("Firebase belum terhubung.");
+    return;
+  }
+  const invoiceNo = String(item?.invoiceNo || "invoice");
+  const agree = window.confirm(`Hapus invoice ${invoiceNo}? Data ini tidak bisa dikembalikan.`);
+  if (!agree) return;
+  const token = window.prompt(`Ketik HAPUS untuk konfirmasi hapus ${invoiceNo}:`, "");
+  if (String(token || "").trim().toUpperCase() !== "HAPUS") {
+    alert("Penghapusan dibatalkan.");
+    return;
+  }
+
+  await state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(String(item.historyId || "")).delete();
+  setFirebaseStatus(`Invoice ${invoiceNo} berhasil dihapus.`, "ok");
+  await refreshDashboardInvoices({ forceServer: true });
+  await loadInvoiceHistory({ direction: "reset", silent: true, forceServer: true });
+  if (el.invoiceHistoryPreview) {
+    el.invoiceHistoryPreview.classList.add("hidden");
+    el.invoiceHistoryPreview.innerHTML = "";
+  }
 }
 
 function redownloadInvoiceFromHistory(item) {
