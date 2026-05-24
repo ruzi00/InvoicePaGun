@@ -249,13 +249,13 @@
               </tr>
             </thead>
             <tbody>
-              <tr><td><input type="checkbox" data-day="Senin" checked /></td><td>Senin</td><td><select data-teacher="Senin" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Senin" /></td><td><input type="time" data-start="Senin" value="19:30" /></td><td><input type="time" data-end="Senin" value="21:00" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Selasa" /></td><td>Selasa</td><td><select data-teacher="Selasa" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Selasa" /></td><td><input type="time" data-start="Selasa" value="19:30" /></td><td><input type="time" data-end="Selasa" value="21:00" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Rabu" /></td><td>Rabu</td><td><select data-teacher="Rabu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Rabu" /></td><td><input type="time" data-start="Rabu" value="19:30" /></td><td><input type="time" data-end="Rabu" value="21:00" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Kamis" /></td><td>Kamis</td><td><select data-teacher="Kamis" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Kamis" /></td><td><input type="time" data-start="Kamis" value="19:30" /></td><td><input type="time" data-end="Kamis" value="21:00" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Jumat" /></td><td>Jumat</td><td><select data-teacher="Jumat" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Jumat" /></td><td><input type="time" data-start="Jumat" value="19:30" /></td><td><input type="time" data-end="Jumat" value="21:00" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Sabtu" /></td><td>Sabtu</td><td><select data-teacher="Sabtu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Sabtu" /></td><td><input type="time" data-start="Sabtu" value="09:00" /></td><td><input type="time" data-end="Sabtu" value="10:30" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Minggu" /></td><td>Minggu</td><td><select data-teacher="Minggu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Minggu" /></td><td><input type="time" data-start="Minggu" value="09:00" /></td><td><input type="time" data-end="Minggu" value="10:30" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Senin" checked /></td><td>Senin</td><td><select data-teacher="Senin" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Senin" /></td><td><input type="time" step="900" data-start="Senin" value="19:30" /></td><td><input type="time" step="900" data-end="Senin" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Selasa" /></td><td>Selasa</td><td><select data-teacher="Selasa" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Selasa" /></td><td><input type="time" step="900" data-start="Selasa" value="19:30" /></td><td><input type="time" step="900" data-end="Selasa" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Rabu" /></td><td>Rabu</td><td><select data-teacher="Rabu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Rabu" /></td><td><input type="time" step="900" data-start="Rabu" value="19:30" /></td><td><input type="time" step="900" data-end="Rabu" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Kamis" /></td><td>Kamis</td><td><select data-teacher="Kamis" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Kamis" /></td><td><input type="time" step="900" data-start="Kamis" value="19:30" /></td><td><input type="time" step="900" data-end="Kamis" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Jumat" /></td><td>Jumat</td><td><select data-teacher="Jumat" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Jumat" /></td><td><input type="time" step="900" data-start="Jumat" value="19:30" /></td><td><input type="time" step="900" data-end="Jumat" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Sabtu" /></td><td>Sabtu</td><td><select data-teacher="Sabtu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Sabtu" /></td><td><input type="time" step="900" data-start="Sabtu" value="09:00" /></td><td><input type="time" step="900" data-end="Sabtu" value="10:30" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Minggu" /></td><td>Minggu</td><td><select data-teacher="Minggu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Minggu" /></td><td><input type="time" step="900" data-start="Minggu" value="09:00" /></td><td><input type="time" step="900" data-end="Minggu" value="10:30" /></td></tr>
             </tbody>
           </table>
         </div>
@@ -321,13 +321,15 @@
         <div class="calendar-legend" aria-label="Legend status kalender">
           <span class="legend-item issued"><i></i>Issued (Belum Bayar)</span>
           <span class="legend-item paid"><i></i>Paid (Lunas)</span>
+          <span class="legend-item cancelled"><i></i>Cancelled (disimpan, tidak tampil di kalender)</span>
+          <span class="legend-item aborted"><i></i>Aborted (disimpan, tidak tampil di kalender)</span>
         </div>
         <div id="invoiceCalendarGrid" class="invoice-calendar-weekly"></div>
       </section>
 
       <section id="paymentStatusSection" class="mode-section hidden">
         <h3>Status Pembayaran Invoice</h3>
-        <p class="sub">Ubah status invoice menjadi ISSUED (terbit, belum bayar) atau PAID (sudah lunas). Perubahan otomatis tercermin di tab Calendar.</p>
+        <p class="sub">Ubah status invoice menjadi ISSUED, PAID, CANCELLED, atau ABORTED. Invoice cancelled/aborted tetap tersimpan, tetapi tidak ditampilkan di tab Calendar.</p>
         <div class="preview-actions history-pagination-actions">
           <button id="btnPaymentStatusRefresh" type="button" class="btn" disabled>Muat Data Status</button>
           <span id="paymentStatusSummary" class="sub history-page-info">Hubungkan Firebase untuk memuat data.</span>

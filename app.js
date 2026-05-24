@@ -576,6 +576,14 @@ function bindEvents() {
       alert(err.message);
     }
   });
+
+  el.paymentStatusTableBody?.addEventListener("change", (event) => {
+    const statusSelect = event.target.closest("select[data-payment-status]");
+    if (!statusSelect) return;
+    const normalized = normalizeInvoiceStatus(statusSelect.value);
+    statusSelect.value = normalized;
+    statusSelect.className = `payment-status-select ${normalized}`;
+  });
 }
 
 function bindCsvEditorActions() {
@@ -1092,8 +1100,12 @@ function generateFrontWeeklySessions() {
       const hari = HARI[date.getDay()];
       if (!activeDays.includes(hari)) continue;
 
-      const jamMulai = el.frontWeekTable.querySelector(`input[data-start="${hari}"]`)?.value || "19:30";
-      const jamSelesai = el.frontWeekTable.querySelector(`input[data-end="${hari}"]`)?.value || "21:00";
+      const startInput = el.frontWeekTable.querySelector(`input[data-start="${hari}"]`);
+      const endInput = el.frontWeekTable.querySelector(`input[data-end="${hari}"]`);
+      const jamMulai = snapTimeToStep(startInput?.value || "19:30", 15);
+      const jamSelesai = snapTimeToStep(endInput?.value || "21:00", 15);
+      if (startInput && startInput.value !== jamMulai) startInput.value = jamMulai;
+      if (endInput && endInput.value !== jamSelesai) endInput.value = jamSelesai;
       const pengajar = el.frontWeekTable.querySelector(`select[data-teacher="${hari}"]`)?.value || "-";
       const pesertaCount = Math.max(
         1,
@@ -2245,6 +2257,21 @@ function parseTimeToMinutes(text) {
   return h * 60 + m;
 }
 
+function minutesToTimeText(totalMinutes) {
+  const dayMinutes = 24 * 60;
+  const normalized = ((totalMinutes % dayMinutes) + dayMinutes) % dayMinutes;
+  const h = Math.floor(normalized / 60);
+  const m = normalized % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function snapTimeToStep(text, stepMinutes = 15) {
+  const min = parseTimeToMinutes(text);
+  if (min < 0) return String(text || "");
+  const snapped = Math.round(min / stepMinutes) * stepMinutes;
+  return minutesToTimeText(snapped);
+}
+
 function parseDateInput(value) {
   if (!value) return null;
   const d = new Date(value);
@@ -2874,7 +2901,7 @@ async function saveInvoiceRecordToFirebase({ silent = false } = {}) {
 
   const record = {
     ...state.lastInvoiceRecord,
-    paymentStatus: String(state.lastInvoiceRecord.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued",
+    paymentStatus: normalizeInvoiceStatus(state.lastInvoiceRecord.paymentStatus || "issued"),
     paidAt: String(state.lastInvoiceRecord.paidAt || ""),
     ownerUid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -3003,8 +3030,8 @@ async function refreshDashboardInvoices({ forceServer = false } = {}) {
   state.dashboardInvoices = (snapshot.docs || []).map((doc) => ({
     historyId: doc.id,
     invoiceNo: doc.data()?.invoiceNo || doc.id,
-    paymentStatus: String(doc.data()?.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued",
     ...doc.data(),
+    paymentStatus: normalizeInvoiceStatus(doc.data()?.paymentStatus || "issued"),
   }));
   state.calendarWeekIndex = 0;
 
@@ -3042,6 +3069,19 @@ function formatMinuteLabel(totalMinutes) {
 
 function formatMonthShort(date) {
   return new Intl.DateTimeFormat("id-ID", { month: "short" }).format(date);
+}
+
+function normalizeInvoiceStatus(status) {
+  const normalized = String(status || "issued").trim().toLowerCase();
+  if (normalized === "paid") return "paid";
+  if (normalized === "cancelled" || normalized === "canceled") return "cancelled";
+  if (normalized === "aborted") return "aborted";
+  return "issued";
+}
+
+function isCalendarVisibleStatus(status) {
+  const normalized = normalizeInvoiceStatus(status);
+  return normalized === "issued" || normalized === "paid";
 }
 
 function assignCalendarEntryLanes(entries) {
@@ -3089,7 +3129,8 @@ function buildCalendarViewModel(days, viewStart, viewEnd, rangeStart, rangeEnd) 
   };
 
   state.dashboardInvoices.forEach((item) => {
-    const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
+    const status = normalizeInvoiceStatus(item.paymentStatus || "issued");
+    if (!isCalendarVisibleStatus(status)) return;
     const sessions = Array.isArray(item.items) ? item.items : [];
 
     sessions.forEach((session) => {
@@ -3154,9 +3195,13 @@ function buildCalendarViewModel(days, viewStart, viewEnd, rangeStart, rangeEnd) 
 
 function buildCalendarBoardHtml(model) {
   const tickLabels = [];
-  for (let m = model.timelineStart; m <= model.timelineEnd; m += 30) {
+  const tickCount = Math.floor((model.timelineEnd - model.timelineStart) / 30) + 1;
+  const denseRuler = tickCount > 20;
+  let tickIndex = 0;
+  for (let m = model.timelineStart; m <= model.timelineEnd; m += 30, tickIndex += 1) {
     const left = ((m - model.timelineStart) / model.totalMinutes) * 100;
-    tickLabels.push(`<span style="left:${left}%;">${escapeHtml(formatMinuteLabel(m))}</span>`);
+    const tickClass = denseRuler && tickIndex % 2 === 1 ? "tick-stagger" : "";
+    tickLabels.push(`<span class="${tickClass}" style="left:${left}%">${escapeHtml(formatMinuteLabel(m))}</span>`);
   }
 
   const rowsHtml = model.days
@@ -3210,7 +3255,7 @@ function buildCalendarBoardHtml(model) {
       <div class="cal-header-row">
         <div class="cal-header-day">Bulan / Hari</div>
         <div class="cal-header-teacher">Pengajar</div>
-        <div class="cal-time-ruler" style="--total-units:${model.totalUnits};">
+        <div class="cal-time-ruler ${denseRuler ? "dense" : ""}" style="--total-units:${model.totalUnits};">
           <div class="cal-track-grid"></div>
           ${tickLabels.join("")}
         </div>
@@ -3311,14 +3356,16 @@ function renderPaymentStatusTable() {
   }
 
   const paidCount = state.dashboardInvoices.filter((x) => String(x.paymentStatus || "").toLowerCase() === "paid").length;
-  const issuedCount = state.dashboardInvoices.length - paidCount;
-  el.paymentStatusSummary.textContent = `Total ${state.dashboardInvoices.length} invoice | ISSUED: ${issuedCount} | PAID: ${paidCount}`;
+  const issuedCount = state.dashboardInvoices.filter((x) => normalizeInvoiceStatus(x.paymentStatus) === "issued").length;
+  const cancelledCount = state.dashboardInvoices.filter((x) => normalizeInvoiceStatus(x.paymentStatus) === "cancelled").length;
+  const abortedCount = state.dashboardInvoices.filter((x) => normalizeInvoiceStatus(x.paymentStatus) === "aborted").length;
+  el.paymentStatusSummary.textContent = `Total ${state.dashboardInvoices.length} invoice | ISSUED: ${issuedCount} | PAID: ${paidCount} | CANCELLED: ${cancelledCount} | ABORTED: ${abortedCount}`;
 
   el.paymentStatusTableBody.innerHTML = state.dashboardInvoices
     .map((item) => {
       const invoiceDate = parseDateInput(String(item.invoiceDate || ""));
       const deadlineDate = parseDateInput(String(item.paymentDeadline || ""));
-      const status = String(item.paymentStatus || "issued").toLowerCase() === "paid" ? "paid" : "issued";
+      const status = normalizeInvoiceStatus(item.paymentStatus || "issued");
       return `
       <tr>
         <td>${escapeHtml(item.invoiceNo || "-")}</td>
@@ -3329,6 +3376,8 @@ function renderPaymentStatusTable() {
           <select data-payment-status class="payment-status-select ${status}">
             <option value="issued" ${status === "issued" ? "selected" : ""}>ISSUED</option>
             <option value="paid" ${status === "paid" ? "selected" : ""}>PAID</option>
+            <option value="cancelled" ${status === "cancelled" ? "selected" : ""}>CANCELLED</option>
+            <option value="aborted" ${status === "aborted" ? "selected" : ""}>ABORTED</option>
           </select>
         </td>
         <td><button type="button" class="btn" data-payment-save="${escapeHtml(item.historyId || "")}">Simpan</button></td>
@@ -3341,7 +3390,7 @@ async function updateInvoicePaymentStatus(historyId, status) {
   if (!state.firebase.ready || !state.firebase.db) {
     throw new Error("Firebase belum terhubung.");
   }
-  const normalized = String(status || "issued").toLowerCase() === "paid" ? "paid" : "issued";
+  const normalized = normalizeInvoiceStatus(status || "issued");
   const ref = state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(historyId);
   await ref.set(
     {

@@ -346,6 +346,16 @@ textarea {
   border-color: #a7d2ba;
 }
 
+.legend-item.cancelled i {
+  background: #f8e9e9;
+  border-color: #d6a2a2;
+}
+
+.legend-item.aborted i {
+  background: #e8eef8;
+  border-color: #9fb5d8;
+}
+
 .calendar-weekly-board {
   min-width: 980px;
   border: 1px solid #dfccaa;
@@ -393,6 +403,20 @@ textarea {
   color: #665438;
   background: rgba(255, 255, 255, 0.8);
   padding: 0 2px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.cal-time-ruler.dense {
+  min-height: 58px;
+}
+
+.cal-time-ruler.dense > span {
+  font-size: 0.62rem;
+}
+
+.cal-time-ruler.dense > span.tick-stagger {
+  top: 26px;
 }
 
 .cal-track-grid {
@@ -529,6 +553,16 @@ textarea {
   background: #edfbf2;
 }
 
+.cal-notime-badge.cancelled {
+  border-color: #d6a2a2;
+  background: #f8e9e9;
+}
+
+.cal-notime-badge.aborted {
+  border-color: #9fb5d8;
+  background: #e8eef8;
+}
+
 .payment-status-select.issued {
   border-color: #dfbe87;
   background: #fff5df;
@@ -540,6 +574,20 @@ textarea {
   border-color: #9ccfb2;
   background: #e9f9ef;
   color: #236846;
+  font-weight: 700;
+}
+
+.payment-status-select.cancelled {
+  border-color: #d6a2a2;
+  background: #f8e9e9;
+  color: #8a2f2f;
+  font-weight: 700;
+}
+
+.payment-status-select.aborted {
+  border-color: #9fb5d8;
+  background: #e8eef8;
+  color: #2b537d;
   font-weight: 700;
 }
 
@@ -1102,6 +1150,14 @@ td .mini {
 
   .cal-time-ruler > span {
     font-size: 0.62rem;
+  }
+
+  .cal-time-ruler.dense {
+    min-height: 44px;
+  }
+
+  .cal-time-ruler.dense > span.tick-stagger {
+    display: none;
   }
 
   .invoice-preview {
