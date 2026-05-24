@@ -395,7 +395,8 @@
           </div>
         </div>
         <div class="toolbar">
-          <button id="btnStudentManageAddRow" type="button" class="btn sekund">Tambah Siswa</button>
+          <button id="btnStudentManageAddRow" type="button" class="btn sekund">Tambah Siswa (Modal)</button>
+          <button id="btnStudentManageHardDelete" type="button" class="btn" disabled>Hard Delete (Admin)</button>
           <button id="btnStudentManageDownloadCsv" type="button" class="btn">Download CSV Siswa</button>
           <button id="btnStudentManageUploadCsv" type="button" class="btn">Upload CSV Siswa</button>
           <button id="btnStudentManageSaveFirebase" type="button" class="btn" disabled>Simpan Siswa ke Firebase</button>
@@ -408,14 +409,22 @@
                 <th>No</th>
                 <th>Nama Panggilan</th>
                 <th>Nama Lengkap</th>
+                <th>L/P</th>
                 <th>Kelas</th>
+                <th>H1</th>
+                <th>Kelas Selanjutnya</th>
+                <th>H2</th>
                 <th>Sekolah</th>
+                <th>WA Siswa</th>
                 <th>Nama Orang Tua/Wali</th>
+                <th>WA Orang Tua</th>
+                <th>Riwayat Les</th>
+                <th>Student ID</th>
                 <th>Aksi</th>
               </tr>
             </thead>
             <tbody id="studentManageTableBody">
-              <tr><td colspan="7" class="empty">Belum ada data siswa.</td></tr>
+              <tr><td colspan="15" class="empty">Belum ada data siswa.</td></tr>
             </tbody>
           </table>
         </div>
@@ -431,6 +440,30 @@
           <button type="button" class="btn" data-page-action="goto" data-page-go="bottom">Go</button>
           <span class="sub student-manage-page-info" data-page-info="bottom">Halaman 1</span>
         </div>
+
+        <dialog id="studentCreateModal" class="student-modal">
+          <form method="dialog" id="studentCreateForm" class="student-modal-form">
+            <h4>Tambah Siswa Baru</h4>
+            <div class="grid-3">
+              <label class="field"><span>Nama Lengkap Siswa</span><input id="studentFormFullName" type="text" required /></label>
+              <label class="field"><span>Nama Panggilan Siswa</span><input id="studentFormNickname" type="text" /></label>
+              <label class="field"><span>L/P</span><input id="studentFormGender" type="text" maxlength="2" placeholder="L/P" /></label>
+              <label class="field"><span>Kelas</span><input id="studentFormKelas" type="text" /></label>
+              <label class="field"><span>H1</span><input id="studentFormH1" type="text" /></label>
+              <label class="field"><span>Kelas Selanjutnya</span><input id="studentFormNextGrade" type="text" /></label>
+              <label class="field"><span>H2</span><input id="studentFormH2" type="text" /></label>
+              <label class="field"><span>Sekolah</span><input id="studentFormSekolah" type="text" /></label>
+              <label class="field"><span>Nomor WhatsApp Siswa</span><input id="studentFormStudentWa" type="text" /></label>
+              <label class="field"><span>Nama Orang Tua/Wali</span><input id="studentFormParentName" type="text" /></label>
+              <label class="field"><span>Nomor WhatsApp Orang Tua/Wali</span><input id="studentFormParentWa" type="text" /></label>
+              <label class="field" style="grid-column: span 3;"><span>Riwayat Les</span><textarea id="studentFormStudyHistory" rows="2"></textarea></label>
+            </div>
+            <div class="toolbar">
+              <button id="btnStudentFormCreate" type="submit" class="btn">Simpan Siswa</button>
+              <button id="btnStudentFormCancel" type="button" class="btn sekund">Batal</button>
+            </div>
+          </form>
+        </dialog>
       </section>
 
       <section id="pricingManagementSection" class="mode-section hidden">

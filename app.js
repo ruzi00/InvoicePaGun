@@ -5,6 +5,21 @@ const FIREBASE_SOURCE_COLLECTION = "invoice_sources";
 const FIREBASE_STUDENT_COLLECTION = "student_details";
 const FIREBASE_INVOICE_COLLECTION = "invoice_records";
 const FIREBASE_SOURCE_KINDS = ["students", "pricing", "discount", "bank", "holiday", "attendance", "template_after"];
+const STUDENT_CSV_HEADERS = [
+  "No.",
+  "Nama Lengkap Siswa",
+  "Nama Panggilan Siswa",
+  "L/P",
+  "Kelas",
+  "H1",
+  "Kelas Selanjutnya",
+  "H2",
+  "Sekolah",
+  "Nomor WhatsApp\nSiswa",
+  "Nama Orang Tua/Wali",
+  "Nomor WhatsApp\nOrang Tua/Wali",
+  "Riwayat Les",
+];
 const FIREBASE_SHARED_OWNER_UID = "bimbelpakgun-shared";
 const DEFAULT_FIREBASE_CONFIG = {
   apiKey: "AIzaSyATOra_DTbyKzS-YY7KyRqBWLmeGPqReKY",
@@ -189,10 +204,26 @@ const el = {
   studentManageGotoInputs: document.querySelectorAll("input[data-student-goto]"),
   studentManageTableBody: document.getElementById("studentManageTableBody"),
   btnStudentManageAddRow: document.getElementById("btnStudentManageAddRow"),
+  btnStudentManageHardDelete: document.getElementById("btnStudentManageHardDelete"),
   btnStudentManageDownloadCsv: document.getElementById("btnStudentManageDownloadCsv"),
   btnStudentManageUploadCsv: document.getElementById("btnStudentManageUploadCsv"),
   fileStudentManageUploadCsv: document.getElementById("fileStudentManageUploadCsv"),
   btnStudentManageSaveFirebase: document.getElementById("btnStudentManageSaveFirebase"),
+  studentCreateModal: document.getElementById("studentCreateModal"),
+  studentCreateForm: document.getElementById("studentCreateForm"),
+  studentFormFullName: document.getElementById("studentFormFullName"),
+  studentFormNickname: document.getElementById("studentFormNickname"),
+  studentFormGender: document.getElementById("studentFormGender"),
+  studentFormKelas: document.getElementById("studentFormKelas"),
+  studentFormH1: document.getElementById("studentFormH1"),
+  studentFormNextGrade: document.getElementById("studentFormNextGrade"),
+  studentFormH2: document.getElementById("studentFormH2"),
+  studentFormSekolah: document.getElementById("studentFormSekolah"),
+  studentFormStudentWa: document.getElementById("studentFormStudentWa"),
+  studentFormParentName: document.getElementById("studentFormParentName"),
+  studentFormParentWa: document.getElementById("studentFormParentWa"),
+  studentFormStudyHistory: document.getElementById("studentFormStudyHistory"),
+  btnStudentFormCancel: document.getElementById("btnStudentFormCancel"),
   pricingManageTableBody: document.getElementById("pricingManageTableBody"),
   btnPricingManageAddRow: document.getElementById("btnPricingManageAddRow"),
   btnPricingManageApply: document.getElementById("btnPricingManageApply"),
@@ -619,15 +650,67 @@ function bindEvents() {
   });
 
   el.btnStudentManageAddRow?.addEventListener("click", () => {
-    state.students.push({
-      fullName: "",
-      nickname: "Siswa Baru",
-      kelas: "",
-      sekolah: "",
-      parentName: "",
-    });
+    if (!el.studentCreateModal) return;
+    el.studentCreateForm?.reset();
+    el.studentCreateModal.showModal();
+  });
+
+  el.btnStudentFormCancel?.addEventListener("click", () => {
+    el.studentCreateModal?.close();
+  });
+
+  el.studentCreateForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const fullName = String(el.studentFormFullName?.value || "").trim();
+    const nickname = String(el.studentFormNickname?.value || "").trim();
+    if (!fullName && !nickname) {
+      alert("Nama lengkap atau nama panggilan wajib diisi.");
+      return;
+    }
+
+    state.students.push(normalizeStudentRecord({
+      fullName,
+      nickname,
+      gender: String(el.studentFormGender?.value || "").trim(),
+      kelas: String(el.studentFormKelas?.value || "").trim(),
+      h1: String(el.studentFormH1?.value || "").trim(),
+      nextGrade: String(el.studentFormNextGrade?.value || "").trim(),
+      h2: String(el.studentFormH2?.value || "").trim(),
+      sekolah: String(el.studentFormSekolah?.value || "").trim(),
+      studentWhatsapp: String(el.studentFormStudentWa?.value || "").trim(),
+      parentName: String(el.studentFormParentName?.value || "").trim(),
+      parentWhatsapp: String(el.studentFormParentWa?.value || "").trim(),
+      studyHistory: String(el.studentFormStudyHistory?.value || "").trim(),
+    }));
     normalizeStudentsState({ sort: false, syncEditors: true });
     state.studentManageQuery.currentPage = 1;
+    renderStudentManagementTable();
+    el.studentCreateModal?.close();
+
+    const created = state.students[state.students.length - 1];
+    if (state.firebase.ready && created) {
+      await saveStudentRecordToFirebase(created);
+    }
+  });
+
+  el.btnStudentManageHardDelete?.addEventListener("click", async () => {
+    if (!state.firebase.ready) {
+      alert("Hubungkan Firebase terlebih dahulu.");
+      return;
+    }
+    const token = window.prompt("Mode admin hard delete: ketik ADMIN-HARD-DELETE untuk melanjutkan.", "");
+    if (String(token || "").trim() !== "ADMIN-HARD-DELETE") {
+      alert("Token admin tidak valid. Hard delete dibatalkan.");
+      return;
+    }
+
+    const targetId = window.prompt("Masukkan studentId yang ingin dihapus permanen:", "");
+    const studentId = String(targetId || "").trim();
+    if (!studentId) return;
+
+    await hardDeleteStudentRecord(studentId);
+    state.students = (state.students || []).filter((s) => String(s.studentId || "") !== studentId);
+    normalizeStudentsState({ sort: false, syncEditors: true });
     renderStudentManagementTable();
   });
 
@@ -683,28 +766,35 @@ function bindEvents() {
     await saveStudentsToFirebase({ applyEditor: false });
   });
 
-  el.studentManageTableBody?.addEventListener("input", (event) => {
-    const input = event.target.closest("input[data-row][data-field]");
-    if (!input) return;
-    const rowIndex = Number.parseInt(String(input.dataset.row || "-1"), 10);
-    const field = String(input.dataset.field || "");
-    if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.students.length) return;
-    if (!field) return;
-
-    state.students[rowIndex][field] = String(input.value || "");
-    if (field === "fullName") {
-      const row = state.students[rowIndex];
-      if (!String(row.nickname || "").trim()) {
-        row.nickname = deriveNicknameFromFullName(row.fullName);
-      }
-    }
-    normalizeStudentsState({ sort: false, syncEditors: true });
-    if (state.firebase.ready) {
-      void saveStudentRecordToFirebase(state.students[rowIndex]).catch((err) => setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error"));
-    }
-  });
-
   el.studentManageTableBody?.addEventListener("click", (event) => {
+    const saveBtn = event.target.closest("button[data-save-student]");
+    if (saveBtn) {
+      const rowIndex = Number.parseInt(String(saveBtn.dataset.saveStudent || "-1"), 10);
+      if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.students.length) return;
+      const row = state.students[rowIndex];
+
+      const readField = (field) => String(el.studentManageTableBody.querySelector(`[data-row="${rowIndex}"][data-field="${field}"]`)?.value || "").trim();
+      row.nickname = readField("nickname") || deriveNicknameFromFullName(readField("fullName"));
+      row.fullName = readField("fullName");
+      row.gender = readField("gender");
+      row.kelas = readField("kelas");
+      row.h1 = readField("h1");
+      row.nextGrade = readField("nextGrade");
+      row.h2 = readField("h2");
+      row.sekolah = readField("sekolah");
+      row.studentWhatsapp = readField("studentWhatsapp");
+      row.parentName = readField("parentName");
+      row.parentWhatsapp = readField("parentWhatsapp");
+      row.studyHistory = readField("studyHistory");
+
+      normalizeStudentsState({ sort: false, syncEditors: true });
+      renderStudentManagementTable();
+      if (state.firebase.ready) {
+        void saveStudentRecordToFirebase(state.students[rowIndex]).catch((err) => setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error"));
+      }
+      return;
+    }
+
     const removeBtn = event.target.closest("button[data-remove-student]");
     if (!removeBtn) return;
     const rowIndex = Number.parseInt(String(removeBtn.dataset.removeStudent || "-1"), 10);
@@ -2567,11 +2657,18 @@ function parseMasterStudents(rows) {
   if (!rows || rows.length < 2) return [];
 
   const headers = (rows[0] || []).map((x) => String(x || "").trim().toLowerCase());
-  const idxFullName = headers.findIndex((h) => h.includes("nama lengkap siswa"));
-  const idxNick = headers.findIndex((h) => h.includes("nama panggilan siswa"));
-  const idxKelas = headers.findIndex((h) => h === "kelas");
-  const idxSekolah = headers.findIndex((h) => h.includes("sekolah"));
-  const idxParent = headers.findIndex((h) => h.includes("nama orang tua") || h.includes("wali"));
+  const idxFullName = findHeaderIndex(headers, ["nama lengkap siswa"]);
+  const idxNick = findHeaderIndex(headers, ["nama panggilan siswa"]);
+  const idxGender = findHeaderIndex(headers, ["l/p", "gender", "jenis kelamin"]);
+  const idxKelas = findHeaderIndex(headers, ["kelas"]);
+  const idxH1 = findHeaderIndex(headers, ["h1"]);
+  const idxNextGrade = findHeaderIndex(headers, ["kelas selanjutnya"]);
+  const idxH2 = findHeaderIndex(headers, ["h2"]);
+  const idxSekolah = findHeaderIndex(headers, ["sekolah"]);
+  const idxStudentWa = findHeaderIndex(headers, ["nomor whatsapp siswa", "nomor whatsapp", "whatsapp siswa"]);
+  const idxParent = findHeaderIndex(headers, ["nama orang tua", "wali"]);
+  const idxParentWa = findHeaderIndex(headers, ["nomor whatsapp orang tua", "whatsapp orang tua"]);
+  const idxHistory = findHeaderIndex(headers, ["riwayat les"]);
   if (idxFullName === -1 && idxNick === -1) return [];
 
   const out = [];
@@ -2584,9 +2681,16 @@ function parseMasterStudents(rows) {
     out.push({
       fullName,
       nickname,
-      kelas: String(row[idxKelas] || "").trim(),
-      sekolah: String(row[idxSekolah] || "").trim(),
-      parentName: String(row[idxParent] || "").trim(),
+      gender: String(idxGender >= 0 ? row[idxGender] : "").trim(),
+      kelas: String(idxKelas >= 0 ? row[idxKelas] : "").trim(),
+      h1: String(idxH1 >= 0 ? row[idxH1] : "").trim(),
+      nextGrade: String(idxNextGrade >= 0 ? row[idxNextGrade] : "").trim(),
+      h2: String(idxH2 >= 0 ? row[idxH2] : "").trim(),
+      sekolah: String(idxSekolah >= 0 ? row[idxSekolah] : "").trim(),
+      studentWhatsapp: String(idxStudentWa >= 0 ? row[idxStudentWa] : "").trim(),
+      parentName: String(idxParent >= 0 ? row[idxParent] : "").trim(),
+      parentWhatsapp: String(idxParentWa >= 0 ? row[idxParentWa] : "").trim(),
+      studyHistory: String(idxHistory >= 0 ? row[idxHistory] : "").trim(),
     });
   }
 
@@ -2630,7 +2734,7 @@ function generateStudentId() {
 }
 
 function studentFingerprint(student) {
-  return [student?.fullName || "", student?.nickname || "", student?.kelas || "", student?.sekolah || "", student?.parentName || ""]
+  return [student?.fullName || "", student?.nickname || ""]
     .map((x) => normalizeName(x))
     .join("|");
 }
@@ -2640,9 +2744,16 @@ function createStudentRecord(student = {}, fallbackId = "") {
     studentId: String(student.studentId || fallbackId || generateStudentId()).trim(),
     fullName: String(student.fullName || "").trim(),
     nickname: String(student.nickname || "").trim() || deriveNicknameFromFullName(String(student.fullName || "")),
+    gender: String(student.gender || "").trim(),
     kelas: String(student.kelas || "").trim(),
+    h1: String(student.h1 || "").trim(),
+    nextGrade: String(student.nextGrade || "").trim(),
+    h2: String(student.h2 || "").trim(),
     sekolah: String(student.sekolah || "").trim(),
+    studentWhatsapp: String(student.studentWhatsapp || "").trim(),
     parentName: String(student.parentName || "").trim(),
+    parentWhatsapp: String(student.parentWhatsapp || "").trim(),
+    studyHistory: String(student.studyHistory || "").trim(),
   };
 }
 
@@ -3426,6 +3537,7 @@ function refreshFirebaseButtons() {
   if (el.btnDownloadCalendarCurrentMonth) el.btnDownloadCalendarCurrentMonth.disabled = !ready;
   if (el.btnDownloadCalendarNextMonth) el.btnDownloadCalendarNextMonth.disabled = !ready;
   if (el.btnPaymentStatusRefresh) el.btnPaymentStatusRefresh.disabled = !ready;
+  if (el.btnStudentManageHardDelete) el.btnStudentManageHardDelete.disabled = !ready;
   const saveButtons = [
     el.btnCsvSaveStudents,
     el.btnCsvSavePricing,
@@ -3566,7 +3678,7 @@ async function loadStudentsFromFirebase({ silent = false, forceServer = false, l
   if (snapshot.empty) {
     if (legacyCsvText.trim()) {
       loadMasterStudentsCsv(legacyCsvText);
-      await saveStudentsToFirebase({ applyEditor: false, preserveLegacy: false, silent: true });
+      await saveStudentsToFirebase({ applyEditor: false, silent: true });
       if (!silent) alert("Data siswa dimigrasikan dari CSV lama ke koleksi student_details.");
       return true;
     }
@@ -3582,15 +3694,22 @@ async function loadStudentsFromFirebase({ silent = false, forceServer = false, l
       studentId: String(data.studentId || doc.id.split("__").slice(1).join("__") || "").trim(),
       fullName: String(data.fullName || "").trim(),
       nickname: String(data.nickname || "").trim(),
+      gender: String(data.gender || "").trim(),
       kelas: String(data.kelas || "").trim(),
+      h1: String(data.h1 || "").trim(),
+      nextGrade: String(data.nextGrade || "").trim(),
+      h2: String(data.h2 || "").trim(),
       sekolah: String(data.sekolah || "").trim(),
+      studentWhatsapp: String(data.studentWhatsapp || "").trim(),
       parentName: String(data.parentName || "").trim(),
+      parentWhatsapp: String(data.parentWhatsapp || "").trim(),
+      studyHistory: String(data.studyHistory || "").trim(),
     }, String(data.studentId || doc.id.split("__").slice(1).join("__") || "").trim()));
   });
 
   if (rows.length === 0 && legacyCsvText.trim()) {
     loadMasterStudentsCsv(legacyCsvText);
-    await saveStudentsToFirebase({ applyEditor: false, preserveLegacy: false, silent: true });
+    await saveStudentsToFirebase({ applyEditor: false, silent: true });
     return true;
   }
 
@@ -3614,9 +3733,16 @@ async function saveStudentRecordToFirebase(student, { deleted = false } = {}) {
       studentId: next.studentId,
       fullName: next.fullName,
       nickname: next.nickname,
+      gender: next.gender,
       kelas: next.kelas,
+      h1: next.h1,
+      nextGrade: next.nextGrade,
+      h2: next.h2,
       sekolah: next.sekolah,
+      studentWhatsapp: next.studentWhatsapp,
       parentName: next.parentName,
+      parentWhatsapp: next.parentWhatsapp,
+      studyHistory: next.studyHistory,
       deletedAt: deleted ? new Date().toISOString() : "",
       deletedBy: deleted ? ownerUid : "",
       ownerUid,
@@ -3631,6 +3757,17 @@ async function softDeleteStudentRecord(student) {
   const current = normalizeStudentRecord(student, student?.studentId || "");
   if (!current.studentId) return;
   await saveStudentRecordToFirebase(current, { deleted: true });
+}
+
+async function hardDeleteStudentRecord(studentId) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    throw new Error("Firebase belum terhubung.");
+  }
+  const ownerUid = getFirebaseWriteOwnerUid();
+  const safeId = String(studentId || "").trim();
+  if (!safeId) throw new Error("studentId tidak valid.");
+  await state.firebase.db.collection(FIREBASE_STUDENT_COLLECTION).doc(`${ownerUid}__${safeId}`).delete();
+  setFirebaseStatus(`Student ${safeId} dihapus permanen.`, "ok");
 }
 
 async function saveStudentsToFirebase({ applyEditor = true, silent = false } = {}) {
@@ -3673,9 +3810,16 @@ async function saveStudentsToFirebase({ applyEditor = true, silent = false } = {
         studentId: normalized.studentId,
         fullName: normalized.fullName,
         nickname: normalized.nickname,
+        gender: normalized.gender,
         kelas: normalized.kelas,
+        h1: normalized.h1,
+        nextGrade: normalized.nextGrade,
+        h2: normalized.h2,
         sekolah: normalized.sekolah,
+        studentWhatsapp: normalized.studentWhatsapp,
         parentName: normalized.parentName,
+        parentWhatsapp: normalized.parentWhatsapp,
+        studyHistory: normalized.studyHistory,
         deletedAt: "",
         deletedBy: "",
         ownerUid,
@@ -3988,6 +4132,8 @@ async function loadInvoiceHistory({ silent = false, forceServer = false, directi
     ...doc.data(),
   }));
 
+  await backfillInvoiceStudentIds(state.invoiceHistory);
+
   renderInvoiceHistoryTable();
   renderInvoiceHistoryPaginationInfo();
   refreshFirebaseButtons();
@@ -3999,6 +4145,44 @@ async function loadInvoiceHistory({ silent = false, forceServer = false, directi
 
   if (!silent && state.invoiceHistory.length > 0) {
     setFirebaseStatus(`Riwayat invoice dimuat (${state.invoiceHistory.length} data).`, "ok");
+  }
+}
+
+async function backfillInvoiceStudentIds(items = []) {
+  if (!state.firebase.ready || !state.firebase.db || !Array.isArray(items) || items.length === 0) return;
+  const ownerUid = getFirebaseWriteOwnerUid();
+  const batch = state.firebase.db.batch();
+  let changed = 0;
+
+  items.forEach((item) => {
+    if (!item?.historyId) return;
+    const existing = String(item.studentId || item?.studentDetail?.studentId || "").trim();
+    if (existing) return;
+
+    const resolved = getStudentRecordFromInvoice(item);
+    const studentId = String(resolved?.studentId || "").trim();
+    if (!studentId) return;
+
+    const ref = state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(String(item.historyId));
+    batch.set(
+      ref,
+      {
+        studentId,
+        studentDetail: {
+          ...(item.studentDetail || {}),
+          studentId,
+        },
+        ownerUid,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    changed += 1;
+  });
+
+  if (changed > 0) {
+    await batch.commit();
+    setFirebaseStatus(`Backfill studentId selesai untuk ${changed} invoice.`, "ok");
   }
 }
 
@@ -4441,7 +4625,7 @@ function renderStudentManagementTable() {
 
   if (!Array.isArray(state.students) || state.students.length === 0 || pageItems.length === 0) {
     const message = state.students.length === 0 ? "Belum ada data siswa." : "Tidak ada siswa untuk filter kelas ini.";
-    el.studentManageTableBody.innerHTML = `<tr><td colspan="7" class="empty">${message}</td></tr>`;
+    el.studentManageTableBody.innerHTML = `<tr><td colspan="15" class="empty">${message}</td></tr>`;
     return;
   }
 
@@ -4454,10 +4638,23 @@ function renderStudentManagementTable() {
         <td>${rowNumber}</td>
         <td><input type="text" data-row="${sourceIndex}" data-field="nickname" value="${escapeHtml(s.nickname || "")}" /></td>
         <td><input type="text" data-row="${sourceIndex}" data-field="fullName" value="${escapeHtml(s.fullName || "")}" /></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="gender" value="${escapeHtml(s.gender || "")}" /></td>
         <td><input type="text" data-row="${sourceIndex}" data-field="kelas" value="${escapeHtml(s.kelas || "")}" /></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="h1" value="${escapeHtml(s.h1 || "")}" /></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="nextGrade" value="${escapeHtml(s.nextGrade || "")}" /></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="h2" value="${escapeHtml(s.h2 || "")}" /></td>
         <td><input type="text" data-row="${sourceIndex}" data-field="sekolah" value="${escapeHtml(s.sekolah || "")}" /></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="studentWhatsapp" value="${escapeHtml(s.studentWhatsapp || "")}" /></td>
         <td><input type="text" data-row="${sourceIndex}" data-field="parentName" value="${escapeHtml(s.parentName || "")}" /></td>
-        <td><button type="button" class="btn" data-remove-student="${sourceIndex}">Hapus</button></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="parentWhatsapp" value="${escapeHtml(s.parentWhatsapp || "")}" /></td>
+        <td><input type="text" data-row="${sourceIndex}" data-field="studyHistory" value="${escapeHtml(s.studyHistory || "")}" /></td>
+        <td><code>${escapeHtml(s.studentId || "-")}</code></td>
+        <td>
+          <div class="student-row-actions">
+            <button type="button" class="icon-btn save" title="Simpan" data-save-student="${sourceIndex}">&#128190;</button>
+            <button type="button" class="icon-btn delete" title="Soft Delete" data-remove-student="${sourceIndex}">&#128465;</button>
+          </div>
+        </td>
       </tr>
     `;
     })
@@ -4935,14 +5132,21 @@ function normalizeStudentsState({ sort = false, syncEditors = false } = {}) {
 
 function serializeStudentsToCsv(students) {
   const rows = [
-    ["No.", "Nama Lengkap Siswa", "Nama Panggilan Siswa", "Kelas", "Sekolah", "Nama Orang Tua/Wali"],
+    STUDENT_CSV_HEADERS,
     ...(students || []).map((s, index) => [
       String(index + 1),
       String(s?.fullName || ""),
       String(s?.nickname || ""),
+      String(s?.gender || ""),
       String(s?.kelas || ""),
+      String(s?.h1 || ""),
+      String(s?.nextGrade || ""),
+      String(s?.h2 || ""),
       String(s?.sekolah || ""),
+      String(s?.studentWhatsapp || ""),
       String(s?.parentName || ""),
+      String(s?.parentWhatsapp || ""),
+      String(s?.studyHistory || ""),
     ]),
   ];
   return serializeRowsToCsv(rows);
