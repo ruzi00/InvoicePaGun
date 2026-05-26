@@ -79,6 +79,7 @@ const state = {
   currentInvoiceId: "",
   autoLoadTried: false,
   calendarWeekAutoFocus: true,
+  calendarShareOnly: false,
   students: [],
   studentsByNickname: new Map(),
   studentsByFullName: new Map(),
@@ -226,6 +227,7 @@ const el = {
   calendarRangeLabel: document.getElementById("calendarRangeLabel"),
   invoiceCalendarGrid: document.getElementById("invoiceCalendarGrid"),
   btnPaymentStatusRefresh: document.getElementById("btnPaymentStatusRefresh"),
+  btnPaymentStatusAutoCancel: document.getElementById("btnPaymentStatusAutoCancel"),
   paymentStatusSummary: document.getElementById("paymentStatusSummary"),
   paymentStatusTableBody: document.querySelector("#paymentStatusTable tbody"),
   studentManageGradeFilter: document.getElementById("studentManageGradeFilter"),
@@ -383,6 +385,7 @@ function initialize() {
 
   const locationState = getLocationState();
   if (locationState) {
+    state.calendarShareOnly = Boolean(locationState.calendarShareOnly);
     state.activeGroup = locationState.group;
     state.activeTab = locationState.tab;
     state.lastTabByGroup[locationState.group] = locationState.tab;
@@ -444,6 +447,7 @@ function bindEvents() {
   window.addEventListener("hashchange", async () => {
     const next = getLocationState();
     if (!next) return;
+    state.calendarShareOnly = Boolean(next.calendarShareOnly);
     if (next.tab === state.activeTab && next.group === state.activeGroup) return;
     await setActiveTab(next.tab, { group: next.group });
   });
@@ -721,6 +725,26 @@ function bindEvents() {
     }
   });
 
+  el.btnPaymentStatusAutoCancel?.addEventListener("click", async () => {
+    if (!state.firebase.ready) {
+      alert("Hubungkan Firebase terlebih dahulu.");
+      return;
+    }
+    try {
+      await refreshDashboardInvoices({ forceServer: true });
+      const changed = await autoCancelOverdueInvoices({ silent: false });
+      if (changed > 0) {
+        await refreshDashboardInvoices({ forceServer: true });
+      } else {
+        renderPaymentStatusTable();
+        renderInvoiceCalendar();
+      }
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal menjalankan auto cancel overdue.", "error");
+      alert(err.message || "Gagal menjalankan auto cancel overdue.");
+    }
+  });
+
   el.btnAttendanceInputAddRow?.addEventListener("click", () => {
     const student = getSelectedStudentRecord();
     const now = getCurrentTimeInZone();
@@ -864,7 +888,7 @@ function bindEvents() {
     el.studentCreateModal?.close();
   });
 
-  el.studentFormKelas?.addEventListener("input", () => {
+  el.studentFormKelas?.addEventListener("change", () => {
     syncStudentFormGradeDerivedFields();
   });
 
@@ -883,9 +907,9 @@ function bindEvents() {
       nickname,
       gender: String(el.studentFormGender?.value || "").trim(),
       kelas: gradeProfile.kelas || String(el.studentFormKelas?.value || "").trim(),
-      h1: gradeProfile.h1 || String(el.studentFormH1?.value || "").trim(),
-      nextGrade: gradeProfile.nextGrade || String(el.studentFormNextGrade?.value || "").trim(),
-      h2: gradeProfile.h2 || String(el.studentFormH2?.value || "").trim(),
+      h1: gradeProfile.h1 || String(el.studentFormH1?.textContent || "").trim(),
+      nextGrade: gradeProfile.nextGrade || String(el.studentFormNextGrade?.textContent || "").trim(),
+      h2: gradeProfile.h2 || String(el.studentFormH2?.textContent || "").trim(),
       sekolah: String(el.studentFormSekolah?.value || "").trim(),
       studentWhatsapp: String(el.studentFormStudentWa?.value || "").trim(),
       parentName: String(el.studentFormParentName?.value || "").trim(),
@@ -1466,24 +1490,34 @@ function normalizeGroup(group) {
 function getLocationState() {
   const raw = String(window.location.hash || "").replace(/^#/, "").toLowerCase();
   const normalized = raw.replace(/^\//, "");
+  if (normalized === "share/calendar" || normalized === "calendar-share") {
+    return { group: "invoice", tab: "calendar", calendarShareOnly: true };
+  }
   const groupMatch = normalized.match(/^group\/([^/]+)\/tab\/([^/]+)/);
   if (groupMatch) {
     const group = normalizeGroup(groupMatch[1]);
     const tab = String(groupMatch[2] || "").trim().toLowerCase();
     if (group && TAB_GROUP_MAP[tab] && GROUP_TABS[group].includes(tab)) {
-      return { group, tab };
+      return { group, tab, calendarShareOnly: false };
     }
   }
 
   const token = normalized.replace(/^tab\//, "");
   if (TAB_GROUP_MAP[token]) {
-    return { group: TAB_GROUP_MAP[token], tab: token };
+    return { group: TAB_GROUP_MAP[token], tab: token, calendarShareOnly: false };
   }
 
   return null;
 }
 
 function updateLocationForView(group, tab) {
+  if (state.calendarShareOnly) {
+    const shareTarget = "#/share/calendar";
+    if (window.location.hash !== shareTarget) {
+      window.history.replaceState(null, "", shareTarget);
+    }
+    return;
+  }
   const target = `#/group/${group}/tab/${tab}`;
   if (window.location.hash === target) return;
   window.history.replaceState(null, "", target);
@@ -1827,9 +1861,22 @@ function detectFileKind(fileName) {
   return null;
 }
 
+function applyCalendarShareOnlyMode() {
+  const enabled = Boolean(state.calendarShareOnly);
+  document.body.classList.toggle("calendar-share-only", enabled);
+  if (el.btnCalendarRefresh) el.btnCalendarRefresh.classList.toggle("hidden", enabled);
+  if (el.btnDownloadCalendarCurrentMonth) el.btnDownloadCalendarCurrentMonth.classList.toggle("hidden", enabled);
+  if (el.btnDownloadCalendarNextMonth) el.btnDownloadCalendarNextMonth.classList.toggle("hidden", enabled);
+}
+
 async function setActiveTab(nextTab, { force = false, group = "" } = {}) {
   let tab = TAB_GROUP_MAP[nextTab] ? String(nextTab) : "front";
   let activeGroup = normalizeGroup(group) || TAB_GROUP_MAP[tab] || "invoice";
+
+  if (state.calendarShareOnly) {
+    tab = "calendar";
+    activeGroup = "invoice";
+  }
 
   if (!GROUP_TABS[activeGroup].includes(tab)) {
     const preferred = state.lastTabByGroup[activeGroup];
@@ -1842,6 +1889,7 @@ async function setActiveTab(nextTab, { force = false, group = "" } = {}) {
   state.activeGroup = activeGroup;
   state.lastTabByGroup[activeGroup] = tab;
   updateLocationForView(activeGroup, tab);
+  applyCalendarShareOnlyMode();
 
   el.workflowGroupButtons.forEach((btn) => {
     const isActive = normalizeGroup(btn.dataset.group) === activeGroup;
@@ -3336,9 +3384,9 @@ function syncStudentFormGradeDerivedFields() {
   if (el.studentFormKelas && profile.kelas) {
     el.studentFormKelas.value = profile.kelas;
   }
-  if (el.studentFormH1) el.studentFormH1.value = profile.h1 || "";
-  if (el.studentFormNextGrade) el.studentFormNextGrade.value = profile.nextGrade || "";
-  if (el.studentFormH2) el.studentFormH2.value = profile.h2 || "";
+  if (el.studentFormH1) el.studentFormH1.textContent = profile.h1 || "-";
+  if (el.studentFormNextGrade) el.studentFormNextGrade.textContent = profile.nextGrade || "-";
+  if (el.studentFormH2) el.studentFormH2.textContent = profile.h2 || "-";
 }
 
 function applyInvoiceDateFromAttendanceDate(isoDate) {
@@ -3476,6 +3524,7 @@ function renderStudentHardDeletePreview(studentId) {
 function openStudentFormForCreate() {
   state.studentFormEditIndex = -1;
   el.studentCreateForm?.reset();
+  if (el.studentFormKelas) el.studentFormKelas.value = "10";
   syncStudentFormGradeDerivedFields();
   if (el.studentFormTitle) el.studentFormTitle.textContent = "Tambah Siswa Baru";
   el.studentCreateModal?.showModal();
@@ -4224,6 +4273,7 @@ function refreshFirebaseButtons() {
   if (el.btnDownloadCalendarCurrentMonth) el.btnDownloadCalendarCurrentMonth.disabled = !ready;
   if (el.btnDownloadCalendarNextMonth) el.btnDownloadCalendarNextMonth.disabled = !ready;
   if (el.btnPaymentStatusRefresh) el.btnPaymentStatusRefresh.disabled = !ready;
+  if (el.btnPaymentStatusAutoCancel) el.btnPaymentStatusAutoCancel.disabled = !ready;
   if (el.btnStudentManageHardDelete) el.btnStudentManageHardDelete.disabled = !ready;
   if (el.btnAttendanceInputSaveAll) el.btnAttendanceInputSaveAll.disabled = !ready;
   const saveButtons = [
@@ -5054,8 +5104,6 @@ async function refreshDashboardInvoices({ forceServer = false } = {}) {
     ...doc.data(),
     paymentStatus: normalizeInvoiceStatus(doc.data()?.paymentStatus || "issued"),
   }));
-
-  await autoCancelOverdueInvoices({ silent: true });
   state.calendarWeekAutoFocus = true;
 
   renderPaymentStatusTable();

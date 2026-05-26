@@ -327,6 +327,7 @@
         <p class="sub">Ubah status invoice menjadi ISSUED, PAID, atau CANCELLED. Invoice cancelled tetap tersimpan, tetapi tidak ditampilkan di tab Calendar.</p>
         <div class="preview-actions history-pagination-actions">
           <button id="btnPaymentStatusRefresh" type="button" class="btn" disabled>Muat Data Status</button>
+          <button id="btnPaymentStatusAutoCancel" type="button" class="btn" disabled>Sync Auto Cancel Overdue</button>
           <span id="paymentStatusSummary" class="sub history-page-info">Hubungkan Firebase untuk memuat data.</span>
         </div>
         <div class="table-wrap">
@@ -367,21 +368,6 @@
             <span>Cari Sekolah</span>
             <input id="studentManageSearchSchool" type="text" placeholder="Nama sekolah" />
           </label>
-          <div class="field student-manage-pager-wrap" style="grid-column: span 2;">
-            <span>Pagination</span>
-            <div class="student-manage-pager" data-pager="top">
-              <button type="button" class="btn" data-page-action="first">&lt;&lt;</button>
-              <button type="button" class="btn" data-page-action="prev">&lt;</button>
-              <button type="button" class="btn" data-page-action="next">&gt;</button>
-              <button type="button" class="btn" data-page-action="last">&gt;&gt;</button>
-              <label class="goto-inline">
-                <span>Go to</span>
-                <input type="number" min="1" data-student-goto="top" />
-              </label>
-              <button type="button" class="btn" data-page-action="goto" data-page-go="top">Go</button>
-              <span class="sub student-manage-page-info" data-page-info="top">Halaman 1</span>
-            </div>
-          </div>
         </div>
         <div class="toolbar">
           <button id="btnStudentManageAddRow" type="button" class="btn sekund">Tambah Siswa (Modal)</button>
@@ -429,10 +415,26 @@
               <label class="field"><span>Nama Lengkap Siswa</span><input id="studentFormFullName" type="text" required /></label>
               <label class="field"><span>Nama Panggilan Siswa</span><input id="studentFormNickname" type="text" /></label>
               <label class="field"><span>L/P</span><input id="studentFormGender" type="text" maxlength="2" placeholder="L/P" /></label>
-              <label class="field"><span>Kelas</span><input id="studentFormKelas" type="number" min="1" max="13" step="1" placeholder="1-13" /></label>
-              <label class="field"><span>H1 (Auto)</span><input id="studentFormH1" type="text" readonly /></label>
-              <label class="field"><span>Kelas Selanjutnya (Auto)</span><input id="studentFormNextGrade" type="text" readonly /></label>
-              <label class="field"><span>H2 (Auto)</span><input id="studentFormH2" type="text" readonly /></label>
+              <label class="field"><span>Kelas</span>
+                <select id="studentFormKelas">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10" selected>10</option>
+                  <option value="11">11</option>
+                  <option value="12">12</option>
+                  <option value="13">13 (Alumni)</option>
+                </select>
+              </label>
+              <label class="field"><span>H1 (Auto)</span><div id="studentFormH1" class="auto-field-label">SMA</div></label>
+              <label class="field"><span>Kelas Selanjutnya (Auto)</span><div id="studentFormNextGrade" class="auto-field-label">11</div></label>
+              <label class="field"><span>H2 (Auto)</span><div id="studentFormH2" class="auto-field-label">SMA</div></label>
               <label class="field"><span>Sekolah</span><input id="studentFormSekolah" type="text" /></label>
               <label class="field"><span>Nomor WhatsApp Siswa</span><input id="studentFormStudentWa" type="text" /></label>
               <label class="field"><span>Nama Orang Tua/Wali</span><input id="studentFormParentName" type="text" /></label>

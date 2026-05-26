@@ -283,6 +283,19 @@ textarea {
   color: var(--ok);
 }
 
+.auto-field-label {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #cab995;
+  border-radius: 10px;
+  background: #f5ede0;
+  color: #3f3220;
+  font-weight: 700;
+}
+
 .toolbar {
   margin-top: 6px;
   display: flex;
@@ -1187,7 +1200,8 @@ td .mini {
 .invoice-sheet.landscape {
   width: 340mm;
   min-height: 210mm;
-  padding: 14mm 14mm 12mm;
+  padding: 12mm 14mm 16mm;
+  overflow: visible;
 }
 
 .invoice-top {
@@ -1307,13 +1321,19 @@ td .mini {
 .deadline-field {
   display: grid;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 .deadline-field span {
   font-size: 0.86rem;
   font-weight: 700;
   color: #5d4f3c;
+}
+
+.deadline-field input {
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  line-height: 1.2;
 }
 
 .topic-input,
@@ -1362,10 +1382,10 @@ td .mini {
 }
 
 .invoice-footer-grid {
-  margin-top: 10px;
+  margin-top: 8px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
+  gap: 10px;
   align-items: start;
 }
 
@@ -1383,9 +1403,9 @@ td .mini {
 }
 
 .bank-row {
-  padding: 4px 0;
+  padding: 3px 0;
   border-bottom: 1px dashed rgba(31, 41, 64, 0.18);
-  font-size: 0.84rem;
+  font-size: 0.82rem;
 }
 
 .bank-row:last-child {
@@ -1459,6 +1479,44 @@ td .mini {
 .total-box {
   grid-column: 2;
   grid-row: 1;
+}
+
+body.calendar-share-only .ambient,
+body.calendar-share-only #settingsMenu,
+body.calendar-share-only .workflow-groups,
+body.calendar-share-only .workflow-tabs,
+body.calendar-share-only #runtimeNotice,
+body.calendar-share-only #cloudReadyNotice,
+body.calendar-share-only #autoLoadSection,
+body.calendar-share-only #firebaseSyncSection,
+body.calendar-share-only #billingInvoiceInfoSection,
+body.calendar-share-only #frontSection,
+body.calendar-share-only #afterSection,
+body.calendar-share-only #paymentStatusSection,
+body.calendar-share-only #studentManagementSection,
+body.calendar-share-only #pricingManagementSection,
+body.calendar-share-only #discountManagementSection,
+body.calendar-share-only #bankManagementSection,
+body.calendar-share-only #holidayManagementSection,
+body.calendar-share-only #attendanceInputOperationsSection,
+body.calendar-share-only #attendanceOperationsSection,
+body.calendar-share-only #receivablesOperationsSection,
+body.calendar-share-only #remindersOperationsSection,
+body.calendar-share-only #sessionsPanel,
+body.calendar-share-only #previewPanel,
+body.calendar-share-only #billingActionToolbar {
+  display: none !important;
+}
+
+body.calendar-share-only .panel-kontrol > h1,
+body.calendar-share-only .panel-kontrol > p.sub,
+body.calendar-share-only .panel-kontrol > .grid-2 {
+  display: none;
+}
+
+body.calendar-share-only .container {
+  max-width: 1440px;
+  padding-top: 18px;
 }
 
 @media (max-width: 800px) {
