@@ -221,7 +221,7 @@
           </label>
           <label class="field">
             <span>Tanggal Invoice</span>
-            <input id="invoiceDate" type="date" />
+            <input id="invoiceDate" type="datetime-local" step="1" />
           </label>
           <label class="field">
             <span>Nama Panggilan Siswa</span>
@@ -359,6 +359,14 @@
               <option value="">Semua Kelas</option>
             </select>
           </label>
+          <label class="field">
+            <span>Cari Nama Siswa</span>
+            <input id="studentManageSearchName" type="text" placeholder="Nama panggilan / nama lengkap" />
+          </label>
+          <label class="field">
+            <span>Cari Sekolah</span>
+            <input id="studentManageSearchSchool" type="text" placeholder="Nama sekolah" />
+          </label>
           <div class="field student-manage-pager-wrap" style="grid-column: span 2;">
             <span>Pagination</span>
             <div class="student-manage-pager" data-pager="top">
@@ -421,10 +429,10 @@
               <label class="field"><span>Nama Lengkap Siswa</span><input id="studentFormFullName" type="text" required /></label>
               <label class="field"><span>Nama Panggilan Siswa</span><input id="studentFormNickname" type="text" /></label>
               <label class="field"><span>L/P</span><input id="studentFormGender" type="text" maxlength="2" placeholder="L/P" /></label>
-              <label class="field"><span>Kelas</span><input id="studentFormKelas" type="text" /></label>
-              <label class="field"><span>H1</span><input id="studentFormH1" type="text" /></label>
-              <label class="field"><span>Kelas Selanjutnya</span><input id="studentFormNextGrade" type="text" /></label>
-              <label class="field"><span>H2</span><input id="studentFormH2" type="text" /></label>
+              <label class="field"><span>Kelas</span><input id="studentFormKelas" type="number" min="1" max="13" step="1" placeholder="1-13" /></label>
+              <label class="field"><span>H1 (Auto)</span><input id="studentFormH1" type="text" readonly /></label>
+              <label class="field"><span>Kelas Selanjutnya (Auto)</span><input id="studentFormNextGrade" type="text" readonly /></label>
+              <label class="field"><span>H2 (Auto)</span><input id="studentFormH2" type="text" readonly /></label>
               <label class="field"><span>Sekolah</span><input id="studentFormSekolah" type="text" /></label>
               <label class="field"><span>Nomor WhatsApp Siswa</span><input id="studentFormStudentWa" type="text" /></label>
               <label class="field"><span>Nama Orang Tua/Wali</span><input id="studentFormParentName" type="text" /></label>

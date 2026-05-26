@@ -124,8 +124,12 @@ const state = {
     pageSize: 15,
     currentPage: 1,
     gradeFilter: "",
+    searchName: "",
+    searchSchool: "",
   },
   studentFormEditIndex: -1,
+  editingInvoiceHistoryId: "",
+  editingInvoiceMeta: null,
   pricingManageRows: [],
   discountManageRows: [],
   bankManageRows: [],
@@ -225,6 +229,8 @@ const el = {
   paymentStatusSummary: document.getElementById("paymentStatusSummary"),
   paymentStatusTableBody: document.querySelector("#paymentStatusTable tbody"),
   studentManageGradeFilter: document.getElementById("studentManageGradeFilter"),
+  studentManageSearchName: document.getElementById("studentManageSearchName"),
+  studentManageSearchSchool: document.getElementById("studentManageSearchSchool"),
   studentManagePagers: document.querySelectorAll(".student-manage-pager"),
   studentManagePageInfos: document.querySelectorAll(".student-manage-page-info"),
   studentManageGotoInputs: document.querySelectorAll("input[data-student-goto]"),
@@ -372,7 +378,7 @@ initialize();
 
 function initialize() {
   const today = new Date();
-  el.invoiceDate.value = toLocalDateInputValue(today);
+  el.invoiceDate.value = toLocalDateTimeInputValue(today);
   el.frontStartDate.value = toLocalDateInputValue(today);
 
   const locationState = getLocationState();
@@ -620,12 +626,27 @@ function bindEvents() {
 
   el.btnApplyAfterInvoiceDate?.addEventListener("click", () => {
     if (!el.afterInvoiceDateSelect?.value) return;
-    el.invoiceDate.value = el.afterInvoiceDateSelect.value;
+    applyInvoiceDateFromAttendanceDate(el.afterInvoiceDateSelect.value);
   });
 
   el.afterInvoiceDateSelect?.addEventListener("change", () => {
     if (!el.afterInvoiceDateSelect.value) return;
-    el.invoiceDate.value = el.afterInvoiceDateSelect.value;
+    applyInvoiceDateFromAttendanceDate(el.afterInvoiceDateSelect.value);
+  });
+
+  el.invoiceDate?.addEventListener("input", async () => {
+    if (!state.lastInvoiceRecord || !state.firebase.ready) return;
+    const parsed = parseDateInput(String(el.invoiceDate.value || "").trim());
+    if (!parsed) return;
+    state.lastInvoiceRecord.invoiceDate = toLocalDateTimeInputValue(parsed);
+    if (state.editingInvoiceHistoryId) {
+      state.lastInvoiceRecord.historyId = state.editingInvoiceHistoryId;
+    }
+    try {
+      await saveInvoiceRecordToFirebase({ silent: true });
+    } catch {
+      // ignore background autosave failures; manual save button remains available
+    }
   });
 
   el.studentSelect.addEventListener("change", () => {
@@ -843,6 +864,10 @@ function bindEvents() {
     el.studentCreateModal?.close();
   });
 
+  el.studentFormKelas?.addEventListener("input", () => {
+    syncStudentFormGradeDerivedFields();
+  });
+
   el.studentCreateForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const fullName = String(el.studentFormFullName?.value || "").trim();
@@ -852,14 +877,15 @@ function bindEvents() {
       return;
     }
 
+    const gradeProfile = getStudentGradeProfile(String(el.studentFormKelas?.value || "").trim());
     const payload = {
       fullName,
       nickname,
       gender: String(el.studentFormGender?.value || "").trim(),
-      kelas: String(el.studentFormKelas?.value || "").trim(),
-      h1: String(el.studentFormH1?.value || "").trim(),
-      nextGrade: String(el.studentFormNextGrade?.value || "").trim(),
-      h2: String(el.studentFormH2?.value || "").trim(),
+      kelas: gradeProfile.kelas || String(el.studentFormKelas?.value || "").trim(),
+      h1: gradeProfile.h1 || String(el.studentFormH1?.value || "").trim(),
+      nextGrade: gradeProfile.nextGrade || String(el.studentFormNextGrade?.value || "").trim(),
+      h2: gradeProfile.h2 || String(el.studentFormH2?.value || "").trim(),
       sekolah: String(el.studentFormSekolah?.value || "").trim(),
       studentWhatsapp: String(el.studentFormStudentWa?.value || "").trim(),
       parentName: String(el.studentFormParentName?.value || "").trim(),
@@ -869,6 +895,17 @@ function bindEvents() {
 
     const editIndex = Number(state.studentFormEditIndex || -1);
     let savedStudent = null;
+    const isNewStudent = !(Number.isInteger(editIndex) && editIndex >= 0 && editIndex < state.students.length);
+
+    if (isNewStudent && !state.firebase.ready) {
+      await bootstrapFirebaseFromStorage({ silent: true, forceServer: true });
+    }
+
+    if (isNewStudent && !state.firebase.ready) {
+      alert("Tambah siswa baru wajib tersimpan ke Firebase. Hubungkan Firebase lalu coba lagi.");
+      return;
+    }
+
     if (Number.isInteger(editIndex) && editIndex >= 0 && editIndex < state.students.length) {
       const current = state.students[editIndex] || {};
       state.students[editIndex] = normalizeStudentRecord({ ...current, ...payload, studentId: current.studentId }, current.studentId || "");
@@ -881,15 +918,23 @@ function bindEvents() {
     }
 
     normalizeStudentsState({ sort: false, syncEditors: true });
+    if (savedStudent) {
+      const refreshed = getStudentRecordById(savedStudent.studentId) || savedStudent;
+      if (state.firebase.ready) {
+        try {
+          await saveStudentRecordToFirebase(refreshed);
+        } catch (err) {
+          setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error");
+          alert(err.message || "Gagal menyimpan data siswa ke Firebase.");
+          return;
+        }
+      }
+    }
+
     renderStudentManagementTable();
     state.studentFormEditIndex = -1;
     if (el.studentFormTitle) el.studentFormTitle.textContent = "Tambah Siswa Baru";
     el.studentCreateModal?.close();
-
-    if (state.firebase.ready && savedStudent) {
-      const refreshed = getStudentRecordById(savedStudent.studentId) || savedStudent;
-      await saveStudentRecordToFirebase(refreshed);
-    }
   });
 
   el.btnStudentManageHardDelete?.addEventListener("click", async () => {
@@ -946,6 +991,18 @@ function bindEvents() {
 
   el.studentManageGradeFilter?.addEventListener("change", () => {
     state.studentManageQuery.gradeFilter = String(el.studentManageGradeFilter?.value || "").trim();
+    state.studentManageQuery.currentPage = 1;
+    renderStudentManagementTable();
+  });
+
+  el.studentManageSearchName?.addEventListener("input", () => {
+    state.studentManageQuery.searchName = String(el.studentManageSearchName?.value || "").trim();
+    state.studentManageQuery.currentPage = 1;
+    renderStudentManagementTable();
+  });
+
+  el.studentManageSearchSchool?.addEventListener("input", () => {
+    state.studentManageQuery.searchSchool = String(el.studentManageSearchSchool?.value || "").trim();
     state.studentManageQuery.currentPage = 1;
     renderStudentManagementTable();
   });
@@ -1303,6 +1360,21 @@ function bindEvents() {
   });
 
   el.paymentStatusTableBody?.addEventListener("click", async (event) => {
+    const deleteBtn = event.target.closest("button[data-payment-delete]");
+    if (deleteBtn) {
+      const historyId = String(deleteBtn.dataset.paymentDelete || "").trim();
+      if (!historyId) return;
+      const item = state.dashboardInvoices.find((row) => String(row.historyId || "") === historyId);
+      if (!item) return;
+      try {
+        await confirmAndDeleteInvoice(item);
+      } catch (err) {
+        setFirebaseStatus(err.message || "Gagal menghapus invoice.", "error");
+        alert(err.message || "Gagal menghapus invoice.");
+      }
+      return;
+    }
+
     const btn = event.target.closest("button[data-payment-save]");
     if (!btn) return;
     const historyId = String(btn.dataset.paymentSave || "");
@@ -2343,7 +2415,7 @@ function updateAfterInvoiceDateOptions(sourceSessions = null) {
 
   const preferred = isoDates[isoDates.length - 1];
   el.afterInvoiceDateSelect.value = preferred;
-  el.invoiceDate.value = preferred;
+  applyInvoiceDateFromAttendanceDate(preferred);
 }
 
 function buildSession({ date, hari, jamMulai, jamSelesai, pengajar, pesertaCount, durasiOverride, topik, catatan, source }) {
@@ -2575,7 +2647,8 @@ function generateInvoice() {
   const detail = getSelectedStudentRecord();
   const invoiceDate = parseDateInput(el.invoiceDate.value) || getCurrentTimeInZone();
   const paymentDeadline = toLocalDateTimeInputValue(addHours(getCurrentTimeInZone(), 24));
-  const invoiceNo = buildInvoiceNumber(invoiceDate, detail, student);
+  const editMeta = state.editingInvoiceMeta;
+  const invoiceNo = String(editMeta?.invoiceNo || "").trim() || buildInvoiceNumber(invoiceDate, detail, student);
   state.currentInvoiceId = invoiceNo;
   const studentId = String(detail?.studentId || "").trim();
   const rowsHtml = selected
@@ -2610,7 +2683,7 @@ function generateInvoice() {
           <div class="invoice-title-box"><div class="invoice-title">${escapeHtml(el.invoiceTitle.value || "INVOICE")}</div></div>
           <div class="badge">
             <div><strong>No:</strong> ${escapeHtml(invoiceNo)}</div>
-            <div><strong>Tanggal:</strong> ${formatTanggalPanjang(invoiceDate)}</div>
+            <div><strong>Tanggal:</strong> ${formatTanggalWaktu(invoiceDate)}</div>
           </div>
         </div>
         <div class="invoice-right">
@@ -2683,7 +2756,7 @@ function generateInvoice() {
 
       <div class="print-page-footer">
         <span>${escapeHtml(invoiceNo)}</span>
-        <span class="page-count"></span>
+        <span>${escapeHtml(formatTanggalWaktu(invoiceDate))} | <span class="page-count"></span></span>
       </div>
     </article>
   `;
@@ -2707,14 +2780,16 @@ function generateInvoice() {
   }
 
   state.lastInvoiceRecord = {
+    historyId: String(editMeta?.historyId || "").trim(),
     invoiceNo,
-    createdAt: new Date().toISOString(),
-    paymentStatus: "issued",
-    paidAt: "",
+    createdAt: String(editMeta?.createdAt || new Date().toISOString()),
+    paymentStatus: normalizeInvoiceStatus(editMeta?.paymentStatus || "issued"),
+    paymentNote: String(editMeta?.paymentNote || "").trim(),
+    paidAt: String(editMeta?.paidAt || ""),
     mode: state.mode,
     title: String(el.invoiceTitle.value || "INVOICE LES").trim(),
     student,
-    invoiceDate: toLocalDateInputValue(invoiceDate),
+    invoiceDate: toLocalDateTimeInputValue(invoiceDate),
     paymentDeadline,
     teachers,
     teacherPortions,
@@ -2748,6 +2823,9 @@ function generateInvoice() {
       // ignore background autosave failures; manual save button remains available
     });
   }
+
+  state.editingInvoiceHistoryId = "";
+  state.editingInvoiceMeta = null;
 }
 
 async function downloadPng() {
@@ -3214,14 +3292,77 @@ function sortAttendanceEntries(entries = []) {
   });
 }
 
+function normalizeGradeNumber(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw === "alumni") return 13;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 13) return null;
+  return parsed;
+}
+
+function getSchoolLevelFromGradeNumber(gradeNumber) {
+  if (!Number.isInteger(gradeNumber)) return "";
+  if (gradeNumber >= 1 && gradeNumber <= 6) return "SD";
+  if (gradeNumber >= 7 && gradeNumber <= 9) return "SMP";
+  if (gradeNumber >= 10 && gradeNumber <= 12) return "SMA";
+  if (gradeNumber === 13) return "Alumni";
+  return "";
+}
+
+function getStudentGradeProfile(kelasValue) {
+  const gradeNumber = normalizeGradeNumber(kelasValue);
+  if (!Number.isInteger(gradeNumber)) {
+    return {
+      gradeNumber: null,
+      kelas: String(kelasValue || "").trim(),
+      h1: "",
+      nextGrade: "",
+      h2: "",
+    };
+  }
+  const nextGradeNumber = Math.min(13, gradeNumber + 1);
+  return {
+    gradeNumber,
+    kelas: String(gradeNumber),
+    h1: getSchoolLevelFromGradeNumber(gradeNumber),
+    nextGrade: String(nextGradeNumber),
+    h2: getSchoolLevelFromGradeNumber(nextGradeNumber),
+  };
+}
+
+function syncStudentFormGradeDerivedFields() {
+  const profile = getStudentGradeProfile(el.studentFormKelas?.value || "");
+  if (el.studentFormKelas && profile.kelas) {
+    el.studentFormKelas.value = profile.kelas;
+  }
+  if (el.studentFormH1) el.studentFormH1.value = profile.h1 || "";
+  if (el.studentFormNextGrade) el.studentFormNextGrade.value = profile.nextGrade || "";
+  if (el.studentFormH2) el.studentFormH2.value = profile.h2 || "";
+}
+
+function applyInvoiceDateFromAttendanceDate(isoDate) {
+  const text = String(isoDate || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || !el.invoiceDate) return;
+  const existing = parseDateInput(String(el.invoiceDate.value || ""));
+  const now = getCurrentTimeInZone();
+  const hour = existing ? existing.getHours() : now.getHours();
+  const minute = existing ? existing.getMinutes() : now.getMinutes();
+  const second = existing ? existing.getSeconds() : now.getSeconds();
+  const next = new Date(`${text}T00:00:00`);
+  next.setHours(hour, minute, second, 0);
+  el.invoiceDate.value = toLocalDateTimeInputValue(next);
+}
+
 function buildInvoiceNumber(invoiceDate, studentRecord, studentName) {
   const datePart = `${invoiceDate.getFullYear()}${String(invoiceDate.getMonth() + 1).padStart(2, "0")}${String(invoiceDate.getDate()).padStart(2, "0")}`;
-  const nowParts = getDatePartsInZone(new Date(), APP_TIME_ZONE);
-  const timePart = `${String(nowParts.hour).padStart(2, "0")}${String(nowParts.minute).padStart(2, "0")}${String(nowParts.second).padStart(2, "0")}`;
-  const nameSource = String(studentName || studentRecord?.nickname || studentRecord?.fullName || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-  const studentKey = (nameSource.slice(0, 6) || "SISWA").toUpperCase();
-  const randomPart = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `INV-${datePart}-${timePart}-${studentKey}-${randomPart}`;
+  const nicknameSource = String(studentName || studentRecord?.nickname || studentRecord?.fullName || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const nicknameKey = nicknameSource.slice(0, 12) || "SISWA";
+  const gradeProfile = getStudentGradeProfile(studentRecord?.kelas || "");
+  const gradeKey = gradeProfile.kelas || "00";
+  const idDigits = String(studentRecord?.studentId || "").replace(/\D/g, "");
+  const studentIdKey = (idDigits.slice(0, 5) || "00000").padEnd(5, "0");
+  return `INV-${datePart}-${nicknameKey}-${gradeKey}-${studentIdKey}`;
 }
 
 function studentFingerprint(student) {
@@ -3231,15 +3372,16 @@ function studentFingerprint(student) {
 }
 
 function createStudentRecord(student = {}, fallbackId = "") {
+  const gradeProfile = getStudentGradeProfile(student.kelas || "");
   return {
     studentId: String(student.studentId || fallbackId || generateStudentId()).trim(),
     fullName: String(student.fullName || "").trim(),
     nickname: String(student.nickname || "").trim() || deriveNicknameFromFullName(String(student.fullName || "")),
     gender: String(student.gender || "").trim(),
-    kelas: String(student.kelas || "").trim(),
-    h1: String(student.h1 || "").trim(),
-    nextGrade: String(student.nextGrade || "").trim(),
-    h2: String(student.h2 || "").trim(),
+    kelas: gradeProfile.kelas || String(student.kelas || "").trim(),
+    h1: gradeProfile.h1 || String(student.h1 || "").trim(),
+    nextGrade: gradeProfile.nextGrade || String(student.nextGrade || "").trim(),
+    h2: gradeProfile.h2 || String(student.h2 || "").trim(),
     sekolah: String(student.sekolah || "").trim(),
     studentWhatsapp: String(student.studentWhatsapp || "").trim(),
     parentName: String(student.parentName || "").trim(),
@@ -3334,6 +3476,7 @@ function renderStudentHardDeletePreview(studentId) {
 function openStudentFormForCreate() {
   state.studentFormEditIndex = -1;
   el.studentCreateForm?.reset();
+  syncStudentFormGradeDerivedFields();
   if (el.studentFormTitle) el.studentFormTitle.textContent = "Tambah Siswa Baru";
   el.studentCreateModal?.showModal();
 }
@@ -3347,9 +3490,7 @@ function openStudentFormForEdit(sourceIndex) {
   if (el.studentFormNickname) el.studentFormNickname.value = String(row.nickname || "");
   if (el.studentFormGender) el.studentFormGender.value = String(row.gender || "");
   if (el.studentFormKelas) el.studentFormKelas.value = String(row.kelas || "");
-  if (el.studentFormH1) el.studentFormH1.value = String(row.h1 || "");
-  if (el.studentFormNextGrade) el.studentFormNextGrade.value = String(row.nextGrade || "");
-  if (el.studentFormH2) el.studentFormH2.value = String(row.h2 || "");
+  syncStudentFormGradeDerivedFields();
   if (el.studentFormSekolah) el.studentFormSekolah.value = String(row.sekolah || "");
   if (el.studentFormStudentWa) el.studentFormStudentWa.value = String(row.studentWhatsapp || "");
   if (el.studentFormParentName) el.studentFormParentName.value = String(row.parentName || "");
@@ -4744,7 +4885,7 @@ async function saveInvoiceRecordToFirebase({ silent = false } = {}) {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
-  const docId = `${ownerUid}__${sanitizeFileName(state.lastInvoiceRecord.invoiceNo || "INV")}`;
+  const docId = String(state.lastInvoiceRecord.historyId || "").trim() || `${ownerUid}__${sanitizeFileName(state.lastInvoiceRecord.invoiceNo || "INV")}`;
   await state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(docId).set(record, { merge: true });
   await refreshDashboardInvoices({ forceServer: true });
   if (!silent) setFirebaseStatus(`Invoice ${state.lastInvoiceRecord.invoiceNo} tersimpan ke Firebase.`, "ok");
@@ -4913,12 +5054,61 @@ async function refreshDashboardInvoices({ forceServer = false } = {}) {
     ...doc.data(),
     paymentStatus: normalizeInvoiceStatus(doc.data()?.paymentStatus || "issued"),
   }));
+
+  await autoCancelOverdueInvoices({ silent: true });
   state.calendarWeekAutoFocus = true;
 
   renderPaymentStatusTable();
   renderInvoiceCalendar();
   renderReceivablesOperationsSection();
   renderRemindersOperationsSection();
+}
+
+async function autoCancelOverdueInvoices({ silent = true } = {}) {
+  if (!state.firebase.ready || !state.firebase.db) return 0;
+  if (!Array.isArray(state.dashboardInvoices) || state.dashboardInvoices.length === 0) return 0;
+
+  const now = getCurrentTimeInZone();
+  const overdue = state.dashboardInvoices.filter((item) => {
+    const status = normalizeInvoiceStatus(item?.paymentStatus || "issued");
+    if (status !== "issued") return false;
+    const deadlineDate = parseDateInput(String(item?.paymentDeadline || ""));
+    if (!deadlineDate) return false;
+    return deadlineDate.getTime() < now.getTime();
+  });
+
+  if (overdue.length === 0) return 0;
+
+  const batch = state.firebase.db.batch();
+  overdue.forEach((item) => {
+    const ref = state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(String(item.historyId || ""));
+    const existingNote = String(item.paymentNote || "").trim();
+    const autoNote = "Auto cancelled: melewati deadline pembayaran.";
+    batch.set(ref, {
+      paymentStatus: "cancelled",
+      paymentNote: existingNote || autoNote,
+      paidAt: "",
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+
+  await batch.commit();
+
+  const cancelledIds = new Set(overdue.map((item) => String(item.historyId || "")));
+  state.dashboardInvoices = state.dashboardInvoices.map((item) => {
+    if (!cancelledIds.has(String(item.historyId || ""))) return item;
+    return {
+      ...item,
+      paymentStatus: "cancelled",
+      paymentNote: String(item.paymentNote || "").trim() || "Auto cancelled: melewati deadline pembayaran.",
+      paidAt: "",
+    };
+  });
+
+  if (!silent) {
+    setFirebaseStatus(`Auto cancel berjalan: ${overdue.length} invoice overdue diubah jadi CANCELLED.`, "ok");
+  }
+  return overdue.length;
 }
 
 function getCalendarRangeBase() {
@@ -5311,7 +5501,7 @@ function renderPaymentStatusTable() {
       <tr>
         <td>${escapeHtml(item.invoiceNo || "-")}</td>
         <td>${escapeHtml(getStudentDisplayName(item.student, item.studentDetail || {}))}</td>
-        <td>${invoiceDate ? escapeHtml(formatTanggal(invoiceDate)) : "-"}</td>
+        <td>${invoiceDate ? escapeHtml(formatTanggalWaktu(invoiceDate)) : "-"}</td>
         <td>${deadlineDate ? escapeHtml(formatTanggalWaktu(deadlineDate)) : "-"}</td>
         <td>
           <select data-payment-status class="payment-status-select ${status}">
@@ -5321,7 +5511,10 @@ function renderPaymentStatusTable() {
           </select>
         </td>
         <td><input type="text" data-payment-note value="${escapeHtml(note)}" placeholder="Transfer ke BCA xxx / alasan cancel" /></td>
-        <td><button type="button" class="btn" data-payment-save="${escapeHtml(item.historyId || "")}">Simpan</button></td>
+        <td>
+          <button type="button" class="btn" data-payment-save="${escapeHtml(item.historyId || "")}">Simpan</button>
+          <button type="button" class="btn" data-payment-delete="${escapeHtml(item.historyId || "")}">Hapus</button>
+        </td>
       </tr>`;
     })
     .join("");
@@ -5667,8 +5860,8 @@ function renderStudentManagementTable() {
     gradeOptionMap.set(grade.value, grade);
   });
   const gradeOptions = [...gradeOptionMap.values()].sort(compareStudentGradeValues);
-  if (!gradeOptions.some((item) => item.value === "alumni")) {
-    gradeOptions.push({ value: "alumni", label: "Alumni" });
+  if (!gradeOptions.some((item) => item.value === "13")) {
+    gradeOptions.push({ value: "13", label: "13 (Alumni)" });
     gradeOptions.sort(compareStudentGradeValues);
   }
   if (el.studentManageGradeFilter) {
@@ -5702,7 +5895,12 @@ function renderStudentManagementTable() {
   });
 
   if (!Array.isArray(state.students) || state.students.length === 0 || pageItems.length === 0) {
-    const message = state.students.length === 0 ? "Belum ada data siswa." : "Tidak ada siswa untuk filter kelas ini.";
+    const hasGradeFilter = String(state.studentManageQuery.gradeFilter || "").trim().length > 0;
+    const hasNameFilter = String(state.studentManageQuery.searchName || "").trim().length > 0;
+    const hasSchoolFilter = String(state.studentManageQuery.searchSchool || "").trim().length > 0;
+    const message = state.students.length === 0
+      ? "Belum ada data siswa."
+      : (hasGradeFilter || hasNameFilter || hasSchoolFilter ? "Tidak ada siswa yang cocok dengan filter pencarian." : "Tidak ada siswa untuk ditampilkan.");
     el.studentManageTableBody.innerHTML = `<tr><td colspan="7" class="empty">${message}</td></tr>`;
     return;
   }
@@ -5716,7 +5914,7 @@ function renderStudentManagementTable() {
         <td>${rowNumber}</td>
         <td><input type="text" data-row="${sourceIndex}" data-field="nickname" value="${escapeHtml(s.nickname || "")}" /></td>
         <td><input type="text" data-row="${sourceIndex}" data-field="fullName" value="${escapeHtml(s.fullName || "")}" /></td>
-        <td><input type="text" data-row="${sourceIndex}" data-field="kelas" value="${escapeHtml(s.kelas || "")}" /></td>
+        <td><input type="number" min="1" max="13" step="1" data-row="${sourceIndex}" data-field="kelas" value="${escapeHtml(s.kelas || "")}" /></td>
         <td><input type="text" data-row="${sourceIndex}" data-field="sekolah" value="${escapeHtml(s.sekolah || "")}" /></td>
         <td><code>${escapeHtml(s.studentId || "-")}</code></td>
         <td>
@@ -6125,11 +6323,22 @@ function applyStudentPageAction(action, targetPage = null) {
 
 function getStudentManagementViewModel() {
   const filter = String(state.studentManageQuery.gradeFilter || "").trim().toLowerCase();
+  const searchName = normalizeName(state.studentManageQuery.searchName || "");
+  const searchSchool = normalizeName(state.studentManageQuery.searchSchool || "");
   const filtered = (state.students || [])
     .map((student, index) => ({ student, sourceIndex: index }))
     .filter(({ student }) => {
-      if (!filter) return true;
-      return normalizeStudentGradeValue(student?.kelas || "").value === filter;
+      const gradeMatch = !filter || normalizeStudentGradeValue(student?.kelas || "").value === filter;
+      if (!gradeMatch) return false;
+
+      const nameHaystack = [student?.nickname || "", student?.fullName || ""]
+        .map((item) => normalizeName(item))
+        .join(" ");
+      const schoolHaystack = normalizeName(student?.sekolah || "");
+
+      const nameMatch = !searchName || nameHaystack.includes(searchName);
+      const schoolMatch = !searchSchool || schoolHaystack.includes(searchSchool);
+      return nameMatch && schoolMatch;
     });
 
   const pageSize = Math.max(1, Number.parseInt(String(state.studentManageQuery.pageSize || "15"), 10) || 15);
@@ -6151,12 +6360,18 @@ function normalizeStudentGradeValue(value) {
       label: String(value.label || "").trim() || String(value.value || "").trim(),
     };
   }
-  const raw = String(value || "").trim();
-  const lower = raw.toLowerCase();
-  if (!raw || raw === "-" || lower === "alumni") {
-    return { value: "alumni", label: "Alumni" };
+  const gradeNumber = normalizeGradeNumber(value);
+  if (gradeNumber === 13) {
+    return { value: "13", label: "13 (Alumni)" };
   }
-  return { value: lower, label: raw };
+  if (Number.isInteger(gradeNumber) && gradeNumber >= 1 && gradeNumber <= 12) {
+    return { value: String(gradeNumber), label: String(gradeNumber) };
+  }
+  const raw = String(value || "").trim();
+  if (!raw || raw === "-") {
+    return { value: "13", label: "13 (Alumni)" };
+  }
+  return { value: raw.toLowerCase(), label: raw };
 }
 
 function compareStudentGradeValues(a, b) {
@@ -6164,8 +6379,8 @@ function compareStudentGradeValues(a, b) {
   const right = normalizeStudentGradeValue(b);
 
   if (left.value === right.value) return 0;
-  if (left.value === "alumni") return 1;
-  if (right.value === "alumni") return -1;
+  if (left.value === "13") return 1;
+  if (right.value === "13") return -1;
 
   const leftNumeric = Number.parseFloat(left.label);
   const rightNumeric = Number.parseFloat(right.label);
@@ -6257,7 +6472,7 @@ function renderInvoiceHistoryTable() {
       return `
       <tr>
         <td>${escapeHtml(item.invoiceNo || "-")}</td>
-        <td>${invoiceDate ? escapeHtml(formatTanggal(invoiceDate)) : "-"}</td>
+        <td>${invoiceDate ? escapeHtml(formatTanggalWaktu(invoiceDate)) : "-"}</td>
         <td>${paymentDeadline ? escapeHtml(formatTanggalWaktu(paymentDeadline)) : "-"}</td>
         <td>${escapeHtml(getStudentDisplayName(item.student, item.studentDetail || {}))}</td>
         <td>${escapeHtml(item.mode || "-")}</td>
@@ -6324,7 +6539,7 @@ async function loadInvoiceForEditing(item) {
     el.invoiceTitle.value = String(item.title || "INVOICE LES").trim() || "INVOICE LES";
   }
   if (el.invoiceDate && item.invoiceDate) {
-    el.invoiceDate.value = String(item.invoiceDate || "").slice(0, 10);
+    el.invoiceDate.value = toDateTimeLocalInputOrEmpty(String(item.invoiceDate || "").trim()) || toLocalDateTimeInputValue(new Date());
   }
   if (el.studentSelect) {
     const studentRecord = getStudentRecordFromInvoice(item);
@@ -6358,6 +6573,15 @@ async function loadInvoiceForEditing(item) {
 
   state.mode = "front";
   state.sessions = editableSessions;
+  state.editingInvoiceHistoryId = String(item.historyId || "").trim();
+  state.editingInvoiceMeta = {
+    historyId: String(item.historyId || "").trim(),
+    invoiceNo: String(item.invoiceNo || "").trim(),
+    createdAt: String(item.createdAt || "").trim(),
+    paymentStatus: String(item.paymentStatus || "issued").trim(),
+    paymentNote: String(item.paymentNote || "").trim(),
+    paidAt: String(item.paidAt || "").trim(),
+  };
   renderSessionsTable();
   updateTotal();
   alert("Invoice dimuat ke editor. Ubah sesi yang diperlukan lalu klik Generate Invoice untuk memperbarui.");
@@ -6448,7 +6672,7 @@ function redownloadInvoiceFromHistory(item) {
           <div class="invoice-title-box"><div class="invoice-title">${escapeHtml(item.title || "INVOICE")}</div></div>
           <div class="badge">
             <div><strong>No:</strong> ${escapeHtml(invoiceNo)}</div>
-            <div><strong>Tanggal:</strong> ${formatTanggalPanjang(invoiceDate)}</div>
+            <div><strong>Tanggal:</strong> ${formatTanggalWaktu(invoiceDate)}</div>
           </div>
         </div>
         <div class="invoice-right">
@@ -6521,7 +6745,7 @@ function redownloadInvoiceFromHistory(item) {
 
       <div class="print-page-footer">
         <span>${escapeHtml(invoiceNo)}</span>
-        <span class="page-count"></span>
+        <span>${escapeHtml(formatTanggalWaktu(invoiceDate))} | <span class="page-count"></span></span>
       </div>
     </article>
   `;
