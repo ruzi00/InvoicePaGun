@@ -44,6 +44,21 @@ service cloud.firestore {
         request.resource.data.mode in ["front", "after"];
     }
 
+    function validStudentDoc() {
+      return request.resource.data.ownerUid is string &&
+        request.resource.data.studentId is string &&
+        request.resource.data.fullName is string &&
+        request.resource.data.nickname is string;
+    }
+
+    function validAttendanceDoc() {
+      return request.resource.data.ownerUid is string &&
+        request.resource.data.attendanceId is string &&
+        request.resource.data.tanggal is string &&
+        request.resource.data.studentId is string &&
+        request.resource.data.studentName is string;
+    }
+
     match /invoice_sources/{docId} {
       allow read: if isOwnerDoc();
       allow create: if isOwnerWrite() && validSourceDoc();
@@ -55,6 +70,20 @@ service cloud.firestore {
       allow read: if isOwnerDoc();
       allow create: if isOwnerWrite() && validInvoiceDoc();
       allow update: if isOwnerDoc() && isOwnerWrite() && validInvoiceDoc();
+      allow delete: if isOwnerDoc();
+    }
+
+    match /student_details/{docId} {
+      allow read: if isOwnerDoc();
+      allow create: if isOwnerWrite() && validStudentDoc();
+      allow update: if isOwnerDoc() && isOwnerWrite() && validStudentDoc();
+      allow delete: if isOwnerDoc();
+    }
+
+    match /attendance_records/{docId} {
+      allow read: if isOwnerDoc();
+      allow create: if isOwnerWrite() && validAttendanceDoc();
+      allow update: if isOwnerDoc() && isOwnerWrite() && validAttendanceDoc();
       allow delete: if isOwnerDoc();
     }
   }
