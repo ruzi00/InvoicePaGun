@@ -5249,6 +5249,21 @@ function formatCalendarStudentLabel(studentName, gradeLabel) {
   return grade ? `${name} (${grade})` : name;
 }
 
+function normalizeTeacherIdentity(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+function getTeacherCalendarAccent(teacherName) {
+  const key = normalizeTeacherIdentity(teacherName);
+  if (key.includes("pakgun") || key.includes("pakgung")) return "#1f3a5f";
+  if (key.includes("trias")) return "#d16a5a";
+  if (key.includes("rensie")) return "#2f9e8f";
+  return "#7a6f60";
+}
+
 function assignCalendarEntryLanes(entries) {
   const sorted = [...entries].sort((a, b) => {
     if (a.startMin !== b.startMin) return a.startMin - b.startMin;
@@ -5386,6 +5401,7 @@ function buildCalendarBoardHtml(model) {
       return teachersForDay
         .map((teacher, teacherIndex) => {
           const row = model.ensureRow(dayKey, teacher, d);
+          const teacherAccent = getTeacherCalendarAccent(teacher);
           const dayLabel = teacherIndex === 0
             ? `<div class="cal-day-label ${outRange ? "out-range" : ""} ${isToday ? "today" : ""}"><em>${escapeHtml(formatMonthShort(d))}</em><span>${escapeHtml(HARI[d.getDay()])}</span><strong>${d.getDate()}</strong></div>`
             : "<div class=\"cal-day-label-spacer\"></div>";
@@ -5397,22 +5413,24 @@ function buildCalendarBoardHtml(model) {
               const widthMin = Math.max(15, entry.endMin - entry.startMin);
               const left = (startOffset / model.totalMinutes) * 100;
               const width = (widthMin / model.totalMinutes) * 100;
+              const entryAccent = getTeacherCalendarAccent(entry.teacher);
               const tooltip = `Invoice: ${entry.invoiceNo || "INV"}\nStatus: ${String(entry.status || "issued").toUpperCase()}\nSiswa: ${entry.studentLabel || entry.student || "-"}\nPengajar: ${entry.teacher || "-"}`;
-              return `<div class="cal-slot-item ${entry.status}" title="${escapeHtml(tooltip)}" style="left:${left}%;width:${width}%;--lane:${entry.lane};"><small>${escapeHtml(entry.studentLabel || entry.student || "-")}</small></div>`;
+              return `<div class="cal-slot-item teacher-coded ${entry.status}" title="${escapeHtml(tooltip)}" style="left:${left}%;width:${width}%;--lane:${entry.lane};--teacher-accent:${entryAccent};"><small>${escapeHtml(entry.studentLabel || entry.student || "-")}</small></div>`;
             })
             .join("");
 
           const noTimeBadges = row.noTime
             .map((entry) => {
               const tooltip = `Invoice: ${entry.invoiceNo || "INV"}\nStatus: ${String(entry.status || "issued").toUpperCase()}\nSiswa: ${entry.studentLabel || entry.student || "-"}\nPengajar: ${entry.teacher || "-"}`;
-              return `<span class="cal-notime-badge ${entry.status}" title="${escapeHtml(tooltip)}">${escapeHtml(entry.studentLabel || entry.student || "-")}</span>`;
+              const entryAccent = getTeacherCalendarAccent(entry.teacher);
+              return `<span class="cal-notime-badge teacher-coded ${entry.status}" title="${escapeHtml(tooltip)}" style="--teacher-accent:${entryAccent};">${escapeHtml(entry.studentLabel || entry.student || "-")}</span>`;
             })
             .join("");
 
           return `
             <div class="cal-week-row ${teacherIndex === 0 ? "day-separator-top" : ""} ${outRange ? "out-range" : ""}">
               ${dayLabel}
-              <div class="cal-teacher-axis ${outRange ? "out-range" : ""}">${escapeHtml(teacher)}</div>
+              <div class="cal-teacher-axis ${outRange ? "out-range" : ""}" style="--teacher-accent:${teacherAccent};"><span class="cal-teacher-dot"></span>${escapeHtml(teacher)}</div>
               <div class="cal-track-wrap ${outRange ? "out-range" : ""}" style="--total-units:${model.totalUnits};--lane-count:${laneLayout.laneCount};">
                 <div class="cal-track-grid"></div>
                 ${blocks}
