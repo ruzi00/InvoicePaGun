@@ -223,6 +223,7 @@ const el = {
   btnDownloadCalendarNextMonth: document.getElementById("btnDownloadCalendarNextMonth"),
   btnCalendarPrevWeek: document.getElementById("btnCalendarPrevWeek"),
   btnCalendarNextWeek: document.getElementById("btnCalendarNextWeek"),
+  btnCalendarCopyShareLink: document.getElementById("btnCalendarCopyShareLink"),
   calendarWeekLabel: document.getElementById("calendarWeekLabel"),
   calendarRangeLabel: document.getElementById("calendarRangeLabel"),
   invoiceCalendarGrid: document.getElementById("invoiceCalendarGrid"),
@@ -705,6 +706,20 @@ function bindEvents() {
     state.calendarWeekAutoFocus = false;
     state.calendarWeekIndex += 1;
     renderInvoiceCalendar();
+  });
+
+  el.btnCalendarCopyShareLink?.addEventListener("click", async () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}#/share/calendar`;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        alert("Link kalender share berhasil disalin.");
+        return;
+      }
+    } catch {
+      // fallback below
+    }
+    window.prompt("Clipboard browser tidak tersedia. Salin link berikut:", shareUrl);
   });
 
   el.btnDownloadCalendarCurrentMonth?.addEventListener("click", async () => {
