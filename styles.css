@@ -1609,6 +1609,10 @@ body.calendar-share-only .container {
 }
 
 @media (max-width: 800px) {
+  body {
+    overflow-x: hidden;
+  }
+
   .container {
     padding: 14px 10px 26px;
   }
@@ -1630,24 +1634,71 @@ body.calendar-share-only .container {
   .workflow-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
     padding-bottom: 4px;
+    gap: 6px;
   }
 
   .workflow-tab {
     flex: 0 0 auto;
     white-space: nowrap;
+    min-height: 40px;
+    padding: 9px 12px;
+    font-size: 0.86rem;
+    scroll-snap-align: start;
+  }
+
+  .workflow-group {
+    min-height: 38px;
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
+
+  .settings-menu {
+    top: 8px;
+    right: 10px;
+  }
+
+  .settings-menu-content {
+    width: min(560px, calc(100vw - 24px));
+    max-height: 72vh;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .btn,
+  .icon-btn {
+    min-height: 42px;
   }
 
   .preview-actions .btn {
     flex: 1 1 auto;
   }
 
+  .history-pagination-actions {
+    row-gap: 8px;
+  }
+
+  .history-page-info {
+    width: 100%;
+  }
+
+  .table-wrap,
+  .invoice-preview {
+    -webkit-overflow-scrolling: touch;
+  }
+
   table {
-    min-width: 760px;
+    min-width: 700px;
   }
 
   .calendar-weekly-board {
-    min-width: 860px;
+    min-width: 800px;
   }
 
   .cal-header-row,
@@ -1673,12 +1724,64 @@ body.calendar-share-only .container {
 
   .invoice-sheet {
     width: 100%;
-    min-width: 740px;
+    min-width: 700px;
     transform-origin: top left;
   }
 
   .invoice-sheet.landscape {
     min-width: 1120px;
+  }
+}
+
+@media (max-width: 560px) {
+  .container {
+    padding: 12px 8px 22px;
+    gap: 12px;
+  }
+
+  .panel {
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  h1 {
+    font-size: 1.45rem;
+    padding-right: 44px;
+  }
+
+  .sub {
+    font-size: 0.9rem;
+  }
+
+  .toolbar,
+  .preview-actions,
+  .history-pagination-actions {
+    gap: 8px;
+  }
+
+  .preview-actions .btn,
+  .history-pagination-actions .btn {
+    flex: 1 1 100%;
+  }
+
+  .goto-inline input {
+    width: 64px;
+  }
+
+  table {
+    min-width: 640px;
+  }
+
+  .calendar-weekly-board {
+    min-width: 760px;
+  }
+
+  .invoice-sheet {
+    min-width: 640px;
+  }
+
+  .invoice-sheet.landscape {
+    min-width: 980px;
   }
 }
 
