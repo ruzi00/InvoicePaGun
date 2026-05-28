@@ -150,6 +150,7 @@ const state = {
 const el = {
   workflowGroupButtons: document.querySelectorAll(".workflow-group"),
   workflowTabs: document.querySelectorAll(".workflow-tab"),
+  mobileNavToggle: document.getElementById("mobileNavToggle"),
   settingsMenu: document.getElementById("settingsMenu"),
   settingsMenuContent: document.getElementById("settingsMenuContent"),
   runtimeNotice: document.getElementById("runtimeNotice"),
@@ -418,6 +419,7 @@ function initialize() {
   renderReceivablesOperationsSection();
   renderRemindersOperationsSection();
   renderInvoiceHistoryTable();
+  setMobileWorkflowMenuOpen(false);
   void initializeDataSources();
 }
 
@@ -432,7 +434,34 @@ async function initializeDataSources() {
   }
 }
 
+function isMobileWorkflowLayout() {
+  return window.matchMedia("(max-width: 800px)").matches;
+}
+
+function setMobileWorkflowMenuOpen(open) {
+  if (!el.mobileNavToggle) return;
+  const shouldOpen = Boolean(open && isMobileWorkflowLayout());
+  document.body.classList.toggle("mobile-workflow-open", shouldOpen);
+  el.mobileNavToggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+  el.mobileNavToggle.textContent = shouldOpen ? "✕ Tutup Menu" : "☰ Menu";
+}
+
+function closeMobileWorkflowMenu() {
+  setMobileWorkflowMenuOpen(false);
+}
+
 function bindEvents() {
+  el.mobileNavToggle?.addEventListener("click", () => {
+    const isOpen = document.body.classList.contains("mobile-workflow-open");
+    setMobileWorkflowMenuOpen(!isOpen);
+  });
+
+  window.addEventListener("resize", () => {
+    if (!isMobileWorkflowLayout()) {
+      closeMobileWorkflowMenu();
+    }
+  });
+
   el.workflowGroupButtons.forEach((groupBtn) => {
     groupBtn.addEventListener("click", async () => {
       const nextGroup = normalizeGroup(groupBtn.dataset.group);
@@ -440,6 +469,7 @@ function bindEvents() {
       const preferredTab = state.lastTabByGroup[nextGroup] || GROUP_TABS[nextGroup][0];
       await setActiveTab(preferredTab, { group: nextGroup });
       clearPreview();
+      closeMobileWorkflowMenu();
     });
   });
 
@@ -449,6 +479,7 @@ function bindEvents() {
       const nextGroup = normalizeGroup(tabBtn.dataset.group);
       await setActiveTab(nextTab, { group: nextGroup });
       clearPreview();
+      closeMobileWorkflowMenu();
     });
   });
 
@@ -458,6 +489,7 @@ function bindEvents() {
     state.calendarShareOnly = Boolean(next.calendarShareOnly);
     if (next.tab === state.activeTab && next.group === state.activeGroup) return;
     await setActiveTab(next.tab, { group: next.group });
+    closeMobileWorkflowMenu();
   });
 
   el.packageFiles.addEventListener("change", async (event) => {
