@@ -1608,6 +1608,26 @@ body.calendar-share-only .container {
   padding-top: 18px;
 }
 
+@media (max-width: 1024px) {
+  .workflow-groups {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+
+  .workflow-group {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .workflow-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 @media (max-width: 800px) {
   body {
     overflow-x: hidden;
@@ -1655,6 +1675,13 @@ body.calendar-share-only .container {
     padding: 6px 10px;
   }
 
+  .workflow-groups {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px;
+  }
+
   .settings-menu {
     top: 8px;
     right: 10px;
@@ -1688,17 +1715,22 @@ body.calendar-share-only .container {
     width: 100%;
   }
 
+  .preview-actions,
+  .toolbar {
+    gap: 8px;
+  }
+
   .table-wrap,
   .invoice-preview {
     -webkit-overflow-scrolling: touch;
   }
 
   table {
-    min-width: 700px;
+    min-width: 620px;
   }
 
   .calendar-weekly-board {
-    min-width: 800px;
+    min-width: 760px;
   }
 
   .cal-header-row,
@@ -1724,12 +1756,12 @@ body.calendar-share-only .container {
 
   .invoice-sheet {
     width: 100%;
-    min-width: 700px;
+    min-width: 640px;
     transform-origin: top left;
   }
 
   .invoice-sheet.landscape {
-    min-width: 1120px;
+    min-width: 980px;
   }
 }
 
@@ -1753,6 +1785,11 @@ body.calendar-share-only .container {
     font-size: 0.9rem;
   }
 
+  .workflow-tab,
+  .workflow-group {
+    font-size: 0.82rem;
+  }
+
   .toolbar,
   .preview-actions,
   .history-pagination-actions {
@@ -1769,15 +1806,15 @@ body.calendar-share-only .container {
   }
 
   table {
-    min-width: 640px;
+    min-width: 560px;
   }
 
   .calendar-weekly-board {
-    min-width: 760px;
+    min-width: 700px;
   }
 
   .invoice-sheet {
-    min-width: 640px;
+    min-width: 560px;
   }
 
   .invoice-sheet.landscape {
