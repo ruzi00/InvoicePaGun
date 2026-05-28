@@ -22,7 +22,9 @@
         <div id="settingsMenuContent" class="settings-menu-content"></div>
       </details>
 
-      <div class="workflow-groups" role="tablist" aria-label="Grup Menu">
+      <button id="mobileNavToggle" type="button" class="mobile-nav-toggle" aria-expanded="false" aria-controls="workflowNavigation">&#9776; Menu</button>
+
+      <div id="workflowNavigation" class="workflow-groups" role="tablist" aria-label="Grup Menu">
         <button type="button" class="workflow-group active" data-group="invoice" role="tab" aria-selected="true">Invoice Group</button>
         <button type="button" class="workflow-group" data-group="data" role="tab" aria-selected="false">Data Management Group</button>
         <button type="button" class="workflow-group" data-group="operations" role="tab" aria-selected="false">Operations Group</button>
