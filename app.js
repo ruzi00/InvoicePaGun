@@ -972,6 +972,7 @@ function bindEvents() {
     const editIndex = Number(state.studentFormEditIndex || -1);
     let savedStudent = null;
     const isNewStudent = !(Number.isInteger(editIndex) && editIndex >= 0 && editIndex < state.students.length);
+    const actionLabel = isNewStudent ? "ditambahkan" : "diperbarui";
 
     if (isNewStudent && !state.firebase.ready) {
       await bootstrapFirebaseFromStorage({ silent: true, forceServer: true });
@@ -999,11 +1000,14 @@ function bindEvents() {
       if (state.firebase.ready) {
         try {
           await saveStudentRecordToFirebase(refreshed);
+          setFirebaseStatus(`Data siswa ${refreshed.nickname || refreshed.fullName || refreshed.studentId} berhasil ${actionLabel} dan tersimpan ke Firebase.`, "ok");
         } catch (err) {
           setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error");
           alert(err.message || "Gagal menyimpan data siswa ke Firebase.");
           return;
         }
+      } else {
+        setFirebaseStatus(`Data siswa ${refreshed.nickname || refreshed.fullName || refreshed.studentId} berhasil ${actionLabel} secara lokal (Firebase belum terhubung).`, "warn");
       }
     }
 
@@ -1058,11 +1062,20 @@ function bindEvents() {
       return;
     }
 
-    await hardDeleteStudentRecord(studentId);
-    state.students = (state.students || []).filter((s) => String(s.studentId || "") !== studentId);
-    normalizeStudentsState({ sort: false, syncEditors: true });
-    renderStudentManagementTable();
-    el.studentHardDeleteModal?.close();
+    const target = getStudentRecordById(studentId);
+    const label = target?.nickname || target?.fullName || studentId;
+
+    try {
+      await hardDeleteStudentRecord(studentId);
+      state.students = (state.students || []).filter((s) => String(s.studentId || "") !== studentId);
+      normalizeStudentsState({ sort: false, syncEditors: true });
+      renderStudentManagementTable();
+      setFirebaseStatus(`Siswa ${label} dihapus permanen dari Firebase.`, "ok");
+      el.studentHardDeleteModal?.close();
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal hard delete siswa.", "error");
+      alert(err.message || "Gagal hard delete siswa.");
+    }
   });
 
   el.studentManageGradeFilter?.addEventListener("change", () => {
@@ -1125,11 +1138,17 @@ function bindEvents() {
       alert("Hubungkan Firebase terlebih dahulu.");
       return;
     }
-    normalizeStudentsState({ sort: false, syncEditors: true });
-    await saveStudentsToFirebase({ applyEditor: false });
+    try {
+      normalizeStudentsState({ sort: false, syncEditors: true });
+      await saveStudentsToFirebase({ applyEditor: false });
+      setFirebaseStatus(`Sinkronisasi siswa selesai: ${state.students.length} baris aktif.`, "ok");
+    } catch (err) {
+      setFirebaseStatus(err.message || "Gagal sinkronisasi siswa ke Firebase.", "error");
+      alert(err.message || "Gagal sinkronisasi siswa ke Firebase.");
+    }
   });
 
-  el.studentManageTableBody?.addEventListener("click", (event) => {
+  el.studentManageTableBody?.addEventListener("click", async (event) => {
     const editBtn = event.target.closest("button[data-edit-student]");
     if (editBtn) {
       const rowIndex = Number.parseInt(String(editBtn.dataset.editStudent || "-1"), 10);
@@ -1155,7 +1174,15 @@ function bindEvents() {
       renderStudentManagementTable();
       if (state.firebase.ready) {
         const updated = getStudentRecordById(savedId) || row;
-        void saveStudentRecordToFirebase(updated).catch((err) => setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error"));
+        try {
+          await saveStudentRecordToFirebase(updated);
+          setFirebaseStatus(`Data siswa ${updated.nickname || updated.fullName || updated.studentId} berhasil disimpan ke Firebase.`, "ok");
+        } catch (err) {
+          setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error");
+          alert(err.message || "Gagal menyimpan data siswa ke Firebase.");
+        }
+      } else {
+        setFirebaseStatus(`Perubahan siswa ${row.nickname || row.fullName || row.studentId} tersimpan lokal (Firebase belum terhubung).`, "warn");
       }
       return;
     }
@@ -1165,11 +1192,27 @@ function bindEvents() {
     const rowIndex = Number.parseInt(String(removeBtn.dataset.removeStudent || "-1"), 10);
     if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= state.students.length) return;
     const removed = state.students[rowIndex];
+    const label = removed?.nickname || removed?.fullName || removed?.studentId || "siswa";
+    const agreed = window.confirm(`Hapus siswa ${label}?`);
+    if (!agreed) return;
+
+    if (state.firebase.ready && removed) {
+      try {
+        await softDeleteStudentRecord(removed);
+      } catch (err) {
+        setFirebaseStatus(err.message || "Gagal menghapus data siswa.", "error");
+        alert(err.message || "Gagal menghapus data siswa dari Firebase.");
+        return;
+      }
+    }
+
     state.students.splice(rowIndex, 1);
     normalizeStudentsState({ sort: false, syncEditors: true });
     renderStudentManagementTable();
-    if (state.firebase.ready && removed) {
-      void softDeleteStudentRecord(removed).catch((err) => setFirebaseStatus(err.message || "Gagal menghapus data siswa.", "error"));
+    if (state.firebase.ready) {
+      setFirebaseStatus(`Siswa ${label} berhasil dihapus dan disinkronkan ke Firebase.`, "ok");
+    } else {
+      setFirebaseStatus(`Siswa ${label} dihapus lokal (Firebase belum terhubung).`, "warn");
     }
   });
 
