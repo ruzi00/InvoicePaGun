@@ -1802,7 +1802,7 @@ body.calendar-share-only .container {
 
 @media (max-width: 560px) {
   body {
-    font-size: 17px;
+    font-size: 16px;
   }
 
   .container {
@@ -1917,6 +1917,11 @@ body.calendar-share-only .container {
 }
 
 @media (max-width: 900px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
   .table-wrap {
     overflow-x: visible;
   }
@@ -1956,6 +1961,8 @@ body.calendar-share-only .container {
     grid-template-columns: minmax(108px, 42%) minmax(0, 1fr);
     gap: 8px;
     align-items: start;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .table-wrap > table td:last-child {
@@ -1987,6 +1994,32 @@ body.calendar-share-only .container {
   .table-wrap > table td button {
     width: 100%;
     max-width: 100%;
+  }
+
+  .table-wrap > table td code,
+  .table-wrap > table td .mini {
+    word-break: break-all;
+  }
+
+  #paymentStatusTable td:nth-child(7) button,
+  #invoiceHistoryTable td:nth-child(7) button {
+    width: calc(50% - 6px);
+    max-width: calc(50% - 6px);
+    min-height: 40px;
+    font-size: 0.85rem;
+    padding: 8px 8px;
+    margin: 0 8px 8px 0;
+    vertical-align: top;
+  }
+
+  #paymentStatusTable td:nth-child(7) button:nth-child(2n),
+  #invoiceHistoryTable td:nth-child(7) button:nth-child(2n) {
+    margin-right: 0;
+  }
+
+  #paymentStatusTable td:nth-child(7) button:last-child,
+  #invoiceHistoryTable td:nth-child(7) button:last-child {
+    margin-bottom: 0;
   }
 
   #frontWeekTable td:nth-child(1)::before { content: "Aktif"; }
