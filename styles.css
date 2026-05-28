@@ -1049,6 +1049,12 @@ h3 {
   gap: 6px;
 }
 
+.invoice-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 #studentManageTable input[type="text"] {
   min-width: 140px;
 }
@@ -2060,6 +2066,23 @@ body.calendar-share-only .container {
   #paymentStatusTable td:nth-child(7) button:last-child,
   #invoiceHistoryTable td:nth-child(7) button:last-child {
     margin-bottom: 0;
+  }
+
+  #paymentStatusTable td:nth-child(7) .invoice-actions,
+  #invoiceHistoryTable td:nth-child(7) .invoice-actions {
+    display: inline-flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  #paymentStatusTable td:nth-child(7) .icon-btn,
+  #invoiceHistoryTable td:nth-child(7) .icon-btn {
+    width: 34px;
+    max-width: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    margin: 0;
+    padding: 0;
   }
 
   #frontWeekTable td:nth-child(1)::before { content: "Aktif"; }

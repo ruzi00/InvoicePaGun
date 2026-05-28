@@ -5967,8 +5967,10 @@ function renderPaymentStatusTable() {
         </td>
         <td><input type="text" data-payment-note value="${escapeHtml(note)}" placeholder="Transfer ke BCA xxx / alasan cancel" /></td>
         <td>
-          <button type="button" class="btn" data-payment-save="${escapeHtml(item.historyId || "")}">Simpan</button>
-          <button type="button" class="btn" data-payment-delete="${escapeHtml(item.historyId || "")}">Hapus</button>
+          <div class="invoice-actions">
+            <button type="button" class="icon-btn save" title="Simpan" aria-label="Simpan status pembayaran" data-payment-save="${escapeHtml(item.historyId || "")}">&#128190;</button>
+            <button type="button" class="icon-btn delete" title="Hapus" aria-label="Hapus invoice" data-payment-delete="${escapeHtml(item.historyId || "")}">&#128465;</button>
+          </div>
         </td>
       </tr>`;
     })
@@ -6933,10 +6935,12 @@ function renderInvoiceHistoryTable() {
         <td>${escapeHtml(item.mode || "-")}</td>
         <td>${formatRupiah(grandTotal)}</td>
         <td>
-          <button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="edit">Edit</button>
-          <button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="view">Lihat</button>
-          <button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="download">Download PNG</button>
-          <button type="button" class="btn" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="delete">Hapus</button>
+          <div class="invoice-actions">
+            <button type="button" class="icon-btn" title="Edit" aria-label="Edit invoice" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="edit">&#9998;</button>
+            <button type="button" class="icon-btn" title="Lihat" aria-label="Lihat invoice" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="view">&#128065;</button>
+            <button type="button" class="icon-btn" title="Download PNG" aria-label="Download invoice PNG" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="download">&#8681;</button>
+            <button type="button" class="icon-btn delete" title="Hapus" aria-label="Hapus invoice" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="delete">&#128465;</button>
+          </div>
         </td>
       </tr>`;
     })
