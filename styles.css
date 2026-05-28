@@ -1631,6 +1631,8 @@ body.calendar-share-only .container {
 @media (max-width: 800px) {
   body {
     overflow-x: hidden;
+    font-size: 16px;
+    line-height: 1.45;
   }
 
   .container {
@@ -1639,6 +1641,18 @@ body.calendar-share-only .container {
 
   .panel {
     padding: 12px;
+  }
+
+  h1 {
+    font-size: 1.7rem;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  h3 {
+    font-size: 1.04rem;
   }
 
   .grid-2,
@@ -1665,13 +1679,13 @@ body.calendar-share-only .container {
     white-space: nowrap;
     min-height: 40px;
     padding: 9px 12px;
-    font-size: 0.86rem;
+    font-size: 0.9rem;
     scroll-snap-align: start;
   }
 
   .workflow-group {
     min-height: 38px;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     padding: 6px 10px;
   }
 
@@ -1696,6 +1710,11 @@ body.calendar-share-only .container {
   select,
   textarea {
     font-size: 16px;
+  }
+
+  th,
+  td {
+    font-size: 0.9rem;
   }
 
   .btn,
@@ -1725,8 +1744,24 @@ body.calendar-share-only .container {
     -webkit-overflow-scrolling: touch;
   }
 
+  #frontWeekTable,
+  #sessionsTable,
+  #studentManageTable,
+  #attendanceInputTable,
+  #attendanceOpsTable,
+  #receivablesOpsTable,
+  #remindersOpsTable,
+  #paymentStatusTable,
+  #invoiceHistoryTable,
+  #pricingManageTable,
+  #discountManageTable,
+  #bankManageTable,
+  #holidayManageTable {
+    min-width: 100%;
+  }
+
   table {
-    min-width: 620px;
+    min-width: 560px;
   }
 
   .calendar-weekly-board {
@@ -1766,6 +1801,10 @@ body.calendar-share-only .container {
 }
 
 @media (max-width: 560px) {
+  body {
+    font-size: 17px;
+  }
+
   .container {
     padding: 12px 8px 22px;
     gap: 12px;
@@ -1777,17 +1816,30 @@ body.calendar-share-only .container {
   }
 
   h1 {
-    font-size: 1.45rem;
+    font-size: 1.6rem;
     padding-right: 44px;
   }
 
   .sub {
-    font-size: 0.9rem;
+    font-size: 0.96rem;
   }
 
   .workflow-tab,
   .workflow-group {
-    font-size: 0.82rem;
+    font-size: 0.9rem;
+  }
+
+  .field span,
+  .goto-inline span,
+  .history-page-info,
+  .student-manage-page-info {
+    font-size: 0.9rem;
+  }
+
+  th,
+  td {
+    font-size: 0.88rem;
+    padding: 7px;
   }
 
   .toolbar,
@@ -1805,8 +1857,24 @@ body.calendar-share-only .container {
     width: 64px;
   }
 
+  #frontWeekTable,
+  #sessionsTable,
+  #studentManageTable,
+  #attendanceInputTable,
+  #attendanceOpsTable,
+  #receivablesOpsTable,
+  #remindersOpsTable,
+  #paymentStatusTable,
+  #invoiceHistoryTable,
+  #pricingManageTable,
+  #discountManageTable,
+  #bankManageTable,
+  #holidayManageTable {
+    min-width: 100%;
+  }
+
   table {
-    min-width: 560px;
+    min-width: 480px;
   }
 
   .calendar-weekly-board {
@@ -1819,6 +1887,32 @@ body.calendar-share-only .container {
 
   .invoice-sheet.landscape {
     min-width: 980px;
+  }
+}
+
+@media (max-width: 430px) {
+  .container {
+    padding: 10px 6px 18px;
+  }
+
+  .panel {
+    padding: 9px;
+  }
+
+  .workflow-tab,
+  .workflow-group {
+    min-height: 40px;
+    font-size: 0.88rem;
+  }
+
+  .btn,
+  .icon-btn {
+    min-height: 44px;
+    font-size: 0.92rem;
+  }
+
+  table {
+    min-width: 440px;
   }
 }
 
