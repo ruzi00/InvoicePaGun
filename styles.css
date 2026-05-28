@@ -1916,6 +1916,180 @@ body.calendar-share-only .container {
   }
 }
 
+@media (max-width: 900px) {
+  .table-wrap {
+    overflow-x: visible;
+  }
+
+  .table-wrap > table {
+    min-width: 100% !important;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .table-wrap > table thead {
+    display: none;
+  }
+
+  .table-wrap > table tbody,
+  .table-wrap > table tr,
+  .table-wrap > table td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-wrap > table tr {
+    border: 1px solid #dbc6a1;
+    border-radius: 10px;
+    background: #fffaf1;
+    margin-bottom: 10px;
+    padding: 6px 8px;
+  }
+
+  .table-wrap > table td {
+    border-bottom: 1px dashed #ead9bc;
+    padding: 8px 4px;
+    font-size: 0.92rem;
+    display: grid;
+    grid-template-columns: minmax(108px, 42%) minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+  }
+
+  .table-wrap > table td:last-child {
+    border-bottom: none;
+  }
+
+  .table-wrap > table td::before {
+    content: "";
+    font-weight: 700;
+    color: #5c4a34;
+    white-space: normal;
+  }
+
+  .table-wrap > table td[colspan] {
+    display: block;
+    text-align: center;
+    border-bottom: none;
+    padding: 10px 6px;
+  }
+
+  .table-wrap > table td[colspan]::before {
+    display: none;
+    content: "";
+  }
+
+  .table-wrap > table td input,
+  .table-wrap > table td select,
+  .table-wrap > table td textarea,
+  .table-wrap > table td button {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  #frontWeekTable td:nth-child(1)::before { content: "Aktif"; }
+  #frontWeekTable td:nth-child(2)::before { content: "Hari"; }
+  #frontWeekTable td:nth-child(3)::before { content: "Pengajar"; }
+  #frontWeekTable td:nth-child(4)::before { content: "Jumlah Peserta"; }
+  #frontWeekTable td:nth-child(5)::before { content: "Jam Mulai"; }
+  #frontWeekTable td:nth-child(6)::before { content: "Jam Selesai"; }
+
+  #sessionsTable td:nth-child(1)::before { content: "Pilih"; }
+  #sessionsTable td:nth-child(2)::before { content: "Hari"; }
+  #sessionsTable td:nth-child(3)::before { content: "Tanggal"; }
+  #sessionsTable td:nth-child(4)::before { content: "Jam"; }
+  #sessionsTable td:nth-child(5)::before { content: "Pengajar"; }
+  #sessionsTable td:nth-child(6)::before { content: "Topik/Mapel"; }
+  #sessionsTable td:nth-child(7)::before { content: "Durasi"; }
+  #sessionsTable td:nth-child(8)::before { content: "Tarif/Jam"; }
+  #sessionsTable td:nth-child(9)::before { content: "Jumlah Peserta"; }
+  #sessionsTable td:nth-child(10)::before { content: "Subtotal"; }
+  #sessionsTable td:nth-child(11)::before { content: "Catatan"; }
+
+  #studentManageTable td:nth-child(1)::before { content: "No"; }
+  #studentManageTable td:nth-child(2)::before { content: "Nama Panggilan"; }
+  #studentManageTable td:nth-child(3)::before { content: "Nama Lengkap"; }
+  #studentManageTable td:nth-child(4)::before { content: "Kelas"; }
+  #studentManageTable td:nth-child(5)::before { content: "Sekolah"; }
+  #studentManageTable td:nth-child(6)::before { content: "Student ID"; }
+  #studentManageTable td:nth-child(7)::before { content: "Aksi"; }
+
+  #paymentStatusTable td:nth-child(1)::before { content: "No Invoice"; }
+  #paymentStatusTable td:nth-child(2)::before { content: "Siswa"; }
+  #paymentStatusTable td:nth-child(3)::before { content: "Tanggal Invoice"; }
+  #paymentStatusTable td:nth-child(4)::before { content: "Deadline"; }
+  #paymentStatusTable td:nth-child(5)::before { content: "Status"; }
+  #paymentStatusTable td:nth-child(6)::before { content: "Catatan"; }
+  #paymentStatusTable td:nth-child(7)::before { content: "Aksi"; }
+
+  #pricingManageTable td:nth-child(1)::before { content: "No"; }
+  #pricingManageTable td:nth-child(2)::before { content: "Jenis Hari"; }
+  #pricingManageTable td:nth-child(3)::before { content: "Jumlah Peserta"; }
+  #pricingManageTable td:nth-child(4)::before { content: "Tarif/Jam"; }
+  #pricingManageTable td:nth-child(5)::before { content: "Aksi"; }
+
+  #discountManageTable td:nth-child(1)::before { content: "No"; }
+  #discountManageTable td:nth-child(2)::before { content: "Min Durasi"; }
+  #discountManageTable td:nth-child(3)::before { content: "Max Durasi"; }
+  #discountManageTable td:nth-child(4)::before { content: "Diskon %"; }
+  #discountManageTable td:nth-child(5)::before { content: "Aksi"; }
+
+  #bankManageTable td:nth-child(1)::before { content: "No"; }
+  #bankManageTable td:nth-child(2)::before { content: "Nama Pengajar"; }
+  #bankManageTable td:nth-child(3)::before { content: "Label Rekening"; }
+  #bankManageTable td:nth-child(4)::before { content: "Bank"; }
+  #bankManageTable td:nth-child(5)::before { content: "Nomor Rekening"; }
+  #bankManageTable td:nth-child(6)::before { content: "Atas Nama"; }
+  #bankManageTable td:nth-child(7)::before { content: "Aksi"; }
+
+  #holidayManageTable td:nth-child(1)::before { content: "No"; }
+  #holidayManageTable td:nth-child(2)::before { content: "Tanggal"; }
+  #holidayManageTable td:nth-child(3)::before { content: "Nama"; }
+  #holidayManageTable td:nth-child(4)::before { content: "Jenis"; }
+  #holidayManageTable td:nth-child(5)::before { content: "Aksi"; }
+
+  #attendanceOpsTable td:nth-child(1)::before { content: "Nama Siswa"; }
+  #attendanceOpsTable td:nth-child(2)::before { content: "Total Hadir"; }
+  #attendanceOpsTable td:nth-child(3)::before { content: "Sesi Terakhir"; }
+  #attendanceOpsTable td:nth-child(4)::before { content: "Format Sumber"; }
+
+  #attendanceInputTable td:nth-child(1)::before { content: "No"; }
+  #attendanceInputTable td:nth-child(2)::before { content: "Tanggal"; }
+  #attendanceInputTable td:nth-child(3)::before { content: "Siswa"; }
+  #attendanceInputTable td:nth-child(4)::before { content: "Status"; }
+  #attendanceInputTable td:nth-child(5)::before { content: "Jam Mulai"; }
+  #attendanceInputTable td:nth-child(6)::before { content: "Jam Selesai"; }
+  #attendanceInputTable td:nth-child(7)::before { content: "Pengajar"; }
+  #attendanceInputTable td:nth-child(8)::before { content: "Peserta"; }
+  #attendanceInputTable td:nth-child(9)::before { content: "Topik"; }
+  #attendanceInputTable td:nth-child(10)::before { content: "Catatan"; }
+  #attendanceInputTable td:nth-child(11)::before { content: "Attendance ID"; }
+  #attendanceInputTable td:nth-child(12)::before { content: "Aksi"; }
+
+  #receivablesOpsTable td:nth-child(1)::before { content: "No Invoice"; }
+  #receivablesOpsTable td:nth-child(2)::before { content: "Siswa"; }
+  #receivablesOpsTable td:nth-child(3)::before { content: "Deadline"; }
+  #receivablesOpsTable td:nth-child(4)::before { content: "Status"; }
+  #receivablesOpsTable td:nth-child(5)::before { content: "Total"; }
+  #receivablesOpsTable td:nth-child(6)::before { content: "Umur Piutang"; }
+
+  #remindersOpsTable td:nth-child(1)::before { content: "No Invoice"; }
+  #remindersOpsTable td:nth-child(2)::before { content: "Siswa"; }
+  #remindersOpsTable td:nth-child(3)::before { content: "WA Orang Tua"; }
+  #remindersOpsTable td:nth-child(4)::before { content: "Deadline"; }
+  #remindersOpsTable td:nth-child(5)::before { content: "Pesan"; }
+
+  #invoiceHistoryTable td:nth-child(1)::before { content: "No Invoice"; }
+  #invoiceHistoryTable td:nth-child(2)::before { content: "Tanggal"; }
+  #invoiceHistoryTable td:nth-child(3)::before { content: "Deadline"; }
+  #invoiceHistoryTable td:nth-child(4)::before { content: "Siswa"; }
+  #invoiceHistoryTable td:nth-child(5)::before { content: "Mode"; }
+  #invoiceHistoryTable td:nth-child(6)::before { content: "Total"; }
+  #invoiceHistoryTable td:nth-child(7)::before { content: "Aksi"; }
+}
+
 @media print {
   body {
     background: none;
