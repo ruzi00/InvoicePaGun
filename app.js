@@ -180,6 +180,7 @@ const el = {
   invoiceTitle: document.getElementById("invoiceTitle"),
   studentSelect: document.getElementById("studentSelect"),
   invoiceCustomDiscount: document.getElementById("invoiceCustomDiscount"),
+  invoiceCustomDiscountReason: document.getElementById("invoiceCustomDiscountReason"),
   invoiceBatchStudentSearch: document.getElementById("invoiceBatchStudentSearch"),
   btnInvoiceBatchAdd: document.getElementById("btnInvoiceBatchAdd"),
   invoiceBatchSelectedList: document.getElementById("invoiceBatchSelectedList"),
@@ -2780,8 +2781,9 @@ function renderSessionsTable(emptyMsg = "Belum ada sesi. Muat data terlebih dahu
 }
 
 function updateTotal() {
-  const customDiscountNominal = Math.max(0, parseIntFromText(String(el.invoiceCustomDiscount?.value || "")) || 0);
-  const totals = calculateInvoiceTotals(state.sessions.filter((s) => s.dipilih), { customDiscountNominal });
+  const customDiscountPercent = parsePercentageFromText(String(el.invoiceCustomDiscount?.value || ""));
+  const customDiscountReason = String(el.invoiceCustomDiscountReason?.value || "").trim();
+  const totals = calculateInvoiceTotals(state.sessions.filter((s) => s.dipilih), { customDiscountPercent, customDiscountReason });
   el.totalTagihan.value = formatRupiah(totals.grandTotal);
 }
 
@@ -2975,8 +2977,9 @@ async function generateInvoice() {
     return;
   }
 
-  const customDiscountNominal = Math.max(0, parseIntFromText(String(el.invoiceCustomDiscount?.value || "")) || 0);
-  const totals = calculateInvoiceTotals(selected, { customDiscountNominal });
+  const customDiscountPercent = parsePercentageFromText(String(el.invoiceCustomDiscount?.value || ""));
+  const customDiscountReason = String(el.invoiceCustomDiscountReason?.value || "").trim();
+  const totals = calculateInvoiceTotals(selected, { customDiscountPercent, customDiscountReason });
   const teacherPortions = calculateTeacherPortions(selected, totals);
   const detail = getSelectedStudentRecord();
   const invoiceTargets = getInvoiceTargetStudentNames(student);
@@ -3005,8 +3008,15 @@ async function generateInvoice() {
     `
     )
     .join("");
+  const customDiscountLabel = [
+    "Diskon Tambahan",
+    Number(totals.customDiscountPercent || 0) > 0 ? `${formatPercent(Number(totals.customDiscountPercent || 0))}%` : "",
+    String(totals.customDiscountReason || "").trim() ? `- ${String(totals.customDiscountReason || "").trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   const customDiscountRow = Number(totals.customDiscountNominal || 0) > 0
-    ? `<div><span>Diskon Tambahan</span><span>${formatRupiah(Number(totals.customDiscountNominal || 0))}</span></div>`
+    ? `<div><span>${escapeHtml(customDiscountLabel)}</span><span>${formatRupiah(Number(totals.customDiscountNominal || 0))}</span></div>`
     : "";
 
   el.preview.innerHTML = `
@@ -3491,21 +3501,37 @@ function calculateTeacherPortions(rows, totals = {}) {
   const fallbackDiscountableBase = entries.reduce((sum, row) => sum + row.discountableGross, 0);
   const baseTotal = Number(totals?.baseTotal || fallbackBase);
   const discountableBaseTotal = Number(totals?.discountableBaseTotal || fallbackDiscountableBase);
-  const totalDiscount = Number(totals?.diskonNominal || 0);
-  let allocatedDiscount = 0;
+  const invoiceDiscountTotal = Number(totals?.diskonNominal || 0);
+  const extraDiscountTotal = Number(totals?.customDiscountNominal || 0);
+  let allocatedInvoiceDiscount = 0;
+  let allocatedExtraDiscount = 0;
 
   return entries.map((entry, index) => {
-    let discount = 0;
+    let invoiceDiscount = 0;
+    let extraDiscount = 0;
+
     const hasDiscountablePart = discountableBaseTotal > 0 && entry.discountableGross > 0;
-    if (totalDiscount > 0 && baseTotal > 0 && hasDiscountablePart) {
+    if (invoiceDiscountTotal > 0 && baseTotal > 0 && hasDiscountablePart) {
       const discountableEntriesLeft = entries.slice(index + 1).some((row) => row.discountableGross > 0);
       if (!discountableEntriesLeft) {
-        discount = Math.max(0, totalDiscount - allocatedDiscount);
+        invoiceDiscount = Math.max(0, invoiceDiscountTotal - allocatedInvoiceDiscount);
       } else {
-        discount = Math.max(0, Math.round((entry.discountableGross / discountableBaseTotal) * totalDiscount));
-        allocatedDiscount += discount;
+        invoiceDiscount = Math.max(0, Math.round((entry.discountableGross / discountableBaseTotal) * invoiceDiscountTotal));
+        allocatedInvoiceDiscount += invoiceDiscount;
       }
     }
+
+    if (extraDiscountTotal > 0 && baseTotal > 0 && entry.gross > 0) {
+      const pricedEntriesLeft = entries.slice(index + 1).some((row) => row.gross > 0);
+      if (!pricedEntriesLeft) {
+        extraDiscount = Math.max(0, extraDiscountTotal - allocatedExtraDiscount);
+      } else {
+        extraDiscount = Math.max(0, Math.round((entry.gross / baseTotal) * extraDiscountTotal));
+        allocatedExtraDiscount += extraDiscount;
+      }
+    }
+
+    const discount = invoiceDiscount + extraDiscount;
 
     return {
       teacher: entry.teacher,
@@ -3537,7 +3563,7 @@ function renderTeacherPortionRows(portions) {
     .join("");
 }
 
-function calculateInvoiceTotals(selectedSessions, { customDiscountNominal = 0 } = {}) {
+function calculateInvoiceTotals(selectedSessions, { customDiscountPercent = 0, customDiscountReason = "" } = {}) {
   const baseTotal = selectedSessions.reduce((sum, s) => sum + s.subtotal, 0);
   const totalDurasi = selectedSessions.reduce((sum, s) => sum + s.durasi, 0);
   const nonPrivateSessions = selectedSessions.filter((s) => Number(s?.pesertaCount || 1) > 1);
@@ -3545,8 +3571,10 @@ function calculateInvoiceTotals(selectedSessions, { customDiscountNominal = 0 } 
   const discountableBaseTotal = nonPrivateSessions.reduce((sum, s) => sum + Number(s?.subtotal || 0), 0);
   const diskonPersen = nonPrivateDurasi > 0 ? pickDiskonByDurasi(nonPrivateDurasi) : 0;
   const diskonNominal = (discountableBaseTotal * diskonPersen) / 100;
-  const customDiscount = Math.max(0, Number(customDiscountNominal || 0));
-  const grandTotal = Math.max(0, baseTotal - diskonNominal - customDiscount);
+  const extraDiscountPercent = Math.min(100, Math.max(0, Number(customDiscountPercent || 0)));
+  const totalAfterInvoiceDiscount = Math.max(0, baseTotal - diskonNominal);
+  const customDiscount = (totalAfterInvoiceDiscount * extraDiscountPercent) / 100;
+  const grandTotal = Math.max(0, totalAfterInvoiceDiscount - customDiscount);
   return {
     baseTotal,
     totalDurasi,
@@ -3554,6 +3582,9 @@ function calculateInvoiceTotals(selectedSessions, { customDiscountNominal = 0 } 
     nonPrivateDurasi,
     diskonPersen,
     diskonNominal,
+    customDiscountPercent: extraDiscountPercent,
+    customDiscountReason: String(customDiscountReason || "").trim(),
+    customDiscountBase: totalAfterInvoiceDiscount,
     customDiscountNominal: customDiscount,
     grandTotal,
   };
@@ -4224,6 +4255,19 @@ function isValidIsoDate(value) {
 function parseIntFromText(text) {
   const n = Number.parseInt(String(text || "").replace(/\D/g, ""), 10);
   return Number.isFinite(n) ? n : 0;
+}
+
+function parsePercentageFromText(text) {
+  const normalized = String(text || "").replace(",", ".").replace(/[^0-9.\-]/g, "");
+  const parsed = Number.parseFloat(normalized);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(100, Math.max(0, parsed));
+}
+
+function formatPercent(value) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return "0";
+  return n.toFixed(2).replace(/\.00$/, "").replace(/(\.\d*[1-9])0$/, "$1");
 }
 
 function formatTanggal(date) {
@@ -6958,8 +7002,19 @@ async function loadInvoiceForEditing(item) {
     renderStudentDetail();
   }
   if (el.invoiceCustomDiscount) {
-    const customDiscount = Math.max(0, Number.parseInt(String(item?.totals?.customDiscountNominal || "0"), 10) || 0);
-    el.invoiceCustomDiscount.value = customDiscount > 0 ? String(customDiscount) : "";
+    const totals = item?.totals || {};
+    let customDiscountPercent = parsePercentageFromText(String(totals.customDiscountPercent || ""));
+    if (customDiscountPercent <= 0) {
+      const legacyNominal = Math.max(0, Number(totals.customDiscountNominal || 0));
+      const legacyBase = Math.max(0, Number(totals.baseTotal || 0) - Number(totals.diskonNominal || 0));
+      if (legacyNominal > 0 && legacyBase > 0) {
+        customDiscountPercent = (legacyNominal / legacyBase) * 100;
+      }
+    }
+    el.invoiceCustomDiscount.value = customDiscountPercent > 0 ? formatPercent(customDiscountPercent) : "";
+  }
+  if (el.invoiceCustomDiscountReason) {
+    el.invoiceCustomDiscountReason.value = String(item?.totals?.customDiscountReason || "").trim();
   }
 
   const editableSessions = items
@@ -7030,7 +7085,16 @@ function redownloadInvoiceFromHistory(item) {
   const items = Array.isArray(item.items) ? item.items : [];
   const detail = item.studentDetail || {};
   const teachers = Array.isArray(item.teachers) ? item.teachers : [];
-  const totals = item.totals || { baseTotal: 0, totalDurasi: 0, diskonPersen: 0, diskonNominal: 0, customDiscountNominal: 0, grandTotal: 0 };
+  const totals = item.totals || {
+    baseTotal: 0,
+    totalDurasi: 0,
+    diskonPersen: 0,
+    diskonNominal: 0,
+    customDiscountPercent: 0,
+    customDiscountReason: "",
+    customDiscountNominal: 0,
+    grandTotal: 0,
+  };
   const teacherPortions = Array.isArray(item.teacherPortions)
     ? item.teacherPortions
     : calculateTeacherPortions(items, totals);
@@ -7074,8 +7138,15 @@ function redownloadInvoiceFromHistory(item) {
   const invoiceDate = parseDateInput(String(item.invoiceDate || "")) || new Date();
   const invoiceNo = String(item.invoiceNo || "INV").trim() || "INV";
   const schoolAndClass = `${detail.sekolah || "-"} / ${detail.kelas || "-"}`;
+  const customDiscountLabel = [
+    "Diskon Tambahan",
+    Number(totals.customDiscountPercent || 0) > 0 ? `${formatPercent(Number(totals.customDiscountPercent || 0))}%` : "",
+    String(totals.customDiscountReason || "").trim() ? `- ${String(totals.customDiscountReason || "").trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   const customDiscountRow = Number(totals.customDiscountNominal || 0) > 0
-    ? `<div><span>Diskon Tambahan</span><span>${formatRupiah(Number(totals.customDiscountNominal || 0))}</span></div>`
+    ? `<div><span>${escapeHtml(customDiscountLabel)}</span><span>${formatRupiah(Number(totals.customDiscountNominal || 0))}</span></div>`
     : "";
 
   el.preview.innerHTML = `

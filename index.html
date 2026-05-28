@@ -231,8 +231,12 @@
             <datalist id="studentOptions"></datalist>
           </label>
           <label class="field">
-            <span>Diskon Tambahan (Rp, Opsional)</span>
-            <input id="invoiceCustomDiscount" type="number" min="0" step="1000" placeholder="Contoh: 50000" />
+            <span>Extra Diskon (%)</span>
+            <input id="invoiceCustomDiscount" type="number" min="0" max="100" step="0.1" placeholder="Contoh: 5" />
+          </label>
+          <label class="field">
+            <span>Keterangan Extra Diskon (Opsional)</span>
+            <input id="invoiceCustomDiscountReason" type="text" placeholder="Contoh: Promo Ramadan" />
           </label>
         </div>
 
