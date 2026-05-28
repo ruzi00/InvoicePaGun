@@ -177,6 +177,8 @@ const el = {
   invoiceDate: document.getElementById("invoiceDate"),
   invoiceTitle: document.getElementById("invoiceTitle"),
   studentSelect: document.getElementById("studentSelect"),
+  invoiceCustomDiscount: document.getElementById("invoiceCustomDiscount"),
+  invoiceBatchStudents: document.getElementById("invoiceBatchStudents"),
   studentOptions: document.getElementById("studentOptions"),
   totalTagihan: document.getElementById("totalTagihan"),
   studentDetail: document.getElementById("studentDetail"),
@@ -667,6 +669,10 @@ function bindEvents() {
 
   el.studentSelect.addEventListener("input", () => {
     renderStudentDetail();
+  });
+
+  el.invoiceCustomDiscount?.addEventListener("input", () => {
+    updateTotal();
   });
 
   el.btnGenerateMingguan.addEventListener("click", generateFrontWeeklySessions);
@@ -2668,8 +2674,41 @@ function renderSessionsTable(emptyMsg = "Belum ada sesi. Muat data terlebih dahu
 }
 
 function updateTotal() {
-  const totals = calculateInvoiceTotals(state.sessions.filter((s) => s.dipilih));
+  const customDiscountNominal = Math.max(0, parseIntFromText(String(el.invoiceCustomDiscount?.value || "")) || 0);
+  const totals = calculateInvoiceTotals(state.sessions.filter((s) => s.dipilih), { customDiscountNominal });
   el.totalTagihan.value = formatRupiah(totals.grandTotal);
+}
+
+function getInvoiceTargetStudentNames(primaryName) {
+  const names = [];
+  const pushName = (value) => {
+    const trimmed = String(value || "").trim();
+    if (!trimmed) return;
+    const key = normalizeName(trimmed);
+    if (!key) return;
+    if (names.some((item) => normalizeName(item) === key)) return;
+    names.push(trimmed);
+  };
+
+  pushName(primaryName);
+
+  const rawBatch = String(el.invoiceBatchStudents?.value || "");
+  rawBatch
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .forEach(pushName);
+
+  return names;
+}
+
+function resolveStudentRecordByName(name) {
+  const normalized = normalizeName(name);
+  if (!normalized) return null;
+  return state.studentsByNickname.get(normalized)
+    || state.studentsByFullName.get(normalized)
+    || state.students.find((item) => normalizeName(item?.nickname || "").startsWith(normalized))
+    || null;
 }
 
 function generateInvoice() {
@@ -2705,9 +2744,11 @@ function generateInvoice() {
     return;
   }
 
-  const totals = calculateInvoiceTotals(selected);
+  const customDiscountNominal = Math.max(0, parseIntFromText(String(el.invoiceCustomDiscount?.value || "")) || 0);
+  const totals = calculateInvoiceTotals(selected, { customDiscountNominal });
   const teacherPortions = calculateTeacherPortions(selected, totals);
   const detail = getSelectedStudentRecord();
+  const invoiceTargets = getInvoiceTargetStudentNames(student);
   const invoiceDate = parseDateInput(el.invoiceDate.value) || getCurrentTimeInZone();
   const paymentDeadline = toLocalDateTimeInputValue(addHours(getCurrentTimeInZone(), 24));
   const editMeta = state.editingInvoiceMeta;
@@ -2733,6 +2774,9 @@ function generateInvoice() {
     `
     )
     .join("");
+  const customDiscountRow = Number(totals.customDiscountNominal || 0) > 0
+    ? `<div><span>Diskon Tambahan</span><span>${formatRupiah(Number(totals.customDiscountNominal || 0))}</span></div>`
+    : "";
 
   el.preview.innerHTML = `
     <article class="invoice-sheet landscape">
@@ -2813,6 +2857,7 @@ function generateInvoice() {
           <div><span>Total Durasi</span><span>${totals.totalDurasi.toFixed(2)} jam</span></div>
           <div><span>Subtotal</span><span>${formatRupiah(totals.baseTotal)}</span></div>
           <div><span>Diskon Invoice</span><span>${totals.diskonPersen}% (${formatRupiah(totals.diskonNominal)})</span></div>
+          ${customDiscountRow}
           <div><span>Total Tagihan</span><span>${formatRupiah(totals.grandTotal)}</span></div>
         </div>
       </div>
@@ -2885,6 +2930,44 @@ function generateInvoice() {
     void saveInvoiceRecordToFirebase({ silent: true }).catch(() => {
       // ignore background autosave failures; manual save button remains available
     });
+  }
+
+  if (invoiceTargets.length > 1) {
+    if (!state.firebase.ready) {
+      alert("Batch invoice membutuhkan Firebase agar setiap siswa tersimpan sebagai invoice terpisah.");
+    } else {
+      const otherTargets = invoiceTargets.filter((name) => normalizeName(name) !== normalizeName(student));
+      if (otherTargets.length > 0) {
+        try {
+          for (const targetName of otherTargets) {
+            const targetRecord = resolveStudentRecordByName(targetName);
+            const targetInvoiceNo = buildInvoiceNumber(invoiceDate, targetRecord || {}, targetName);
+            const targetStudentId = String(targetRecord?.studentId || "").trim();
+            const payload = {
+              ...state.lastInvoiceRecord,
+              historyId: "",
+              invoiceNo: targetInvoiceNo,
+              createdAt: new Date().toISOString(),
+              student: targetName,
+              studentId: targetStudentId,
+              studentDetail: {
+                studentId: targetStudentId,
+                fullName: targetRecord?.fullName || "",
+                parentName: targetRecord?.parentName || "",
+                kelas: targetRecord?.kelas || "",
+                sekolah: targetRecord?.sekolah || "",
+              },
+            };
+            await saveInvoiceRecordPayloadToFirebase(payload, { silent: true, refresh: false });
+          }
+          await refreshDashboardInvoices({ forceServer: true });
+          setFirebaseStatus(`Batch invoice tersimpan: ${invoiceTargets.length} siswa.`, "ok");
+        } catch (err) {
+          setFirebaseStatus(err.message || "Gagal menyimpan batch invoice.", "error");
+          alert(err.message || "Gagal menyimpan batch invoice.");
+        }
+      }
+    }
   }
 
   state.editingInvoiceHistoryId = "";
@@ -3223,7 +3306,7 @@ function renderTeacherPortionRows(portions) {
     .join("");
 }
 
-function calculateInvoiceTotals(selectedSessions) {
+function calculateInvoiceTotals(selectedSessions, { customDiscountNominal = 0 } = {}) {
   const baseTotal = selectedSessions.reduce((sum, s) => sum + s.subtotal, 0);
   const totalDurasi = selectedSessions.reduce((sum, s) => sum + s.durasi, 0);
   const nonPrivateSessions = selectedSessions.filter((s) => Number(s?.pesertaCount || 1) > 1);
@@ -3231,8 +3314,18 @@ function calculateInvoiceTotals(selectedSessions) {
   const discountableBaseTotal = nonPrivateSessions.reduce((sum, s) => sum + Number(s?.subtotal || 0), 0);
   const diskonPersen = nonPrivateDurasi > 0 ? pickDiskonByDurasi(nonPrivateDurasi) : 0;
   const diskonNominal = (discountableBaseTotal * diskonPersen) / 100;
-  const grandTotal = Math.max(0, baseTotal - diskonNominal);
-  return { baseTotal, totalDurasi, discountableBaseTotal, nonPrivateDurasi, diskonPersen, diskonNominal, grandTotal };
+  const customDiscount = Math.max(0, Number(customDiscountNominal || 0));
+  const grandTotal = Math.max(0, baseTotal - diskonNominal - customDiscount);
+  return {
+    baseTotal,
+    totalDurasi,
+    discountableBaseTotal,
+    nonPrivateDurasi,
+    diskonPersen,
+    diskonNominal,
+    customDiscountNominal: customDiscount,
+    grandTotal,
+  };
 }
 
 function parseMasterStudents(rows) {
@@ -4931,6 +5024,26 @@ async function saveSingleSourceToFirebase(kind) {
   setFirebaseStatus(`CSV ${kind} berhasil diupdate ke Firebase.`, "ok");
 }
 
+async function saveInvoiceRecordPayloadToFirebase(recordInput, { silent = false, refresh = true } = {}) {
+  if (!state.firebase.ready || !state.firebase.db) {
+    throw new Error("Firebase belum terhubung.");
+  }
+
+  const ownerUid = getFirebaseWriteOwnerUid();
+  const record = {
+    ...(recordInput || {}),
+    paymentStatus: normalizeInvoiceStatus(recordInput?.paymentStatus || "issued"),
+    paidAt: String(recordInput?.paidAt || ""),
+    ownerUid,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  const docId = String(record.historyId || "").trim() || `${ownerUid}__${sanitizeFileName(record.invoiceNo || "INV")}`;
+  await state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(docId).set(record, { merge: true });
+  if (refresh) await refreshDashboardInvoices({ forceServer: true });
+  if (!silent) setFirebaseStatus(`Invoice ${record.invoiceNo} tersimpan ke Firebase.`, "ok");
+}
+
 async function saveInvoiceRecordToFirebase({ silent = false } = {}) {
   if (!state.firebase.ready || !state.firebase.db) {
     throw new Error("Firebase belum terhubung.");
@@ -4940,20 +5053,7 @@ async function saveInvoiceRecordToFirebase({ silent = false } = {}) {
     throw new Error("Generate invoice terlebih dahulu sebelum menyimpan ke Firebase.");
   }
 
-  const ownerUid = getFirebaseWriteOwnerUid();
-
-  const record = {
-    ...state.lastInvoiceRecord,
-    paymentStatus: normalizeInvoiceStatus(state.lastInvoiceRecord.paymentStatus || "issued"),
-    paidAt: String(state.lastInvoiceRecord.paidAt || ""),
-    ownerUid,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-  };
-
-  const docId = String(state.lastInvoiceRecord.historyId || "").trim() || `${ownerUid}__${sanitizeFileName(state.lastInvoiceRecord.invoiceNo || "INV")}`;
-  await state.firebase.db.collection(FIREBASE_INVOICE_COLLECTION).doc(docId).set(record, { merge: true });
-  await refreshDashboardInvoices({ forceServer: true });
-  if (!silent) setFirebaseStatus(`Invoice ${state.lastInvoiceRecord.invoiceNo} tersimpan ke Firebase.`, "ok");
+  await saveInvoiceRecordPayloadToFirebase(state.lastInvoiceRecord, { silent, refresh: true });
 }
 
 async function loadInvoiceHistory({ silent = false, forceServer = false, direction = "reset" } = {}) {
@@ -6627,6 +6727,10 @@ async function loadInvoiceForEditing(item) {
     el.studentSelect.value = studentRecord?.nickname || getStudentDisplayName(item.student, item.studentDetail || {});
     renderStudentDetail();
   }
+  if (el.invoiceCustomDiscount) {
+    const customDiscount = Math.max(0, Number.parseInt(String(item?.totals?.customDiscountNominal || "0"), 10) || 0);
+    el.invoiceCustomDiscount.value = customDiscount > 0 ? String(customDiscount) : "";
+  }
 
   const editableSessions = items
     .map((s) => {
@@ -6696,7 +6800,7 @@ function redownloadInvoiceFromHistory(item) {
   const items = Array.isArray(item.items) ? item.items : [];
   const detail = item.studentDetail || {};
   const teachers = Array.isArray(item.teachers) ? item.teachers : [];
-  const totals = item.totals || { baseTotal: 0, totalDurasi: 0, diskonPersen: 0, diskonNominal: 0, grandTotal: 0 };
+  const totals = item.totals || { baseTotal: 0, totalDurasi: 0, diskonPersen: 0, diskonNominal: 0, customDiscountNominal: 0, grandTotal: 0 };
   const teacherPortions = Array.isArray(item.teacherPortions)
     ? item.teacherPortions
     : calculateTeacherPortions(items, totals);
@@ -6740,6 +6844,9 @@ function redownloadInvoiceFromHistory(item) {
   const invoiceDate = parseDateInput(String(item.invoiceDate || "")) || new Date();
   const invoiceNo = String(item.invoiceNo || "INV").trim() || "INV";
   const schoolAndClass = `${detail.sekolah || "-"} / ${detail.kelas || "-"}`;
+  const customDiscountRow = Number(totals.customDiscountNominal || 0) > 0
+    ? `<div><span>Diskon Tambahan</span><span>${formatRupiah(Number(totals.customDiscountNominal || 0))}</span></div>`
+    : "";
 
   el.preview.innerHTML = `
     <article class="invoice-sheet landscape">
@@ -6820,6 +6927,7 @@ function redownloadInvoiceFromHistory(item) {
           <div><span>Total Durasi</span><span>${Number(totals.totalDurasi || 0).toFixed(2)} jam</span></div>
           <div><span>Subtotal</span><span>${formatRupiah(Number(totals.baseTotal || 0))}</span></div>
           <div><span>Diskon Invoice</span><span>${Number(totals.diskonPersen || 0)}% (${formatRupiah(Number(totals.diskonNominal || 0))})</span></div>
+          ${customDiscountRow}
           <div><span>Total Tagihan</span><span>${formatRupiah(Number(totals.grandTotal || 0))}</span></div>
         </div>
       </div>

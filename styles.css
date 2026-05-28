@@ -1584,14 +1584,15 @@ body.calendar-share-only .container {
 
   .preview-actions .btn {
     flex: 1 1 auto;
+    min-height: 42px;
   }
 
   table {
-    min-width: 760px;
+    min-width: 640px;
   }
 
   .calendar-weekly-board {
-    min-width: 860px;
+    min-width: 780px;
   }
 
   .cal-header-row,
@@ -1623,6 +1624,51 @@ body.calendar-share-only .container {
 
   .invoice-sheet.landscape {
     min-width: 1120px;
+  }
+}
+
+@media (max-width: 600px) {
+  body {
+    font-size: 16px;
+  }
+
+  .container {
+    padding: 10px 8px 22px;
+  }
+
+  .panel {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .toolbar {
+    gap: 8px;
+  }
+
+  .btn,
+  .icon-btn {
+    min-height: 42px;
+  }
+
+  .workflow-tab,
+  .workflow-group {
+    font-size: 0.9rem;
+  }
+
+  .sub {
+    font-size: 0.92rem;
+  }
+
+  table {
+    min-width: 560px;
+  }
+
+  .calendar-weekly-board {
+    min-width: 720px;
+  }
+
+  .cal-slot-item small {
+    font-size: 0.74rem;
   }
 }
 
