@@ -4774,8 +4774,6 @@ async function saveStudentRecordToFirebase(student, { deleted = false } = {}) {
   const ownerUid = getFirebaseWriteOwnerUid();
   const next = normalizeStudentRecord(student, student?.studentId || "");
   const ref = state.firebase.db.collection(FIREBASE_STUDENT_COLLECTION).doc(`${ownerUid}__${next.studentId}`);
-  const existing = await ref.get();
-  const existingData = existing.exists ? (existing.data() || {}) : {};
   await ref.set(
     {
       studentId: next.studentId,
@@ -4795,7 +4793,7 @@ async function saveStudentRecordToFirebase(student, { deleted = false } = {}) {
       deletedBy: deleted ? ownerUid : "",
       ownerUid,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      createdAt: existingData.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     },
     { merge: true }
   );
