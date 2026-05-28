@@ -781,6 +781,62 @@ h3 {
   font-size: 0.9rem;
 }
 
+.batch-student-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.batch-student-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.batch-student-input-row .btn {
+  min-width: 92px;
+}
+
+.batch-student-selected {
+  min-height: 44px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #cfbc9a;
+  border-radius: 10px;
+  background: #fff8ec;
+}
+
+.batch-student-selected.empty {
+  align-items: center;
+  color: #766956;
+  font-size: 0.86rem;
+}
+
+.batch-student-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #c5ab7f;
+  border-radius: 999px;
+  background: #f3e5cc;
+  color: #4f3e29;
+  padding: 5px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.batch-student-chip .remove {
+  border: none;
+  background: transparent;
+  color: #7b4426;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0;
+}
+
 .reschedule-toolbar {
   display: grid;
   grid-template-columns: minmax(220px, 320px) minmax(260px, 1fr) auto;

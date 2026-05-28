@@ -236,8 +236,15 @@
 
         <div class="grid-1">
           <label class="field">
-            <span>Batch Siswa (Opsional, pisahkan dengan koma/baris baru)</span>
-            <textarea id="invoiceBatchStudents" rows="2" placeholder="Contoh: Budi, Sinta, Farhan"></textarea>
+            <span>Batch Siswa (Opsional, pilih dari data siswa)</span>
+            <div class="batch-student-picker">
+              <div class="batch-student-input-row">
+                <input id="invoiceBatchStudentSearch" type="text" list="studentOptions" placeholder="Cari siswa, lalu tekan Enter atau klik Tambah" autocomplete="off" />
+                <button id="btnInvoiceBatchAdd" type="button" class="btn sekund">Tambah</button>
+              </div>
+              <div id="invoiceBatchSelectedList" class="batch-student-selected empty">Belum ada siswa tambahan.</div>
+              <textarea id="invoiceBatchStudents" class="hidden-input" rows="2"></textarea>
+            </div>
           </label>
           <label class="field readonly">
             <span>Total Tagihan Terpilih</span>

@@ -84,6 +84,7 @@ const state = {
   studentsByNickname: new Map(),
   studentsByFullName: new Map(),
   studentsById: new Map(),
+  invoiceBatchStudents: [],
   absensiRows: [],
   absensiHeaders: [],
   attendanceEntries: [],
@@ -178,6 +179,9 @@ const el = {
   invoiceTitle: document.getElementById("invoiceTitle"),
   studentSelect: document.getElementById("studentSelect"),
   invoiceCustomDiscount: document.getElementById("invoiceCustomDiscount"),
+  invoiceBatchStudentSearch: document.getElementById("invoiceBatchStudentSearch"),
+  btnInvoiceBatchAdd: document.getElementById("btnInvoiceBatchAdd"),
+  invoiceBatchSelectedList: document.getElementById("invoiceBatchSelectedList"),
   invoiceBatchStudents: document.getElementById("invoiceBatchStudents"),
   studentOptions: document.getElementById("studentOptions"),
   totalTagihan: document.getElementById("totalTagihan"),
@@ -394,6 +398,7 @@ function initialize() {
     state.lastTabByGroup[locationState.group] = locationState.tab;
   }
   bindEvents();
+  renderInvoiceBatchSelectedList();
   applyRuntimeModeHints();
   moveSettingsIntoMenu();
   hydrateFirebaseConfigInputs();
@@ -659,6 +664,7 @@ function bindEvents() {
   el.studentSelect.addEventListener("change", () => {
     el.studentSelect.value = getSelectedStudentName();
     renderStudentDetail();
+    removePrimaryStudentFromBatch();
     if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
     if (state.mode === "front") {
       state.sessions = [];
@@ -673,6 +679,31 @@ function bindEvents() {
 
   el.invoiceCustomDiscount?.addEventListener("input", () => {
     updateTotal();
+  });
+
+  el.btnInvoiceBatchAdd?.addEventListener("click", () => {
+    const added = addInvoiceBatchStudentsFromText(String(el.invoiceBatchStudentSearch?.value || ""), { silentInvalid: false });
+    if (added > 0 && el.invoiceBatchStudentSearch) {
+      el.invoiceBatchStudentSearch.value = "";
+    }
+  });
+
+  el.invoiceBatchStudentSearch?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== ",") return;
+    event.preventDefault();
+    const added = addInvoiceBatchStudentsFromText(String(el.invoiceBatchStudentSearch?.value || ""), { silentInvalid: false });
+    if (added > 0 && el.invoiceBatchStudentSearch) {
+      el.invoiceBatchStudentSearch.value = "";
+    }
+  });
+
+  el.invoiceBatchStudentSearch?.addEventListener("change", () => {
+    const raw = String(el.invoiceBatchStudentSearch?.value || "").trim();
+    if (!raw) return;
+    const added = addInvoiceBatchStudentsFromText(raw, { silentInvalid: false });
+    if (added > 0 && el.invoiceBatchStudentSearch) {
+      el.invoiceBatchStudentSearch.value = "";
+    }
   });
 
   el.btnGenerateMingguan.addEventListener("click", generateFrontWeeklySessions);
@@ -2679,6 +2710,127 @@ function updateTotal() {
   el.totalTagihan.value = formatRupiah(totals.grandTotal);
 }
 
+function syncInvoiceBatchStudentsField() {
+  if (!el.invoiceBatchStudents) return;
+  el.invoiceBatchStudents.value = state.invoiceBatchStudents.join(", ");
+}
+
+function renderInvoiceBatchSelectedList() {
+  if (!el.invoiceBatchSelectedList) return;
+
+  if (!Array.isArray(state.invoiceBatchStudents) || state.invoiceBatchStudents.length === 0) {
+    el.invoiceBatchSelectedList.classList.add("empty");
+    el.invoiceBatchSelectedList.textContent = "Belum ada siswa tambahan.";
+    syncInvoiceBatchStudentsField();
+    return;
+  }
+
+  el.invoiceBatchSelectedList.classList.remove("empty");
+  el.invoiceBatchSelectedList.innerHTML = state.invoiceBatchStudents
+    .map((name) => `
+      <span class="batch-student-chip">
+        <span>${escapeHtml(name)}</span>
+        <button type="button" class="remove" data-remove-batch-student="${escapeHtml(name)}" aria-label="Hapus ${escapeHtml(name)}">x</button>
+      </span>
+    `)
+    .join("");
+
+  el.invoiceBatchSelectedList.querySelectorAll("button[data-remove-batch-student]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      removeInvoiceBatchStudent(String(btn.dataset.removeBatchStudent || ""));
+    });
+  });
+
+  syncInvoiceBatchStudentsField();
+}
+
+function removeInvoiceBatchStudent(name) {
+  const key = normalizeName(name);
+  if (!key) return;
+  state.invoiceBatchStudents = state.invoiceBatchStudents.filter((item) => normalizeName(item) !== key);
+  renderInvoiceBatchSelectedList();
+}
+
+function removePrimaryStudentFromBatch() {
+  const primaryKey = normalizeName(getSelectedStudentName());
+  if (!primaryKey) return;
+  const before = state.invoiceBatchStudents.length;
+  state.invoiceBatchStudents = state.invoiceBatchStudents.filter((item) => normalizeName(item) !== primaryKey);
+  if (state.invoiceBatchStudents.length !== before) {
+    renderInvoiceBatchSelectedList();
+  }
+}
+
+function addInvoiceBatchStudent(name, { silent = false } = {}) {
+  const raw = String(name || "").trim();
+  if (!raw) return false;
+
+  const record = resolveStudentRecordByName(raw);
+  if (!record) {
+    if (!silent) alert("Siswa tidak ditemukan di data master. Pilih nama dari daftar siswa.");
+    return false;
+  }
+
+  const canonical = String(record.nickname || record.fullName || raw).trim();
+  const key = normalizeName(canonical);
+  if (!key) return false;
+
+  const primaryKey = normalizeName(getSelectedStudentName());
+  if (primaryKey && key === primaryKey) {
+    if (!silent) alert("Siswa ini sudah dipilih sebagai siswa utama invoice.");
+    return false;
+  }
+
+  if (state.invoiceBatchStudents.some((item) => normalizeName(item) === key)) {
+    if (!silent) alert("Siswa sudah ada dalam daftar batch.");
+    return false;
+  }
+
+  state.invoiceBatchStudents.push(canonical);
+  renderInvoiceBatchSelectedList();
+  return true;
+}
+
+function addInvoiceBatchStudentsFromText(text, { silentInvalid = true } = {}) {
+  const parts = String(text || "")
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) return 0;
+
+  let added = 0;
+  for (const item of parts) {
+    if (addInvoiceBatchStudent(item, { silent: silentInvalid })) {
+      added += 1;
+    }
+  }
+
+  return added;
+}
+
+function pruneInvoiceBatchStudents() {
+  if (!Array.isArray(state.invoiceBatchStudents) || state.invoiceBatchStudents.length === 0) {
+    renderInvoiceBatchSelectedList();
+    return;
+  }
+
+  const seen = new Set();
+  const next = [];
+  for (const rawName of state.invoiceBatchStudents) {
+    const record = resolveStudentRecordByName(rawName);
+    if (!record) continue;
+    const canonical = String(record.nickname || record.fullName || rawName).trim();
+    const key = normalizeName(canonical);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    next.push(canonical);
+  }
+
+  state.invoiceBatchStudents = next;
+  renderInvoiceBatchSelectedList();
+}
+
 function getInvoiceTargetStudentNames(primaryName) {
   const names = [];
   const pushName = (value) => {
@@ -2692,12 +2844,16 @@ function getInvoiceTargetStudentNames(primaryName) {
 
   pushName(primaryName);
 
-  const rawBatch = String(el.invoiceBatchStudents?.value || "");
-  rawBatch
-    .split(/[\n,;]+/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .forEach(pushName);
+  if (Array.isArray(state.invoiceBatchStudents) && state.invoiceBatchStudents.length > 0) {
+    state.invoiceBatchStudents.forEach(pushName);
+  } else {
+    const rawBatch = String(el.invoiceBatchStudents?.value || "");
+    rawBatch
+      .split(/[\n,;]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .forEach(pushName);
+  }
 
   return names;
 }
@@ -3577,6 +3733,7 @@ function setStudentList(list, { sort = false, syncEditors = false } = {}) {
 
   state.students = next;
   rebuildStudentIndexes(next);
+  pruneInvoiceBatchStudents();
   syncStudentCsvSnapshot(next, { syncEditors });
 }
 
