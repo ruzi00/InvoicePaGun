@@ -2711,7 +2711,7 @@ function resolveStudentRecordByName(name) {
     || null;
 }
 
-function generateInvoice() {
+async function generateInvoice() {
   const student = getSelectedStudentName();
   if (!student) {
     alert("Pilih siswa terlebih dahulu.");
