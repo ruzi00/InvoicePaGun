@@ -313,15 +313,35 @@ body {
 }
 
 :root[data-theme="dark"] td .mini,
-:root[data-theme="dark"] .empty,
-:root[data-theme="dark"] .placeholder {
+:root[data-theme="dark"] .empty {
   color: #a9997a;
 }
 
-:root[data-theme="dark"] .invoice-preview {
-  border-color: #4d4029;
-  background: #201a14;
+/*
+ * The invoice preview/result area intentionally always stays light,
+ * regardless of app theme: it previews the actual printable/downloadable
+ * invoice image, which must always look like the real branded document.
+ * The generic dark-theme rules above (table/th/td/input color+background)
+ * would otherwise leak into the generated invoice via the [data-theme]
+ * attribute selector's higher specificity, so they are explicitly undone
+ * here for anything rendered inside .invoice-sheet.
+ */
+:root[data-theme="dark"] .invoice-sheet,
+:root[data-theme="dark"] .invoice-sheet * {
+  color: #1f2940;
 }
+
+:root[data-theme="dark"] .invoice-sheet th {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+:root[data-theme="dark"] .invoice-sheet input,
+:root[data-theme="dark"] .invoice-sheet select,
+:root[data-theme="dark"] .invoice-sheet textarea {
+  background: #fff;
+  border-color: rgba(31, 41, 64, 0.28);
+}
+
 
 :root[data-theme="dark"] .student-detail {
   background: #241e17;
@@ -353,11 +373,6 @@ body {
 
 :root[data-theme="dark"] #studentHardDeleteConfirmSection {
   border-top-color: #4d4029;
-}
-
-:root[data-theme="dark"] .history-preview {
-  border-color: #4d4029;
-  background: #201a14;
 }
 
 @media (max-width: 900px) {
@@ -1615,6 +1630,7 @@ td .mini {
   border: 1px dashed #ccb897;
   border-radius: 14px;
   background: #f7eee0;
+  color: #2c2418;
   overflow: auto;
 }
 
@@ -1640,6 +1656,7 @@ td .mini {
   border: 1px solid #cfbb97;
   border-radius: 10px;
   background: #fff9ef;
+  color: #2c2418;
   padding: 12px;
   display: grid;
   gap: 6px;
@@ -1977,6 +1994,8 @@ td .mini {
 
 body.calendar-share-only .ambient,
 body.calendar-share-only #settingsMenu,
+body.calendar-share-only .mobile-nav-toggle,
+body.calendar-share-only .app-footer,
 body.calendar-share-only .workflow-groups,
 body.calendar-share-only .workflow-tabs,
 body.calendar-share-only #runtimeNotice,

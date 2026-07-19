@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Catatan Pengembangan — InvoicePaGun</title>
+<link rel="icon" type="image/svg+xml" href="../assets/icons/favicon-invoice.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
+<script>
+  (function () {
+    try {
+      var stored = localStorage.getItem("invoice-app-theme");
+      var theme = stored === "dark" || stored === "light"
+        ? stored
+        : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  :root {
+    --bg-cream: #f8f4eb;
+    --card: #fffdf9;
+    --line: #d9c8aa;
+    --text: #2c2418;
+    --muted: #6f6558;
+    --accent: #1d6f8f;
+    --accent-2: #da8f2d;
+    --danger: #9f2e2e;
+    --danger-bg: #fdeeee;
+    --danger-border: #c96a6a;
+    --ok: #1f7a4f;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 24px;
+    color-scheme: light;
+  }
+
+  :root[data-theme="dark"] {
+    --bg-cream: #17140f;
+    --card: #241e17;
+    --line: #4d4029;
+    --text: #ece4d4;
+    --muted: #ab9c81;
+    --accent: #5fb8dd;
+    --accent-2: #e7a648;
+    --danger: #e2867a;
+    --danger-bg: #2c1414;
+    --danger-border: #6b3232;
+    --ok: #4caf7d;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Plus Jakarta Sans", sans-serif;
+    background: var(--bg-cream);
+    color: var(--text);
+  }
+
+  .page {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: var(--sp-5);
+  }
+
+  h1 {
+    margin: 0;
+    font-family: "DM Serif Display", serif;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+  }
+
+  .sub {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 0.92rem;
+    max-width: 60ch;
+  }
+
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--accent-2);
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: var(--sp-4);
+    box-shadow: 0 10px 30px rgba(26, 35, 46, 0.08);
+    margin-bottom: var(--sp-4);
+  }
+
+  h2 {
+    margin: 0 0 var(--sp-3);
+    font-family: "DM Serif Display", serif;
+    font-size: 1.2rem;
+  }
+
+  .field {
+    display: grid;
+    gap: 6px;
+    margin-bottom: var(--sp-3);
+  }
+
+  .field span {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--sp-3);
+  }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg-cream);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.94rem;
+  }
+
+  textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    align-items: center;
+  }
+
+  .btn {
+    border: 1px solid #bca67f;
+    background: #fff4e0;
+    color: #4d3f2c;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 0.92rem;
+  }
+
+  :root[data-theme="dark"] .btn {
+    border-color: var(--line);
+    background: #2c2417;
+    color: #ecd9b8;
+  }
+
+  .btn.utama {
+    background: linear-gradient(120deg, var(--accent), #2f8cb0);
+    border-color: #186683;
+    color: #f6fdff;
+  }
+
+  .btn.danger {
+    background: var(--danger-bg);
+    border-color: var(--danger-border);
+    color: var(--danger);
+  }
+
+  .list-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-3);
+  }
+
+  .note-card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    display: grid;
+    gap: 6px;
+    background: var(--bg-cream);
+  }
+
+  .note-card.done {
+    opacity: 0.55;
+  }
+
+  .note-card.done .note-title {
+    text-decoration: line-through;
+  }
+
+  .note-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .note-title {
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .note-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 0.72rem;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    background: #f3e7d1;
+    color: #5c4933;
+  }
+
+  :root[data-theme="dark"] .tag {
+    background: #2c2417;
+    color: #d8c9a8;
+  }
+
+  .tag.prio-tinggi { background: var(--danger-bg); color: var(--danger); }
+  .tag.prio-sedang { background: #f9e8b2; color: #785200; }
+  :root[data-theme="dark"] .tag.prio-sedang { background: #2c2210; color: #e8c46b; }
+  .tag.prio-rendah { background: #d7f3de; color: #16603a; }
+  :root[data-theme="dark"] .tag.prio-rendah { background: #132a1c; color: #7fd9a0; }
+
+  .note-desc {
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    color: var(--text);
+  }
+
+  .note-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .note-actions button {
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 5px 9px;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 24px;
+    font-size: 0.92rem;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    background: var(--ok);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  footer {
+    margin-top: var(--sp-5);
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  footer a {
+    color: var(--accent);
+    font-weight: 700;
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div>
+      <h1>Catatan Pengembangan</h1>
+      <p class="sub">Tulis catatan saat Anda mencoba InvoicePaGun — bug, ide perbaikan, atau hal yang terasa kurang pas. Simpan di sini dulu, lalu salin ke chat Claude saat siap diminta diperbaiki.</p>
+    </div>
+    <button id="themeToggle" class="icon-btn" type="button" title="Ganti tema" aria-label="Ganti tema terang/gelap"></button>
+  </header>
+
+  <section class="panel">
+    <h2>Tambah Catatan</h2>
+    <div class="grid-2">
+      <label class="field">
+        <span>Judul singkat</span>
+        <input id="noteTitle" type="text" placeholder="Contoh: Tombol Simpan tidak responsif di HP" />
+      </label>
+      <label class="field">
+        <span>Area / Halaman</span>
+        <select id="noteArea">
+          <option>Payment in Front</option>
+          <option>Payment After</option>
+          <option>Kalender</option>
+          <option>Status Pembayaran</option>
+          <option>Data Siswa</option>
+          <option>Tarif / Diskon / Bank / Libur</option>
+          <option>Input &amp; Rekap Absensi</option>
+          <option>Piutang</option>
+          <option>Pusat Pengingat</option>
+          <option>Firebase / Sinkronisasi</option>
+          <option>Tampilan Umum / Dark Mode</option>
+          <option>Lainnya</option>
+        </select>
+      </label>
+    </div>
+    <div class="grid-2">
+      <label class="field">
+        <span>Prioritas</span>
+        <select id="notePriority">
+          <option value="sedang">Sedang</option>
+          <option value="tinggi">Tinggi</option>
+          <option value="rendah">Rendah</option>
+        </select>
+      </label>
+      <div></div>
+    </div>
+    <label class="field">
+      <span>Detail (opsional)</span>
+      <textarea id="noteDesc" placeholder="Ceritakan langkah untuk mengulangi masalah, atau jelaskan perbaikan yang diinginkan..."></textarea>
+    </label>
+    <div class="toolbar">
+      <button id="btnAddNote" class="btn utama" type="button">Simpan Catatan</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="list-head">
+      <h2 style="margin:0">Daftar Catatan (<span id="noteCount">0</span>)</h2>
+      <div class="toolbar">
+        <button id="btnCopyAll" class="btn" type="button">Salin untuk Claude</button>
+        <button id="btnClearDone" class="btn" type="button">Hapus yang Selesai</button>
+      </div>
+    </div>
+    <div id="noteList"></div>
+  </section>
+
+  <footer>
+    <a href="../index.html">&larr; Kembali ke InvoicePaGun</a> &middot; <a href="../docs/panduan.html">Panduan Penggunaan</a>
+  </footer>
+
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+  const STORAGE_KEY = "invoicepagun-dev-notes";
+  const THEME_KEY = "invoice-app-theme";
+
+  const ICONS = {
+    sun: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>',
+    moon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"></path></svg>',
+  };
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    const toggle = document.getElementById("themeToggle");
+    toggle.innerHTML = theme === "dark" ? ICONS.moon : ICONS.sun;
+    toggle.title = theme === "dark" ? "Tema gelap aktif — klik untuk tema terang" : "Tema terang aktif — klik untuk tema gelap";
+  }
+
+  (function initTheme() {
+    const current = document.documentElement.getAttribute("data-theme") || "light";
+    applyTheme(current);
+    document.getElementById("themeToggle").addEventListener("click", () => {
+      const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      localStorage.setItem(THEME_KEY, next);
+      applyTheme(next);
+    });
+  })();
+
+  function loadNotes() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveNotes(notes) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+  }
+
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function showToast(message) {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 1800);
+  }
+
+  function render() {
+    const notes = loadNotes();
+    document.getElementById("noteCount").textContent = notes.length;
+    const list = document.getElementById("noteList");
+
+    if (notes.length === 0) {
+      list.innerHTML = '<div class="empty">Belum ada catatan. Tambahkan lewat form di atas saat Anda menemukan sesuatu.</div>';
+      return;
+    }
+
+    const sorted = [...notes].sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    list.innerHTML = sorted.map((note) => `
+      <div class="note-card ${note.done ? "done" : ""}" data-id="${note.id}">
+        <div class="note-top">
+          <div>
+            <div class="note-title">${escapeHtml(note.title)}</div>
+            <div class="note-meta">
+              <span class="tag">${escapeHtml(note.area)}</span>
+              <span class="tag prio-${note.priority}">${escapeHtml(note.priority)}</span>
+              <span style="color:var(--muted);text-transform:none;font-weight:600;">${formatDate(note.createdAt)}</span>
+            </div>
+          </div>
+          <div class="note-actions">
+            <button data-action="toggle" title="${note.done ? "Tandai belum selesai" : "Tandai selesai"}">${note.done ? "Batal" : "Selesai"}</button>
+            <button data-action="delete" title="Hapus">Hapus</button>
+          </div>
+        </div>
+        ${note.desc ? `<div class="note-desc">${escapeHtml(note.desc)}</div>` : ""}
+      </div>
+    `).join("");
+  }
+
+  document.getElementById("btnAddNote").addEventListener("click", () => {
+    const title = document.getElementById("noteTitle").value.trim();
+    if (!title) {
+      document.getElementById("noteTitle").focus();
+      return;
+    }
+    const notes = loadNotes();
+    notes.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title,
+      area: document.getElementById("noteArea").value,
+      priority: document.getElementById("notePriority").value,
+      desc: document.getElementById("noteDesc").value.trim(),
+      done: false,
+      createdAt: new Date().toISOString(),
+    });
+    saveNotes(notes);
+    document.getElementById("noteTitle").value = "";
+    document.getElementById("noteDesc").value = "";
+    document.getElementById("noteTitle").focus();
+    render();
+    showToast("Catatan disimpan.");
+  });
+
+  document.getElementById("noteList").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const card = btn.closest(".note-card");
+    const id = card.dataset.id;
+    let notes = loadNotes();
+
+    if (btn.dataset.action === "toggle") {
+      notes = notes.map((n) => (n.id === id ? { ...n, done: !n.done } : n));
+    } else if (btn.dataset.action === "delete") {
+      if (!confirm("Hapus catatan ini?")) return;
+      notes = notes.filter((n) => n.id !== id);
+    }
+    saveNotes(notes);
+    render();
+  });
+
+  document.getElementById("btnClearDone").addEventListener("click", () => {
+    const notes = loadNotes();
+    const remaining = notes.filter((n) => !n.done);
+    if (remaining.length === notes.length) {
+      showToast("Tidak ada catatan selesai untuk dihapus.");
+      return;
+    }
+    if (!confirm("Hapus semua catatan yang sudah ditandai selesai?")) return;
+    saveNotes(remaining);
+    render();
+    showToast("Catatan selesai dihapus.");
+  });
+
+  document.getElementById("btnCopyAll").addEventListener("click", async () => {
+    const notes = loadNotes().filter((n) => !n.done);
+    if (notes.length === 0) {
+      showToast("Tidak ada catatan terbuka untuk disalin.");
+      return;
+    }
+    const text = notes
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+      .map((n, i) => {
+        const lines = [`${i + 1}. [${n.area}] ${n.title} (prioritas: ${n.priority})`];
+        if (n.desc) lines.push(`   ${n.desc.split("\n").join("\n   ")}`);
+        return lines.join("\n");
+      })
+      .join("\n\n");
+    const header = "Tolong perbaiki catatan berikut di InvoicePaGun:\n\n";
+    try {
+      await navigator.clipboard.writeText(header + text);
+      showToast("Tersalin! Tempel di chat Claude.");
+    } catch (e) {
+      window.prompt("Salin teks berikut secara manual:", header + text);
+    }
+  });
+
+  render();
+</script>
+</body>
+</html>
