@@ -400,7 +400,7 @@
       <p class="tagline">Panduan lengkap penggunaan aplikasi pembuat invoice les otomatis — dari penjadwalan sesi, penghitungan diskon, sampai sinkronisasi Firebase.</p>
     </div>
     <div class="meta">
-      Versi aplikasi: <strong>v1.0.0</strong> (19 Jul 2026)<br>
+      Versi aplikasi: <strong>v1.0.1</strong> (19 Jul 2026)<br>
       Disusun untuk: <strong>Bimbel Pak Gun</strong><br>
       Bahasa aplikasi: <strong>Indonesia</strong>
     </div>
@@ -557,7 +557,7 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
         </div>
 
         <h3>Tab Status Pembayaran</h3>
-        <p>Tabel seluruh invoice dengan kolom No Invoice, Siswa, Tanggal, Deadline, Status (<code>issued</code> / <code>paid</code> / <code>cancelled</code>), dan Catatan Pembayaran.</p>
+        <p>Tabel seluruh invoice dengan kolom No Invoice, Siswa, Tanggal, Deadline, Status (<code>issued</code> / <code>paid</code> / <code>cancelled</code>), dan Catatan Pembayaran. Invoice <code>issued</code> yang tenggatnya sudah lewat langsung ditandai badge merah <strong>Overdue</strong> di kolom Deadline, jadi tidak perlu pindah ke tab Piutang hanya untuk memeriksa mana yang sudah lewat jatuh tempo.</p>
 
         <div class="icon-legend">
           <div><span class="ic">💾</span> Simpan perubahan baris</div>
@@ -666,6 +666,13 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
           <table>
             <thead><tr><th>Versi</th><th>Tanggal</th><th>Perubahan</th></tr></thead>
             <tbody>
+              <tr>
+                <td class="mono">v1.0.1</td>
+                <td class="mono">19 Jul 2026</td>
+                <td>
+                  Tabel Status Pembayaran kini menandai baris <span class="field-tag" style="margin:0">Overdue</span> berwarna merah pada kolom Deadline untuk invoice <code>ISSUED</code> yang tenggatnya sudah lewat, tanpa perlu pindah ke tab Piutang. Tombol <strong>Hard Delete (Admin)</strong> di Data Siswa kini bergaya merah (bukan warna tombol aman biasa) agar aksi hapus permanen tidak tertukar dengan aksi lain.
+                </td>
+              </tr>
               <tr>
                 <td class="mono">v1.0.0</td>
                 <td class="mono">19 Jul 2026</td>

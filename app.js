@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.1";
 const APP_VERSION_DATE = "2026-07-19";
 const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const FIREBASE_CONFIG_STORAGE_KEY = "invoice-firebase-config";
@@ -5992,12 +5992,13 @@ function renderPaymentStatusTable() {
       const deadlineDate = parseDateInput(String(item.paymentDeadline || ""));
       const status = normalizeInvoiceStatus(item.paymentStatus || "issued");
       const note = String(item.paymentNote || "").trim();
+      const isOverdue = status === "issued" && deadlineDate && deadlineDate.getTime() < Date.now();
       return `
       <tr>
         <td>${escapeHtml(item.invoiceNo || "-")}</td>
         <td>${escapeHtml(getStudentDisplayName(item.student, item.studentDetail || {}))}</td>
         <td>${invoiceDate ? escapeHtml(formatTanggalWaktu(invoiceDate)) : "-"}</td>
-        <td>${deadlineDate ? escapeHtml(formatTanggalWaktu(deadlineDate)) : "-"}</td>
+        <td class="${isOverdue ? "ops-overdue" : ""}" title="${isOverdue ? "Sudah melewati deadline" : ""}">${deadlineDate ? escapeHtml(formatTanggalWaktu(deadlineDate)) : "-"}${isOverdue ? ' <span class="status-overdue-tag">Overdue</span>' : ""}</td>
         <td>
           <select data-payment-status class="payment-status-select ${status}">
             <option value="issued" ${status === "issued" ? "selected" : ""}>ISSUED</option>
