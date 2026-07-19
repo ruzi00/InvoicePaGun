@@ -1,4 +1,4 @@
-const APP_VERSION = "1.2.1";
+const APP_VERSION = "1.3.0";
 const APP_VERSION_DATE = "2026-07-19";
 const THEME_STORAGE_KEY = "invoice-app-theme";
 
@@ -427,6 +427,29 @@ const el = {
   btnCsvUploadTemplateAfter: document.getElementById("btnCsvUploadTemplateAfter"),
   fileCsvUploadTemplateAfter: document.getElementById("fileCsvUploadTemplateAfter"),
 };
+
+const TAB_SECTION_MAP = {
+  front: el.frontSection,
+  after: el.afterSection,
+  calendar: el.calendarSection,
+  status: el.paymentStatusSection,
+  students: el.studentManagementSection,
+  pricing: el.pricingManagementSection,
+  discount: el.discountManagementSection,
+  bank: el.bankManagementSection,
+  holiday: el.holidayManagementSection,
+  attendance_input: el.attendanceInputOperationsSection,
+  attendance: el.attendanceOperationsSection,
+  receivables: el.receivablesOperationsSection,
+  reminders: el.remindersOperationsSection,
+};
+
+function playTabEnterAnimation(target) {
+  if (!target) return;
+  target.classList.remove("tab-panel-enter");
+  void target.offsetWidth;
+  target.classList.add("tab-panel-enter");
+}
 
 initialize();
 
@@ -2105,6 +2128,8 @@ async function setActiveTab(nextTab, { force = false, group = "" } = {}) {
   if (el.previewPanel) el.previewPanel.classList.toggle("hidden", !billingTab);
   if (el.billingActionToolbar) el.billingActionToolbar.classList.toggle("hidden", !billingTab);
   if (el.billingInvoiceInfoSection) el.billingInvoiceInfoSection.classList.toggle("hidden", !billingTab);
+
+  playTabEnterAnimation(TAB_SECTION_MAP[tab]);
 
   if (tab === "front" || tab === "after") {
     state.mode = tab;

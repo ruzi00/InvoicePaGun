@@ -40,6 +40,7 @@ body {
   margin: 0;
   font-family: "Plus Jakarta Sans", sans-serif;
   color: var(--text);
+  line-height: 1.5;
   background: radial-gradient(1200px 700px at 90% -10%, #c3dfeb 0%, transparent 60%),
     radial-gradient(900px 500px at -10% 30%, #f1dcb3 0%, transparent 60%),
     linear-gradient(150deg, var(--bg-cream), #f6efe2 50%, #f3ead9 100%);
@@ -399,6 +400,34 @@ body {
   gap: var(--sp-5);
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes tab-panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .tab-panel-enter {
+    animation: tab-panel-in 260ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .panel {
   background: color-mix(in srgb, var(--card) 90%, #fff 10%);
   border: 1px solid var(--line);
@@ -683,6 +712,12 @@ textarea {
   background: linear-gradient(180deg, #fff8ea, #f3e4c9);
   color: #59472f;
   cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.settings-menu > summary:hover {
+  transform: translateY(-1px) rotate(18deg);
+  box-shadow: 0 5px 12px rgba(36, 32, 22, 0.16);
 }
 
 .theme-toggle {
@@ -694,11 +729,18 @@ textarea {
   border: 1px solid #c6b18a;
   background: linear-gradient(180deg, #fff8ea, #f3e4c9);
   color: #59472f;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 5px 12px rgba(36, 32, 22, 0.16);
 }
 
 .theme-toggle svg {
   width: 18px;
   height: 18px;
+  transition: transform 220ms ease;
 }
 
 .settings-menu > summary::-webkit-details-marker {
@@ -756,6 +798,12 @@ textarea {
   padding: 6px 12px;
   font-weight: 700;
   cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.workflow-group:hover:not(.active) {
+  background: rgba(255, 253, 248, 0.6);
+  color: #3f3020;
 }
 
 .workflow-group.active {
@@ -774,6 +822,12 @@ textarea {
   font-weight: 700;
   cursor: pointer;
   transform: translateY(1px);
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.workflow-tab:hover:not(.active) {
+  background: linear-gradient(180deg, #f8eeda, #f0e2c8);
+  transform: translateY(0);
 }
 
 .workflow-tab.active {
@@ -1301,7 +1355,11 @@ h3 {
   border-radius: 10px;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 160ms ease, border-color 160ms ease, filter 160ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  filter: brightness(1.03);
 }
 
 .btn:hover {
@@ -2102,6 +2160,11 @@ body.calendar-share-only .container {
     color: #4f402d;
     font-weight: 700;
     margin: 10px 0 8px;
+    transition: background-color 160ms ease, transform 120ms ease;
+  }
+
+  .mobile-nav-toggle:active {
+    transform: scale(0.98);
   }
 
   .workflow-groups,
