@@ -781,6 +781,24 @@ textarea {
   border-radius: 14px;
   background: var(--surface-1);
   box-shadow: 0 14px 36px rgba(31, 35, 46, 0.18);
+  transform-origin: top right;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes settings-panel-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .settings-menu[open] .settings-menu-content {
+    animation: settings-panel-in 180ms ease;
+  }
 }
 
 .settings-menu-content > * {
