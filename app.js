@@ -1,5 +1,46 @@
-const APP_VERSION = "1.0.1";
+const APP_VERSION = "1.1.0";
 const APP_VERSION_DATE = "2026-07-19";
+const THEME_STORAGE_KEY = "invoice-app-theme";
+
+function svgIcon(paths, viewBox = "0 0 24 24") {
+  return `<svg viewBox="${viewBox}" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+}
+
+const ICONS = {
+  save: svgIcon('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"></path><path d="M17 21v-8H7v8"></path><path d="M7 3v5h8"></path>'),
+  delete: svgIcon('<path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>'),
+  edit: svgIcon('<path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path>'),
+  view: svgIcon('<path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"></path><circle cx="12" cy="12" r="3"></circle>'),
+  download: svgIcon('<path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path>'),
+  sun: svgIcon('<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>'),
+  moon: svgIcon('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"></path>'),
+};
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  root.setAttribute("data-theme", theme);
+  const toggle = document.getElementById("themeToggle");
+  if (toggle) {
+    const isDark = theme === "dark";
+    toggle.innerHTML = isDark ? ICONS.moon : ICONS.sun;
+    toggle.title = isDark ? "Tema gelap aktif — klik untuk tema terang" : "Tema terang aktif — klik untuk tema gelap";
+  }
+}
+
+function initializeTheme() {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(stored === "dark" || stored === "light" ? stored : (prefersDark ? "dark" : "light"));
+
+  const toggle = document.getElementById("themeToggle");
+  if (toggle) {
+    toggle.addEventListener("click", () => {
+      const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      localStorage.setItem(THEME_STORAGE_KEY, next);
+      applyTheme(next);
+    });
+  }
+}
 const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const FIREBASE_CONFIG_STORAGE_KEY = "invoice-firebase-config";
 const DEFAULT_TEACHER_STORAGE_KEY = "invoice-default-teacher";
@@ -397,6 +438,7 @@ function renderAppVersionInfo() {
 }
 
 function initialize() {
+  initializeTheme();
   renderAppVersionInfo();
   const today = new Date();
   el.invoiceDate.value = toLocalDateTimeInputValue(today);
@@ -6009,8 +6051,8 @@ function renderPaymentStatusTable() {
         <td><input type="text" data-payment-note value="${escapeHtml(note)}" placeholder="Transfer ke BCA xxx / alasan cancel" /></td>
         <td>
           <div class="invoice-actions">
-            <button type="button" class="icon-btn save" title="Simpan" aria-label="Simpan status pembayaran" data-payment-save="${escapeHtml(item.historyId || "")}">&#128190;</button>
-            <button type="button" class="icon-btn delete" title="Hapus" aria-label="Hapus invoice" data-payment-delete="${escapeHtml(item.historyId || "")}">&#128465;</button>
+            <button type="button" class="icon-btn save" title="Simpan" aria-label="Simpan status pembayaran" data-payment-save="${escapeHtml(item.historyId || "")}">${ICONS.save}</button>
+            <button type="button" class="icon-btn delete" title="Hapus" aria-label="Hapus invoice" data-payment-delete="${escapeHtml(item.historyId || "")}">${ICONS.delete}</button>
           </div>
         </td>
       </tr>`;
@@ -6075,8 +6117,8 @@ function renderAttendanceInputSection() {
         <td><code>${escapeHtml(String(row.attendanceId || "-"))}</code></td>
         <td>
           <div class="attendance-actions">
-            <button type="button" class="icon-btn save" title="Simpan" data-save-attendance="${index}">&#128190;</button>
-            <button type="button" class="icon-btn delete" title="Hapus" data-remove-attendance="${index}">&#128465;</button>
+            <button type="button" class="icon-btn save" title="Simpan" data-save-attendance="${index}">${ICONS.save}</button>
+            <button type="button" class="icon-btn delete" title="Hapus" data-remove-attendance="${index}">${ICONS.delete}</button>
           </div>
         </td>
       </tr>`)
@@ -6418,8 +6460,8 @@ function renderStudentManagementTable() {
         <td>
           <div class="student-row-actions">
             <button type="button" class="btn" title="Edit Detail" data-edit-student="${sourceIndex}">Detail</button>
-            <button type="button" class="icon-btn save" title="Simpan" data-save-student="${sourceIndex}">&#128190;</button>
-            <button type="button" class="icon-btn delete" title="Soft Delete" data-remove-student="${sourceIndex}">&#128465;</button>
+            <button type="button" class="icon-btn save" title="Simpan" data-save-student="${sourceIndex}">${ICONS.save}</button>
+            <button type="button" class="icon-btn delete" title="Soft Delete" data-remove-student="${sourceIndex}">${ICONS.delete}</button>
           </div>
         </td>
       </tr>
@@ -6977,10 +7019,10 @@ function renderInvoiceHistoryTable() {
         <td>${formatRupiah(grandTotal)}</td>
         <td>
           <div class="invoice-actions">
-            <button type="button" class="icon-btn" title="Edit" aria-label="Edit invoice" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="edit">&#9998;</button>
-            <button type="button" class="icon-btn" title="Lihat" aria-label="Lihat invoice" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="view">&#128065;</button>
-            <button type="button" class="icon-btn" title="Download PNG" aria-label="Download invoice PNG" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="download">&#8681;</button>
-            <button type="button" class="icon-btn delete" title="Hapus" aria-label="Hapus invoice" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="delete">&#128465;</button>
+            <button type="button" class="icon-btn" title="Edit" aria-label="Edit invoice" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="edit">${ICONS.edit}</button>
+            <button type="button" class="icon-btn" title="Lihat" aria-label="Lihat invoice" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="view">${ICONS.view}</button>
+            <button type="button" class="icon-btn" title="Download PNG" aria-label="Download invoice PNG" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="download">${ICONS.download}</button>
+            <button type="button" class="icon-btn delete" title="Hapus" aria-label="Hapus invoice" data-history-id="${escapeHtml(item.historyId || "")}" data-history-action="delete">${ICONS.delete}</button>
           </div>
         </td>
       </tr>`;

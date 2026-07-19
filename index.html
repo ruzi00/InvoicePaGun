@@ -9,6 +9,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/svg+xml" href="assets/icons/favicon-invoice.svg" />
   <link rel="stylesheet" href="styles.css" />
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("invoice-app-theme");
+        var theme = stored === "dark" || stored === "light"
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div class="ambient"></div>
@@ -17,12 +28,20 @@
       <h1>Invoice Les Manager</h1>
       <p class="sub">Payment in Front, Payment After, dan data management sumber dalam satu workflow.</p>
 
-      <details id="settingsMenu" class="settings-menu">
-        <summary aria-label="Settings" title="Settings">&#9881;</summary>
-        <div id="settingsMenuContent" class="settings-menu-content"></div>
-      </details>
+      <div class="header-actions">
+        <button id="themeToggle" type="button" class="icon-btn theme-toggle" title="Ganti tema terang/gelap" aria-label="Ganti tema terang/gelap"></button>
+        <details id="settingsMenu" class="settings-menu">
+          <summary aria-label="Settings" title="Settings">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"></path></svg>
+          </summary>
+          <div id="settingsMenuContent" class="settings-menu-content"></div>
+        </details>
+      </div>
 
-      <button id="mobileNavToggle" type="button" class="mobile-nav-toggle" aria-expanded="false" aria-controls="workflowNavigation">&#9776; Menu</button>
+      <button id="mobileNavToggle" type="button" class="mobile-nav-toggle" aria-expanded="false" aria-controls="workflowNavigation">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M3 12h18"></path><path d="M3 18h18"></path></svg>
+        Menu
+      </button>
 
       <div id="workflowNavigation" class="workflow-groups" role="tablist" aria-label="Grup Menu">
         <button type="button" class="workflow-group active" data-group="invoice" role="tab" aria-selected="true">Invoice Group</button>
@@ -864,6 +883,11 @@
   </main>
 
   <footer class="app-footer">
+    <a class="app-footer-link" href="docs/panduan.html" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"></path></svg>
+      Panduan Penggunaan
+    </a>
+    <span class="app-footer-sep">&middot;</span>
     <span id="appVersionInfo" class="app-version"></span>
   </footer>
 
