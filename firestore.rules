@@ -59,6 +59,15 @@ service cloud.firestore {
         request.resource.data.studentName is string;
     }
 
+    function validDevNoteDoc() {
+      return request.resource.data.ownerUid is string &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() <= 200 &&
+        request.resource.data.area is string &&
+        request.resource.data.priority in ["rendah", "sedang", "tinggi"] &&
+        request.resource.data.done is bool;
+    }
+
     match /invoice_sources/{docId} {
       allow read: if isOwnerDoc();
       allow create: if isOwnerWrite() && validSourceDoc();
@@ -84,6 +93,13 @@ service cloud.firestore {
       allow read: if isOwnerDoc();
       allow create: if isOwnerWrite() && validAttendanceDoc();
       allow update: if isOwnerDoc() && isOwnerWrite() && validAttendanceDoc();
+      allow delete: if isOwnerDoc();
+    }
+
+    match /dev_notes/{docId} {
+      allow read: if isOwnerDoc();
+      allow create: if isOwnerWrite() && validDevNoteDoc();
+      allow update: if isOwnerDoc() && isOwnerWrite() && validDevNoteDoc();
       allow delete: if isOwnerDoc();
     }
   }

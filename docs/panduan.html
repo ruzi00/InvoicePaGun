@@ -400,7 +400,7 @@
       <p class="tagline">Panduan lengkap penggunaan aplikasi pembuat invoice les otomatis — dari penjadwalan sesi, penghitungan diskon, sampai sinkronisasi Firebase.</p>
     </div>
     <div class="meta">
-      Versi aplikasi: <strong>v1.2.0</strong> (19 Jul 2026)<br>
+      Versi aplikasi: <strong>v1.2.1</strong> (19 Jul 2026)<br>
       Disusun untuk: <strong>Bimbel Pak Gun</strong><br>
       Bahasa aplikasi: <strong>Indonesia</strong>
     </div>
@@ -644,6 +644,7 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
             <tbody>
               <tr><td class="mono">invoice_sources</td><td>CSV sumber data (students, pricing, discount, bank, holiday, attendance, template_after), per pemilik akun</td></tr>
               <tr><td class="mono">invoice_records</td><td>Riwayat invoice yang sudah digenerate, termasuk status, tenggat, dan catatan pembayaran</td></tr>
+              <tr><td class="mono">dev_notes</td><td>Catatan pengembangan/bug dari halaman dev/feedback.html</td></tr>
               <tr><td class="mono">student_details</td><td>Profil siswa lengkap</td></tr>
               <tr><td class="mono">attendance_records</td><td>Catatan kehadiran per sesi</td></tr>
             </tbody>
@@ -670,6 +671,13 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
           <table>
             <thead><tr><th>Versi</th><th>Tanggal</th><th>Perubahan</th></tr></thead>
             <tbody>
+              <tr>
+                <td class="mono">v1.2.1</td>
+                <td class="mono">19 Jul 2026</td>
+                <td>
+                  Catatan Pengembangan kini tersimpan di Firestore (koleksi <code>dev_notes</code>), bukan lagi hanya di browser — sinkron otomatis di semua perangkat, dengan status koneksi Firebase ditampilkan di halaman. <strong>Perlu tindakan sekali:</strong> aturan keamanan baru untuk <code>dev_notes</code> harus di-deploy manual (<code>firebase deploy --only firestore:rules</code>, atau tempel isi <code>firestore.rules</code> ke tab Rules di Firebase Console) sebelum catatan bisa tersimpan.
+                </td>
+              </tr>
               <tr>
                 <td class="mono">v1.2.0</td>
                 <td class="mono">19 Jul 2026</td>

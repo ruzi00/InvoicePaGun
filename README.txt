@@ -85,3 +85,4 @@ Koleksi Firebase yang dipakai:
 - invoice_sources: menyimpan CSV sumber data per jenis (students, pricing, discount, bank, holiday, attendance), scoped per owner UID.
 - invoice_sources juga menyimpan `template_after` (template_payment_after.csv).
 - invoice_records: menyimpan riwayat invoice yang digenerate dari browser, scoped per owner UID.
+- dev_notes: catatan pengembangan/bug dari halaman dev/feedback.html, scoped per owner UID.

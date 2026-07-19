@@ -320,6 +320,39 @@
     font-weight: 700;
     text-decoration: none;
   }
+
+  .sync-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    margin-top: 10px;
+    background: #f9e8b2;
+    color: #785200;
+  }
+
+  :root[data-theme="dark"] .sync-status {
+    background: #2c2210;
+    color: #e8c46b;
+  }
+
+  .sync-status.ok {
+    background: #d7f3de;
+    color: #16603a;
+  }
+
+  :root[data-theme="dark"] .sync-status.ok {
+    background: #132a1c;
+    color: #7fd9a0;
+  }
+
+  .sync-status.error {
+    background: var(--danger-bg);
+    color: var(--danger);
+  }
 </style>
 </head>
 <body>
@@ -328,7 +361,8 @@
   <header>
     <div>
       <h1>Catatan Pengembangan</h1>
-      <p class="sub">Tulis catatan saat Anda mencoba InvoicePaGun — bug, ide perbaikan, atau hal yang terasa kurang pas. Simpan di sini dulu, lalu salin ke chat Claude saat siap diminta diperbaiki.</p>
+      <p class="sub">Tulis catatan saat Anda mencoba InvoicePaGun — bug, ide perbaikan, atau hal yang terasa kurang pas. Tersimpan di Firebase (sinkron di semua perangkat), lalu salin ke chat Claude saat siap diminta diperbaiki.</p>
+      <span id="syncStatus" class="sync-status">Menghubungkan ke Firebase...</span>
     </div>
     <button id="themeToggle" class="icon-btn" type="button" title="Ganti tema" aria-label="Ganti tema terang/gelap"></button>
   </header>
@@ -397,9 +431,24 @@
 
 <div id="toast" class="toast"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 <script>
-  const STORAGE_KEY = "invoicepagun-dev-notes";
   const THEME_KEY = "invoice-app-theme";
+  const OWNER_UID = "bimbelpakgun-shared";
+  const COLLECTION = "dev_notes";
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyATOra_DTbyKzS-YY7KyRqBWLmeGPqReKY",
+    authDomain: "bimbelpakgun.firebaseapp.com",
+    projectId: "bimbelpakgun",
+    storageBucket: "bimbelpakgun.firebasestorage.app",
+    messagingSenderId: "1089600700256",
+    appId: "1:1089600700256:web:1e99ba6cd2c2e88592a805",
+  };
+
+  let db = null;
+  let notesCache = [];
 
   const ICONS = {
     sun: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>',
@@ -423,16 +472,10 @@
     });
   })();
 
-  function loadNotes() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function saveNotes(notes) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+  function setSyncStatus(text, kind) {
+    const el = document.getElementById("syncStatus");
+    el.textContent = text;
+    el.className = "sync-status" + (kind ? " " + kind : "");
   }
 
   function escapeHtml(text) {
@@ -456,16 +499,15 @@
   }
 
   function render() {
-    const notes = loadNotes();
-    document.getElementById("noteCount").textContent = notes.length;
+    document.getElementById("noteCount").textContent = notesCache.length;
     const list = document.getElementById("noteList");
 
-    if (notes.length === 0) {
+    if (notesCache.length === 0) {
       list.innerHTML = '<div class="empty">Belum ada catatan. Tambahkan lewat form di atas saat Anda menemukan sesuatu.</div>';
       return;
     }
 
-    const sorted = [...notes].sort((a, b) => {
+    const sorted = [...notesCache].sort((a, b) => {
       if (a.done !== b.done) return a.done ? 1 : -1;
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
@@ -491,62 +533,107 @@
     `).join("");
   }
 
-  document.getElementById("btnAddNote").addEventListener("click", () => {
+  async function initFirebase() {
+    try {
+      const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
+      const auth = firebase.auth();
+      db = firebase.firestore();
+      await auth.signInAnonymously();
+
+      db.collection(COLLECTION)
+        .where("ownerUid", "==", OWNER_UID)
+        .onSnapshot(
+          (snap) => {
+            notesCache = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+            setSyncStatus("Tersinkron dengan Firebase", "ok");
+            render();
+          },
+          (err) => {
+            console.error(err);
+            if (String(err.code) === "permission-denied") {
+              setSyncStatus("Ditolak Firestore — aturan dev_notes belum di-deploy", "error");
+            } else {
+              setSyncStatus("Gagal sinkron: " + err.message, "error");
+            }
+          }
+        );
+    } catch (err) {
+      console.error(err);
+      setSyncStatus("Gagal terhubung ke Firebase: " + err.message, "error");
+    }
+  }
+
+  document.getElementById("btnAddNote").addEventListener("click", async () => {
     const title = document.getElementById("noteTitle").value.trim();
     if (!title) {
       document.getElementById("noteTitle").focus();
       return;
     }
-    const notes = loadNotes();
-    notes.push({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title,
-      area: document.getElementById("noteArea").value,
-      priority: document.getElementById("notePriority").value,
-      desc: document.getElementById("noteDesc").value.trim(),
-      done: false,
-      createdAt: new Date().toISOString(),
-    });
-    saveNotes(notes);
-    document.getElementById("noteTitle").value = "";
-    document.getElementById("noteDesc").value = "";
-    document.getElementById("noteTitle").focus();
-    render();
-    showToast("Catatan disimpan.");
+    if (!db) {
+      showToast("Belum terhubung ke Firebase.");
+      return;
+    }
+    const btn = document.getElementById("btnAddNote");
+    btn.disabled = true;
+    try {
+      await db.collection(COLLECTION).add({
+        ownerUid: OWNER_UID,
+        title,
+        area: document.getElementById("noteArea").value,
+        priority: document.getElementById("notePriority").value,
+        desc: document.getElementById("noteDesc").value.trim(),
+        done: false,
+        createdAt: new Date().toISOString(),
+      });
+      document.getElementById("noteTitle").value = "";
+      document.getElementById("noteDesc").value = "";
+      document.getElementById("noteTitle").focus();
+      showToast("Catatan disimpan.");
+    } catch (err) {
+      showToast("Gagal menyimpan: " + err.message);
+    } finally {
+      btn.disabled = false;
+    }
   });
 
-  document.getElementById("noteList").addEventListener("click", (e) => {
+  document.getElementById("noteList").addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-action]");
-    if (!btn) return;
+    if (!btn || !db) return;
     const card = btn.closest(".note-card");
     const id = card.dataset.id;
-    let notes = loadNotes();
+    const note = notesCache.find((n) => n.id === id);
+    if (!note) return;
 
-    if (btn.dataset.action === "toggle") {
-      notes = notes.map((n) => (n.id === id ? { ...n, done: !n.done } : n));
-    } else if (btn.dataset.action === "delete") {
-      if (!confirm("Hapus catatan ini?")) return;
-      notes = notes.filter((n) => n.id !== id);
+    try {
+      if (btn.dataset.action === "toggle") {
+        await db.collection(COLLECTION).doc(id).update({ done: !note.done });
+      } else if (btn.dataset.action === "delete") {
+        if (!confirm("Hapus catatan ini?")) return;
+        await db.collection(COLLECTION).doc(id).delete();
+      }
+    } catch (err) {
+      showToast("Gagal memperbarui: " + err.message);
     }
-    saveNotes(notes);
-    render();
   });
 
-  document.getElementById("btnClearDone").addEventListener("click", () => {
-    const notes = loadNotes();
-    const remaining = notes.filter((n) => !n.done);
-    if (remaining.length === notes.length) {
+  document.getElementById("btnClearDone").addEventListener("click", async () => {
+    if (!db) return;
+    const done = notesCache.filter((n) => n.done);
+    if (done.length === 0) {
       showToast("Tidak ada catatan selesai untuk dihapus.");
       return;
     }
     if (!confirm("Hapus semua catatan yang sudah ditandai selesai?")) return;
-    saveNotes(remaining);
-    render();
-    showToast("Catatan selesai dihapus.");
+    try {
+      await Promise.all(done.map((n) => db.collection(COLLECTION).doc(n.id).delete()));
+      showToast("Catatan selesai dihapus.");
+    } catch (err) {
+      showToast("Gagal menghapus: " + err.message);
+    }
   });
 
   document.getElementById("btnCopyAll").addEventListener("click", async () => {
-    const notes = loadNotes().filter((n) => !n.done);
+    const notes = notesCache.filter((n) => !n.done);
     if (notes.length === 0) {
       showToast("Tidak ada catatan terbuka untuk disalin.");
       return;
@@ -569,6 +656,7 @@
   });
 
   render();
+  initFirebase();
 </script>
 </body>
 </html>
