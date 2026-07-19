@@ -1,3 +1,5 @@
+const APP_VERSION = "1.0.0";
+const APP_VERSION_DATE = "2026-07-19";
 const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const FIREBASE_CONFIG_STORAGE_KEY = "invoice-firebase-config";
 const DEFAULT_TEACHER_STORAGE_KEY = "invoice-default-teacher";
@@ -387,7 +389,15 @@ const el = {
 
 initialize();
 
+function renderAppVersionInfo() {
+  const target = document.getElementById("appVersionInfo");
+  if (!target) return;
+  target.textContent = `v${APP_VERSION} · ${APP_VERSION_DATE}`;
+  target.title = `InvoicePaGun versi ${APP_VERSION}, terakhir diperbarui ${APP_VERSION_DATE}`;
+}
+
 function initialize() {
+  renderAppVersionInfo();
   const today = new Date();
   el.invoiceDate.value = toLocalDateTimeInputValue(today);
   el.frontStartDate.value = toLocalDateInputValue(today);
@@ -3118,7 +3128,7 @@ async function generateInvoice() {
     deadlineInput.addEventListener("input", () => {
       deadlineInput.dataset.userEdited = "true";
       if (state.lastInvoiceRecord) {
-        state.lastInvoiceRecord.paymentDeadline = String(deadlineInput.value || "").trim() || toLocalDateTimeInputValue(addHours(new Date(), 24));
+        state.lastInvoiceRecord.paymentDeadline = String(deadlineInput.value || "").trim() || toLocalDateTimeInputValue(addHours(getCurrentTimeInZone(), 24));
         if (state.firebase.ready) {
           void saveInvoiceRecordToFirebase({ silent: true }).catch(() => {
             // ignore background autosave failures; manual save button remains available
@@ -4241,7 +4251,31 @@ function normalizeName(text) {
 }
 
 function parseCurrency(text) {
-  const cleaned = String(text || "").replace(/[^0-9,.-]/g, "").replace(/,/g, "");
+  let cleaned = String(text || "").trim().replace(/[^0-9,.-]/g, "");
+  const hasComma = cleaned.includes(",");
+  const hasDot = cleaned.includes(".");
+
+  if (hasComma && hasDot) {
+    // The rightmost separator is the decimal point; the other is thousands grouping.
+    if (cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")) {
+      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (hasComma) {
+    const parts = cleaned.split(",");
+    cleaned = parts.length === 2 && parts[1].length <= 2
+      ? cleaned.replace(",", ".")
+      : cleaned.replace(/,/g, "");
+  } else if (hasDot) {
+    const parts = cleaned.split(".");
+    // Multiple dots, or a single dot followed by exactly 3 digits (e.g. "150.000"),
+    // is Indonesian thousands grouping rather than a decimal point.
+    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
+      cleaned = cleaned.replace(/\./g, "");
+    }
+  }
+
   const val = Number.parseFloat(cleaned);
   return Number.isFinite(val) ? val : 0;
 }
@@ -4336,6 +4370,12 @@ function snapTimeToStep(text, stepMinutes = 15) {
 
 function parseDateInput(value) {
   if (!value) return null;
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value).trim());
+  if (dateOnly) {
+    const [, y, m, d] = dateOnly;
+    const local = new Date(Number(y), Number(m) - 1, Number(d));
+    return Number.isNaN(local.getTime()) ? null : local;
+  }
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
 }

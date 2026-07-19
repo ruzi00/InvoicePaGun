@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panduan Penggunaan InvoicePaGun</title>
+<style>
+  :root{
+    --bg: #eef0e9;
+    --bg-raised: #f7f7f2;
+    --ink: #1e2a26;
+    --ink-soft: #4a564f;
+    --line: #c7ccbf;
+    --line-soft: #dadfd2;
+    --accent: #a97425;
+    --accent-ink: #6e4c17;
+    --ledger: #3c6e58;
+    --ledger-soft: #e2ece5;
+    --warn: #9a3b2c;
+    --warn-soft: #f3e1dc;
+    --code-bg: #26302a;
+    --code-ink: #e7ead9;
+    --shadow: 0 1px 0 rgba(30,42,38,0.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg: #161c19;
+      --bg-raised: #1e2622;
+      --ink: #e9ede3;
+      --ink-soft: #adb7a7;
+      --line: #37423b;
+      --line-soft: #2b352f;
+      --accent: #d9a44e;
+      --accent-ink: #f0c383;
+      --ledger: #7fbf9c;
+      --ledger-soft: #223129;
+      --warn: #e0917f;
+      --warn-soft: #34211d;
+      --code-bg: #10160f;
+      --code-ink: #dbe6d3;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg: #161c19;
+    --bg-raised: #1e2622;
+    --ink: #e9ede3;
+    --ink-soft: #adb7a7;
+    --line: #37423b;
+    --line-soft: #2b352f;
+    --accent: #d9a44e;
+    --accent-ink: #f0c383;
+    --ledger: #7fbf9c;
+    --ledger-soft: #223129;
+    --warn: #e0917f;
+    --warn-soft: #34211d;
+    --code-bg: #10160f;
+    --code-ink: #dbe6d3;
+  }
+  :root[data-theme="light"]{
+    --bg: #eef0e9;
+    --bg-raised: #f7f7f2;
+    --ink: #1e2a26;
+    --ink-soft: #4a564f;
+    --line: #c7ccbf;
+    --line-soft: #dadfd2;
+    --accent: #a97425;
+    --accent-ink: #6e4c17;
+    --ledger: #3c6e58;
+    --ledger-soft: #e2ece5;
+    --warn: #9a3b2c;
+    --warn-soft: #f3e1dc;
+    --code-bg: #26302a;
+    --code-ink: #e7ead9;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family: "Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Noto Serif",serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--accent); color:#1b1204; }
+
+  a{ color:var(--ledger); text-decoration-thickness:1px; text-underline-offset:2px; }
+  a:focus-visible, button:focus-visible, summary:focus-visible{
+    outline:2px solid var(--accent); outline-offset:2px; border-radius:2px;
+  }
+
+  .page{
+    max-width:1180px;
+    margin:0 auto;
+    padding:0 clamp(18px,4vw,48px) 96px;
+  }
+
+  /* ---------- Masthead ---------- */
+  .masthead{
+    padding:56px 0 30px;
+    border-bottom:2px solid var(--ink);
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:24px;
+  }
+  .masthead .eyebrow{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:12.5px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent-ink);
+    font-weight:600;
+    margin:0 0 10px;
+  }
+  .masthead h1{
+    font-size:clamp(34px,5vw,54px);
+    margin:0;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    text-wrap:balance;
+  }
+  .masthead .tagline{
+    margin:10px 0 0;
+    color:var(--ink-soft);
+    font-size:17px;
+    max-width:52ch;
+  }
+  .masthead .meta{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    text-align:right;
+    line-height:1.7;
+  }
+  .masthead .meta strong{ color:var(--ink); }
+
+  /* ---------- Layout: sidebar + content ---------- */
+  .layout{
+    display:grid;
+    grid-template-columns: 232px 1fr;
+    gap:52px;
+    margin-top:38px;
+    align-items:start;
+  }
+  @media (max-width: 860px){
+    .layout{ grid-template-columns: 1fr; }
+  }
+
+  nav.toc{
+    position:sticky;
+    top:24px;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:13px;
+    border-left:1px solid var(--line);
+    padding-left:16px;
+  }
+  @media (max-width:860px){ nav.toc{ position:static; border-left:none; padding-left:0; } }
+  nav.toc .toc-label{
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    font-size:11px;
+    font-weight:700;
+    color:var(--accent-ink);
+    margin-bottom:10px;
+  }
+  nav.toc ol{ list-style:none; margin:0; padding:0; counter-reset:tocnum; }
+  nav.toc li{ counter-increment:tocnum; margin:0 0 9px; }
+  nav.toc a{
+    color:var(--ink-soft);
+    text-decoration:none;
+    display:flex;
+    gap:8px;
+  }
+  nav.toc a:hover{ color:var(--ink); }
+  nav.toc a::before{
+    content: counter(tocnum,decimal-leading-zero);
+    font-variant-numeric: tabular-nums;
+    color:var(--line);
+    font-weight:600;
+  }
+
+  main{ min-width:0; }
+
+  section.chapter{
+    padding-top:46px;
+    margin-top:46px;
+    border-top:1px solid var(--line-soft);
+    scroll-margin-top:20px;
+  }
+  section.chapter:first-child{ border-top:none; margin-top:22px; padding-top:0; }
+
+  .chapter-head{
+    display:flex;
+    align-items:baseline;
+    gap:14px;
+    margin-bottom:6px;
+  }
+  .chapter-num{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:13px;
+    font-weight:700;
+    color:var(--accent);
+    letter-spacing:.04em;
+  }
+  h2{
+    font-size:clamp(22px,3vw,28px);
+    margin:0;
+    font-weight:600;
+    text-wrap:balance;
+  }
+  .chapter-sub{
+    color:var(--ink-soft);
+    font-size:15px;
+    margin:6px 0 22px;
+    max-width:64ch;
+  }
+  h3{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:14.5px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    font-weight:700;
+    color:var(--ink);
+    margin:30px 0 12px;
+  }
+  p{ margin:0 0 14px; max-width:68ch; }
+  ul, ol.steps{ margin:0 0 16px; padding-left:22px; max-width:66ch; }
+  li{ margin-bottom:6px; }
+  ol.steps{ list-style:none; padding-left:0; counter-reset:stepnum; }
+  ol.steps li{
+    counter-increment:stepnum;
+    position:relative;
+    padding-left:34px;
+    margin-bottom:11px;
+  }
+  ol.steps li::before{
+    content: counter(stepnum);
+    position:absolute; left:0; top:1px;
+    width:22px; height:22px;
+    border-radius:50%;
+    background:var(--ledger-soft);
+    color:var(--ledger);
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:12px;
+    font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  code, .kbd{
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    font-size:.86em;
+    background:var(--ledger-soft);
+    color:var(--accent-ink);
+    padding:.12em .42em;
+    border-radius:4px;
+  }
+
+  .field-tag{
+    display:inline-block;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:12px;
+    background:var(--bg-raised);
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+    padding:2px 9px;
+    border-radius:20px;
+    margin:0 6px 6px 0;
+  }
+
+  /* ---------- Panels / callouts ---------- */
+  .panel{
+    background:var(--bg-raised);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:18px 20px;
+    margin:0 0 18px;
+    box-shadow: var(--shadow);
+  }
+  .panel h3{ margin-top:0; }
+
+  .note, .warn{
+    border-radius:8px;
+    padding:14px 16px 14px 46px;
+    position:relative;
+    margin:0 0 18px;
+    max-width:66ch;
+    font-size:14.5px;
+  }
+  .note{ background:var(--ledger-soft); color:var(--ink); border:1px solid color-mix(in srgb, var(--ledger) 30%, transparent); }
+  .warn{ background:var(--warn-soft); color:var(--ink); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent); }
+  .note::before, .warn::before{
+    position:absolute; left:16px; top:13px;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-weight:800; font-size:11px; letter-spacing:.06em;
+  }
+  .note::before{ content:"CATATAN"; color:var(--ledger); }
+  .warn::before{ content:"PERHATIAN"; color:var(--warn); }
+  .note p:last-child, .warn p:last-child{ margin-bottom:0; }
+  .note{ padding-top:32px; }
+  .warn{ padding-top:32px; }
+  .note::before, .warn::before{ top:14px; }
+
+  /* ---------- Tables ---------- */
+  .table-wrap{ overflow-x:auto; margin:0 0 20px; border:1px solid var(--line); border-radius:8px; }
+  table{ border-collapse:collapse; width:100%; min-width:480px; font-size:14px; background:var(--bg-raised); }
+  thead th{
+    text-align:left;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--ink-soft);
+    background:var(--ledger-soft);
+    padding:10px 14px;
+    border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  tbody td{
+    padding:9px 14px;
+    border-bottom:1px solid var(--line-soft);
+    vertical-align:top;
+  }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.mono, th.mono{ font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:12.8px; }
+
+  /* CSV sample block */
+  .csv-block{
+    background:var(--code-bg);
+    color:var(--code-ink);
+    border-radius:8px;
+    padding:16px 18px;
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size:12.8px;
+    line-height:1.7;
+    overflow-x:auto;
+    margin:0 0 18px;
+  }
+  .csv-block .caption{
+    display:block;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    color: color-mix(in srgb, var(--code-ink) 55%, transparent);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    font-size:10.5px;
+    margin-bottom:8px;
+  }
+
+  /* Mode badges */
+  .badge-row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+  .badge{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:12px;
+    font-weight:700;
+    padding:5px 12px;
+    border-radius:20px;
+  }
+  .badge.front{ background:var(--ledger-soft); color:var(--ledger); }
+  .badge.after{ background:color-mix(in srgb, var(--accent) 18%, var(--bg-raised)); color:var(--accent-ink); }
+
+  /* Icon action legend */
+  .icon-legend{ display:flex; flex-wrap:wrap; gap:10px 22px; margin:0 0 18px; }
+  .icon-legend div{ display:flex; align-items:center; gap:8px; font-size:14px; color:var(--ink-soft); }
+  .icon-legend span.ic{ font-size:16px; }
+
+  /* Two-column feature grid */
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px; }
+  @media (max-width:640px){ .grid2{ grid-template-columns:1fr; } }
+  .grid2 .panel{ margin-bottom:0; }
+
+  footer{
+    margin-top:64px;
+    padding-top:22px;
+    border-top:2px solid var(--ink);
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    display:flex;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+
+  @media (prefers-reduced-motion: no-preference){
+    section.chapter{ animation: fade-up .5s ease both; }
+    @keyframes fade-up{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Buku Panduan Operasional</p>
+      <h1>InvoicePaGun</h1>
+      <p class="tagline">Panduan lengkap penggunaan aplikasi pembuat invoice les otomatis — dari penjadwalan sesi, penghitungan diskon, sampai sinkronisasi Firebase.</p>
+    </div>
+    <div class="meta">
+      Versi aplikasi: <strong>v1.0.0</strong> (19 Jul 2026)<br>
+      Disusun untuk: <strong>Bimbel Pak Gun</strong><br>
+      Bahasa aplikasi: <strong>Indonesia</strong>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Daftar isi">
+      <div class="toc-label">Daftar Isi</div>
+      <ol>
+        <li><a href="#ringkasan">Apa itu InvoicePaGun</a></li>
+        <li><a href="#mulai">Memulai &amp; Sumber Data</a></li>
+        <li><a href="#front">Mode Payment in Front</a></li>
+        <li><a href="#after">Mode Payment After</a></li>
+        <li><a href="#diskon">Diskon &amp; Extra Diskon</a></li>
+        <li><a href="#kalender">Kalender &amp; Status</a></li>
+        <li><a href="#siswa">Data Siswa</a></li>
+        <li><a href="#operasional">Absensi, Piutang &amp; Pengingat</a></li>
+        <li><a href="#pengajar">Pembagian Pengajar</a></li>
+        <li><a href="#cloud">Firebase &amp; Publikasi</a></li>
+        <li><a href="#versi">Versi Aplikasi</a></li>
+      </ol>
+    </nav>
+
+    <main>
+
+      <section class="chapter" id="ringkasan">
+        <div class="chapter-head"><span class="chapter-num">01</span><h2>Apa itu InvoicePaGun</h2></div>
+        <p class="chapter-sub">Aplikasi web satu halaman untuk membuat, mengelola, dan menagih invoice les privat/bimbel, lengkap dengan histori dan kalender jadwal.</p>
+
+        <p>InvoicePaGun adalah aplikasi web statis (tanpa proses instalasi rumit) yang dipakai untuk membuat invoice les secara otomatis berdasarkan jadwal mingguan atau berdasarkan data absensi. Semua tampilan berada dalam satu halaman (<code>index.html</code>) yang berpindah-pindah lewat tab, dan seluruh logikanya berjalan langsung di peramban (<code>app.js</code>) — tidak memerlukan server backend khusus.</p>
+
+        <div class="grid2">
+          <div class="panel">
+            <h3>Dua sumber data</h3>
+            <p style="margin-bottom:0">Data bisa datang dari berkas CSV lokal, Google Sheet, atau dari <strong>Firebase</strong> (Firestore) bila sudah dihubungkan. Saat Firebase aktif, aplikasi berpindah ke mode "cloud-ready" dan kontrol CSV lokal otomatis disembunyikan.</p>
+          </div>
+          <div class="panel">
+            <h3>Publikasi tanpa server</h3>
+            <p style="margin-bottom:0">Karena tidak ada build step, aplikasi ini bisa dipublikasikan langsung sebagai situs statis di <strong>GitHub Pages</strong>. Penyimpanan data histori dan sinkronisasi antar-perangkat memakai Firebase Firestore.</p>
+          </div>
+        </div>
+
+        <div class="note">
+          <p>Aplikasi ini murni berbahasa Indonesia — seluruh label, tombol, dan pesan dalam antarmuka memakai istilah operasional bimbel sehari-hari (Tarif, Diskon, Pengajar, Peserta, dsb).</p>
+        </div>
+      </section>
+
+      <section class="chapter" id="mulai">
+        <div class="chapter-head"><span class="chapter-num">02</span><h2>Memulai &amp; Sumber Data</h2></div>
+        <p class="chapter-sub">Sebelum membuat invoice pertama, empat sumber data dasar harus dimuat.</p>
+
+        <ol class="steps">
+          <li>Buka <code>index.html</code> lewat local server (disarankan ekstensi <em>Live Server</em>) — bukan dibuka langsung sebagai berkas, karena pengambilan data dari Google Sheet membutuhkan koneksi HTTP.</li>
+          <li>Muat <strong>Data Siswa</strong> — dari Google Sheet (URL default sudah tersedia) atau unggah <code>REKAP DATA SISWA.csv</code>.</li>
+          <li>Muat <strong>Tarif</strong>, <strong>Diskon Durasi</strong>, dan <strong>Bank Guru</strong> lewat tab masing-masing di grup "Data Management".</li>
+          <li>Pilih mode invoice yang ingin dipakai: <em>Payment in Front</em> atau <em>Payment After</em>.</li>
+        </ol>
+
+        <h3>Format berkas sumber</h3>
+        <p>Setiap sumber data disimpan dan ditukar dalam bentuk teks CSV, termasuk saat disinkronkan ke Firestore (field <code>csvText</code>).</p>
+
+        <div class="csv-block"><span class="caption">tarif.csv — tarif per jam berdasarkan jenis hari &amp; jumlah peserta</span>jenis_hari,jumlah_peserta,tarif_per_jam
+senin-jumat,1,80000
+sabtu,1,90000
+minggu,1,100000</div>
+
+        <div class="note">
+          <p>Kolom <code>tarif_per_jam</code> menerima angka polos (<code>80000</code>) maupun format Indonesia dengan titik sebagai pemisah ribuan (<code>80.000</code>) — keduanya dibaca sebagai nilai yang sama sejak perbaikan pembacaan angka pada v1.0.0.</p>
+        </div>
+
+        <div class="csv-block"><span class="caption">diskon_durasi.csv — diskon otomatis berdasarkan lama sesi (jam)</span>min_durasi,max_durasi,diskon_persen
+0,1.49,0
+1.5,1.99,5
+2,2.99,10
+3,99,15</div>
+
+        <div class="csv-block"><span class="caption">bank_guru.csv — rekening tujuan pembayaran per pengajar</span>nama_pengajar,label_rekening,bank,nomor_rekening,atas_nama
+Rensie,Utama,BCA,1234567890,Rensie P
+Trias,Utama,Mandiri,1122334455,Trias A</div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tab Data</th><th>Isi</th><th>Kolom Utama</th></tr></thead>
+            <tbody>
+              <tr><td>Data Siswa</td><td>Profil siswa &amp; kontak</td><td class="mono">nama lengkap, panggilan, kelas, sekolah, WA siswa/ortu</td></tr>
+              <tr><td>Tarif</td><td>Tarif per jam</td><td class="mono">jenis_hari, jumlah_peserta, tarif_per_jam</td></tr>
+              <tr><td>Diskon</td><td>Diskon berdasar durasi</td><td class="mono">min_durasi, max_durasi, diskon_persen</td></tr>
+              <tr><td>Bank Guru</td><td>Rekening pencairan</td><td class="mono">nama_pengajar, label_rekening, bank, nomor_rekening, atas_nama</td></tr>
+              <tr><td>Hari Libur</td><td>Tanggal libur (dikecualikan dari jadwal)</td><td class="mono">tanggal, nama, jenis</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>Setiap tab data menyediakan tombol yang sama: <strong>Tambah Baris</strong>, <strong>Apply ke App</strong>, <strong>Download CSV</strong>, <strong>Upload CSV</strong>, dan <strong>Simpan ke Firebase</strong>.</p>
+      </section>
+
+      <section class="chapter" id="front">
+        <div class="chapter-head"><span class="chapter-num">03</span><h2>Mode Payment in Front</h2></div>
+        <div class="badge-row"><span class="badge front">Bayar di muka — jadwal mingguan berulang</span></div>
+        <p class="chapter-sub">Dipakai saat siswa membayar sebelum les berlangsung, berdasarkan jadwal tetap per minggu.</p>
+
+        <ol class="steps">
+          <li>Isi <strong>Tanggal Awal Minggu</strong> sebagai titik awal jadwal.</li>
+          <li>Isi <strong>Jumlah Minggu</strong> yang ingin ditagihkan sekaligus.</li>
+          <li>Pada tabel hari (Senin–Minggu), centang <strong>Aktif</strong> untuk hari-hari les berlangsung, lalu isi Pengajar, Jumlah Peserta, Jam Mulai, dan Jam Selesai per hari.</li>
+          <li>Klik <strong>Generate Jadwal</strong> — sistem menyusun daftar sesi otomatis mengikuti hari libur di sumber Hari Libur.</li>
+          <li>Periksa tabel <strong>Daftar Sesi Tagihan</strong>, tambahkan catatan bila perlu, dan nonaktifkan sesi yang tidak jadi ditagih lewat kotak centang.</li>
+          <li>Klik <strong>Generate Invoice</strong>, lalu <strong>Download PNG</strong> untuk menyimpan invoice sebagai gambar.</li>
+        </ol>
+
+        <div class="note">
+          <p><strong>Sesi Pengganti.</strong> Jika ada jadwal yang perlu dipindah tanggal (misalnya siswa berhalangan), gunakan tombol <strong>Insert Sesi Pengganti</strong> pada tabel sesi untuk menyisipkan sesi baru di tanggal lain, sekaligus otomatis menonaktifkan sesi asal yang digantikannya.</p>
+        </div>
+      </section>
+
+      <section class="chapter" id="after">
+        <div class="chapter-head"><span class="chapter-num">04</span><h2>Mode Payment After</h2></div>
+        <div class="badge-row"><span class="badge after">Bayar di belakang — berdasar absensi aktual</span></div>
+        <p class="chapter-sub">Dipakai saat penagihan dihitung dari sesi yang benar-benar sudah berlangsung (hadir), bukan jadwal rencana.</p>
+
+        <ol class="steps">
+          <li>Data kehadiran dimasukkan lebih dulu lewat tab <strong>Input Absensi</strong> (manual, unggah CSV, atau tarik dari Google Sheet).</li>
+          <li>Pindah ke mode <strong>Payment After</strong>, lalu pilih tanggal invoice dari dropdown <strong>Daftar Tanggal Invoice</strong>.</li>
+          <li>Klik <strong>Pakai Tanggal Terpilih</strong> — sistem menampilkan seluruh sesi berstatus hadir milik siswa terkait pada rentang tersebut.</li>
+          <li>Periksa baris sesi, sesuaikan jumlah peserta atau catatan bila diperlukan.</li>
+          <li>Klik <strong>Generate Invoice</strong>, lalu <strong>Download PNG</strong>.</li>
+        </ol>
+      </section>
+
+      <section class="chapter" id="diskon">
+        <div class="chapter-head"><span class="chapter-num">05</span><h2>Diskon &amp; Extra Diskon</h2></div>
+        <p class="chapter-sub">Ada dua lapis diskon yang dihitung berurutan sebelum invoice difinalkan.</p>
+
+        <h3>Lapis 1 — Diskon Durasi (otomatis)</h3>
+        <p>Dihitung otomatis dari tabel <code>diskon_durasi.csv</code> berdasarkan total durasi sesi, dan hanya berlaku untuk sesi kelompok (<strong>jumlah peserta &gt; 1</strong>) — sesi privat tidak mendapat diskon durasi.</p>
+
+        <h3>Lapis 2 — Extra Diskon (manual, dalam persen)</h3>
+        <p>Setelah diskon durasi diterapkan, admin dapat menambahkan potongan tambahan lewat field <span class="field-tag">Extra Diskon (%)</span> di panel Informasi Invoice, dengan alasan potongan dicatat di <span class="field-tag">Keterangan Extra Diskon</span>. Persentase ini dihitung dari subtotal setelah diskon durasi, sehingga hasil akhirnya adalah <strong>Total Tagihan</strong> final.</p>
+
+        <div class="warn">
+          <p>Extra Diskon kini berupa <strong>persentase</strong> (bukan lagi nominal tetap) dan wajib disertai keterangan alasan — perubahan ini menggantikan skema diskon nominal tetap yang dipakai sebelumnya, agar setiap potongan manual selalu punya jejak alasan yang tercatat di invoice.</p>
+        </div>
+      </section>
+
+      <section class="chapter" id="kalender">
+        <div class="chapter-head"><span class="chapter-num">06</span><h2>Kalender &amp; Status Pembayaran</h2></div>
+        <p class="chapter-sub">Memantau jadwal dan status tagihan lintas pengajar dalam satu tampilan.</p>
+
+        <h3>Tab Kalender</h3>
+        <p>Menampilkan kalender mingguan berjalan (2 bulan) berwarna per pengajar (Pak Gun / Trias / Rensie) dan per status invoice. Tersedia tombol <strong>Muat Kalender dari Firebase</strong>, <strong>Download Bulan Ini/Depan</strong> (sebagai PNG), <strong>Copy Share Link</strong>, serta navigasi <strong>Minggu Sebelumnya/Berikutnya</strong>.</p>
+
+        <div class="note">
+          <p><strong>Copy Share Link</strong> menghasilkan tautan berisi <code>#/share/calendar</code> yang membuka kalender dalam mode baca-saja tanpa navigasi tab lain — cocok dibagikan ke orang tua siswa atau pengajar tanpa memberi akses ke seluruh aplikasi.</p>
+        </div>
+
+        <h3>Tab Status Pembayaran</h3>
+        <p>Tabel seluruh invoice dengan kolom No Invoice, Siswa, Tanggal, Deadline, Status (<code>issued</code> / <code>paid</code> / <code>cancelled</code>), dan Catatan Pembayaran.</p>
+
+        <div class="icon-legend">
+          <div><span class="ic">💾</span> Simpan perubahan baris</div>
+          <div><span class="ic">🗑</span> Hapus invoice</div>
+          <div><span class="ic">✎</span> Edit invoice</div>
+          <div><span class="ic">👁</span> Lihat invoice</div>
+          <div><span class="ic">⬇</span> Unduh PNG</div>
+        </div>
+        <p style="margin-top:-8px">Tombol-tombol aksi berbentuk ikon ini dipakai konsisten di tabel Status Pembayaran maupun Riwayat Invoice agar tabel tetap ringkas di layar kecil.</p>
+
+        <div class="warn">
+          <p><strong>Sync Auto Cancel Overdue.</strong> Tombol ini memindai seluruh invoice berstatus <code>issued</code> yang tenggat pembayarannya sudah lewat, lalu otomatis mengubah statusnya menjadi <code>cancelled</code> dengan catatan "Auto cancelled: melewati deadline pembayaran." Invoice baru secara default mendapat tenggat <strong>24 jam</strong> sejak dibuat, dan bisa diubah manual sebelum disimpan. Invoice yang dibatalkan tidak lagi muncul di Kalender, namun tetap tersimpan di Riwayat Invoice.</p>
+        </div>
+      </section>
+
+      <section class="chapter" id="siswa">
+        <div class="chapter-head"><span class="chapter-num">07</span><h2>Data Siswa</h2></div>
+        <p class="chapter-sub">Pusat pengelolaan profil siswa, terpisah dari alur pembuatan invoice.</p>
+
+        <p>Tab <strong>Data Siswa</strong> menyediakan pengelolaan penuh (tambah, ubah, hapus) lewat dialog modal <strong>Tambah Siswa</strong>, berisi Nama Lengkap, Nama Panggilan, Jenis Kelamin, Kelas (1–13, dengan jenjang sekolah dan kelas berikutnya terisi otomatis), Sekolah, WA Siswa/Orang Tua, dan Riwayat Les. Tabel bisa difilter berdasarkan kelas, nama, atau sekolah, dan mendukung pagination.</p>
+
+        <div class="warn">
+          <p><strong>Hard Delete (Admin).</strong> Penghapusan permanen data siswa memerlukan konfirmasi eksplisit dengan mengetik ulang kata kunci <code>HAPUS-PERMANEN</code> pada dialog konfirmasi — tindakan ini tidak bisa dibatalkan.</p>
+        </div>
+      </section>
+
+      <section class="chapter" id="operasional">
+        <div class="chapter-head"><span class="chapter-num">08</span><h2>Absensi, Piutang &amp; Pengingat</h2></div>
+        <p class="chapter-sub">Tiga tab pendukung operasional harian di luar alur invoice inti.</p>
+
+        <div class="grid2">
+          <div class="panel">
+            <h3>Input Absensi</h3>
+            <p style="margin-bottom:0">Mencatat sesi harian secara manual, lewat unggah CSV, atau impor Google Sheet — kolom meliputi Tanggal, Siswa, Status, Jam Mulai/Selesai, Pengajar, Peserta, Topik, dan Catatan. Data ini menjadi sumber utama mode <em>Payment After</em>.</p>
+          </div>
+          <div class="panel">
+            <h3>Rekap Absensi</h3>
+            <p style="margin-bottom:0">Ringkasan baca-saja: total sesi, jumlah siswa unik, rentang tanggal, dan jumlah kehadiran per siswa.</p>
+          </div>
+          <div class="panel">
+            <h3>Piutang</h3>
+            <p style="margin-bottom:0">Daftar invoice yang masih terbuka/belum lunas, ditandai <strong>Overdue</strong> bila melewati tenggat, lengkap dengan total piutang keseluruhan.</p>
+          </div>
+          <div class="panel">
+            <h3>Pusat Pengingat</h3>
+            <p style="margin-bottom:0">Daftar tagihan belum lunas berikut nomor WhatsApp orang tua dan draf pesan penagihan siap salin — pengiriman tetap dilakukan manual, aplikasi tidak mengirim WhatsApp otomatis.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="pengajar">
+        <div class="chapter-head"><span class="chapter-num">09</span><h2>Pembagian Pengajar &amp; Rekening</h2></div>
+        <p class="chapter-sub">Aturan pembagian pendapatan saat satu jadwal ditangani lebih dari satu pengajar.</p>
+
+        <p>Bila satu rangkaian sesi melibatkan lebih dari satu pengajar, pendapatan kotor, potongan diskon durasi, dan Extra Diskon dibagi <strong>proporsional</strong> ke masing-masing pengajar sesuai kontribusi sesinya — sisa pembulatan diberikan ke entri terakhir agar tidak ada selisih rupiah yang hilang.</p>
+
+        <div class="note">
+          <p><strong>Rekening Kolaborasi.</strong> Jika jadwal melibatkan lebih dari satu pengajar berbeda, invoice otomatis menampilkan rekening berlabel "Kolaborasi" (baris di Bank Guru yang namanya mengandung kata tersebut), menggantikan tampilan rekening masing-masing pengajar secara terpisah.</p>
+        </div>
+
+        <p>Fitur <strong>Batch Siswa</strong> pada panel invoice memungkinkan satu proses generate mencakup beberapa siswa sekaligus lewat pemilih multi-siswa, dengan total tagihan gabungan ditampilkan di <span class="field-tag">Total Tagihan Terpilih</span>.</p>
+      </section>
+
+      <section class="chapter" id="cloud">
+        <div class="chapter-head"><span class="chapter-num">10</span><h2>Firebase &amp; Publikasi</h2></div>
+        <p class="chapter-sub">Menghubungkan aplikasi ke penyimpanan cloud dan mempublikasikannya sebagai situs statis.</p>
+
+        <h3>Menghubungkan Firebase</h3>
+        <ol class="steps">
+          <li>Buat proyek baru di Firebase Console, aktifkan <strong>Anonymous Authentication</strong> dan <strong>Firestore</strong>.</li>
+          <li>Salin konfigurasi Web App (API Key, Auth Domain, Project ID, App ID, Measurement ID) ke panel <strong>Firebase Sync</strong> di aplikasi.</li>
+          <li>Klik <strong>Hubungkan Firebase</strong>, lalu <strong>Simpan Data ke Firebase</strong>.</li>
+          <li>Setelah tersambung, kontrol CSV lokal otomatis tersembunyi (mode cloud-ready); gunakan <strong>Muat Riwayat Invoice</strong> untuk melihat invoice terdahulu.</li>
+          <li>Gunakan <strong>CSV Cloud Editor</strong> untuk mengubah setiap sumber CSV langsung dari aplikasi lalu menyimpannya ke Firestore.</li>
+        </ol>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Koleksi Firestore</th><th>Isi</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">invoice_sources</td><td>CSV sumber data (students, pricing, discount, bank, holiday, attendance, template_after), per pemilik akun</td></tr>
+              <tr><td class="mono">invoice_records</td><td>Riwayat invoice yang sudah digenerate, termasuk status, tenggat, dan catatan pembayaran</td></tr>
+              <tr><td class="mono">student_details</td><td>Profil siswa lengkap</td></tr>
+              <tr><td class="mono">attendance_records</td><td>Catatan kehadiran per sesi</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Publikasi ke GitHub Pages</h3>
+        <ol class="steps">
+          <li>Push folder proyek ke GitHub.</li>
+          <li>Aktifkan GitHub Pages dari branch utama, atau gunakan workflow yang sudah disediakan di <code>.github/workflows/pages.yml</code>.</li>
+          <li>Deploy aturan keamanan Firestore bila ada perubahan: <code>firebase login</code> → <code>firebase use bimbelpakgun</code> → <code>firebase deploy --only firestore:rules</code> (memerlukan <code>firebase-tools</code>).</li>
+        </ol>
+
+        <div class="note">
+          <p>Invoice dicetak dalam orientasi landscape A4 dengan latar <code>Template INVOICE Background.png</code>. Bila Google Sheet yang dipakai bersifat privat atau belum dibagikan aksesnya, proses pengambilan data akan gagal — pastikan share setting sudah "siapa saja dengan link".</p>
+        </div>
+      </section>
+
+      <section class="chapter" id="versi">
+        <div class="chapter-head"><span class="chapter-num">11</span><h2>Versi Aplikasi</h2></div>
+        <p class="chapter-sub">Nomor versi dan tanggal pembaruan terakhir ditampilkan di bagian paling bawah halaman aplikasi, agar mudah dicocokkan dengan riwayat perubahan di bawah ini.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Versi</th><th>Tanggal</th><th>Perubahan</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="mono">v1.0.0</td>
+                <td class="mono">19 Jul 2026</td>
+                <td>
+                  Rilis pertama dengan info versi di aplikasi. Perbaikan: pembacaan angka <code>tarif_per_jam</code> dari CSV/Cloud Editor kini benar untuk format Indonesia bertitik ribuan (mis. <code>150.000</code>) — sebelumnya salah dibaca sebagai <code>150</code>; penguraian tanggal (<code>parseDateInput</code>) diperbaiki agar konsisten memakai komponen tanggal lokal, mencegah pergeseran hari pada Payment in Front di zona waktu selain WIB; tenggat pembayaran fallback kini konsisten memakai waktu Asia/Jakarta.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <footer>
+    <span>InvoicePaGun — Panduan Operasional Internal</span>
+    <span>Sumber: README.txt &amp; app.js (Bimbel Pak Gun)</span>
+  </footer>
+
+</div>
+</body>
+</html>

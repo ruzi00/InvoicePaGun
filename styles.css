@@ -2263,3 +2263,16 @@ body.calendar-share-only .container {
     margin: 20mm 10mm 16mm;
   }
 }
+
+.app-footer {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 10px 20px 28px;
+  text-align: center;
+}
+
+.app-version {
+  font-size: 12px;
+  color: var(--muted, #6f6558);
+  letter-spacing: 0.02em;
+}
