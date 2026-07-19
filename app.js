@@ -1,4 +1,4 @@
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const APP_VERSION_DATE = "2026-07-19";
 const THEME_STORAGE_KEY = "invoice-app-theme";
 
@@ -15,6 +15,52 @@ const ICONS = {
   sun: svgIcon('<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>'),
   moon: svgIcon('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"></path>'),
 };
+
+function showAppToast(message, kind = "info") {
+  const stack = document.getElementById("appToastStack");
+  const text = String(message ?? "").trim();
+  if (!stack || !text) return;
+
+  const toast = document.createElement("div");
+  toast.className = `app-toast ${kind}`;
+  toast.textContent = text;
+  stack.appendChild(toast);
+
+  setTimeout(() => toast.classList.add("show"), 20);
+
+  const duration = Math.min(7000, Math.max(2600, text.length * 55));
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 220);
+  }, duration);
+}
+
+function toastMessage(message, kind) {
+  const text = String(message ?? "");
+  let resolvedKind = kind;
+  if (!resolvedKind) {
+    const lower = text.toLowerCase();
+    if (/gagal|error|ditolak/.test(lower)) resolvedKind = "error";
+    else if (/terlebih dahulu|belum |wajib|tidak valid|tidak ditemukan|kosong|dibatalkan|salah\b/.test(lower)) resolvedKind = "warn";
+    else if (/berhasil|selesai|tersimpan|disalin|dimuat|ditambahkan|dimigrasikan/.test(lower)) resolvedKind = "ok";
+    else resolvedKind = "info";
+  }
+  showAppToast(text, resolvedKind);
+}
+
+async function withButtonLoading(button, loadingLabel, task) {
+  if (!button) return task();
+  const originalLabel = button.textContent;
+  const originalDisabled = button.disabled;
+  button.disabled = true;
+  button.textContent = loadingLabel;
+  try {
+    return await task();
+  } finally {
+    button.disabled = originalDisabled;
+    button.textContent = originalLabel;
+  }
+}
 
 function applyTheme(theme) {
   const root = document.documentElement;
@@ -585,7 +631,7 @@ function bindEvents() {
       const text = await fetchCsv(url, "Gagal mengambil data siswa dari Google Sheet.");
       loadMasterStudentsCsv(text);
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -599,7 +645,7 @@ function bindEvents() {
     try {
       loadMasterStudentsCsv(await fetchBundledSource("students", "Tidak bisa memuat REKAP DATA SISWA.csv"));
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -613,7 +659,7 @@ function bindEvents() {
     try {
       applyPricingCsv(await fetchBundledSource("pricing", "Tidak bisa memuat tarif.csv"));
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -627,7 +673,7 @@ function bindEvents() {
     try {
       applyDiscountCsv(await fetchBundledSource("discount", "Tidak bisa memuat diskon_durasi.csv"));
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -644,7 +690,7 @@ function bindEvents() {
       const text = await fetchBundledSource("bank", "Tidak bisa memuat bank_guru.csv");
       applyBankRows(parseCsv(text), true, text);
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -659,7 +705,7 @@ function bindEvents() {
       const text = await fetchBundledSource("holiday", "Tidak bisa memuat hari_libur.csv");
       applyHolidayCsv(text);
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -680,7 +726,7 @@ function bindEvents() {
   });
 
   el.btnContoh.addEventListener("click", async () => {
-    alert("File contoh absensi sudah dihapus. Silakan unggah CSV absensi sendiri atau muat dari Google Sheet / Firebase.");
+    toastMessage("File contoh absensi sudah dihapus. Silakan unggah CSV absensi sendiri atau muat dari Google Sheet / Firebase.");
   });
 
   el.btnDownloadAfterTemplate.addEventListener("click", downloadAfterTemplateCsv);
@@ -693,39 +739,47 @@ function bindEvents() {
   });
 
   el.btnFirebaseConnect?.addEventListener("click", async () => {
-    try {
-      await connectFirebase({ saveConfig: true, loadSources: true });
-    } catch (err) {
-      setFirebaseStatus(err.message || "Gagal menghubungkan Firebase.", "error");
-      alert(err.message);
-    }
+    await withButtonLoading(el.btnFirebaseConnect, "Menghubungkan...", async () => {
+      try {
+        await connectFirebase({ saveConfig: true, loadSources: true });
+      } catch (err) {
+        setFirebaseStatus(err.message || "Gagal menghubungkan Firebase.", "error");
+        toastMessage(err.message);
+      }
+    });
   });
 
   el.btnFirebaseLoadSources?.addEventListener("click", async () => {
-    try {
-      await loadSourcesFromFirebase();
-    } catch (err) {
-      setFirebaseStatus(err.message || "Gagal memuat data Firebase.", "error");
-      alert(err.message);
-    }
+    await withButtonLoading(el.btnFirebaseLoadSources, "Memuat...", async () => {
+      try {
+        await loadSourcesFromFirebase();
+      } catch (err) {
+        setFirebaseStatus(err.message || "Gagal memuat data Firebase.", "error");
+        toastMessage(err.message);
+      }
+    });
   });
 
   el.btnFirebaseSaveSources?.addEventListener("click", async () => {
-    try {
-      await saveSourcesToFirebase();
-    } catch (err) {
-      setFirebaseStatus(err.message || "Gagal menyimpan data ke Firebase.", "error");
-      alert(err.message);
-    }
+    await withButtonLoading(el.btnFirebaseSaveSources, "Menyimpan...", async () => {
+      try {
+        await saveSourcesToFirebase();
+      } catch (err) {
+        setFirebaseStatus(err.message || "Gagal menyimpan data ke Firebase.", "error");
+        toastMessage(err.message);
+      }
+    });
   });
 
   el.btnFirebaseSaveInvoice?.addEventListener("click", async () => {
-    try {
-      await saveInvoiceRecordToFirebase();
-    } catch (err) {
-      setFirebaseStatus(err.message || "Gagal menyimpan invoice ke Firebase.", "error");
-      alert(err.message);
-    }
+    await withButtonLoading(el.btnFirebaseSaveInvoice, "Menyimpan...", async () => {
+      try {
+        await saveInvoiceRecordToFirebase();
+      } catch (err) {
+        setFirebaseStatus(err.message || "Gagal menyimpan invoice ke Firebase.", "error");
+        toastMessage(err.message);
+      }
+    });
   });
 
   bindCsvEditorActions();
@@ -740,7 +794,7 @@ function bindEvents() {
         setFirebaseStatus(`Import attendance dari Google Sheet selesai: ${added} baris ditambahkan.`, "ok");
       }
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -818,24 +872,24 @@ function bindEvents() {
   el.btnSaveDefaultTeacher?.addEventListener("click", () => {
     const teacher = String(el.defaultTeacherSelect?.value || "").trim();
     if (!teacher) {
-      alert("Pilih nama pengajar default terlebih dahulu.");
+      toastMessage("Pilih nama pengajar default terlebih dahulu.");
       return;
     }
     persistDefaultTeacher(teacher);
     applyDefaultTeacherToWeekTable();
-    alert(`Default pengajar disimpan: ${teacher}`);
+    toastMessage(`Default pengajar disimpan: ${teacher}`);
   });
-  el.btnGenerate.addEventListener("click", generateInvoice);
+  el.btnGenerate.addEventListener("click", () => withButtonLoading(el.btnGenerate, "Membuat...", generateInvoice));
   el.btnAddRescheduleSession?.addEventListener("click", insertRescheduleSession);
-  el.btnDownloadPng.addEventListener("click", downloadPng);
-  if (el.btnPreviewPng) el.btnPreviewPng.addEventListener("click", downloadPng);
+  el.btnDownloadPng.addEventListener("click", () => withButtonLoading(el.btnDownloadPng, "Membuat PNG...", downloadPng));
+  if (el.btnPreviewPng) el.btnPreviewPng.addEventListener("click", () => withButtonLoading(el.btnPreviewPng, "Membuat PNG...", downloadPng));
   el.btnCalendarRefresh?.addEventListener("click", async () => {
     try {
       await refreshDashboardInvoices({ forceServer: true });
       renderInvoiceCalendar();
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal memuat kalender invoice.", "error");
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -858,7 +912,7 @@ function bindEvents() {
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(shareUrl);
-        alert("Link kalender share berhasil disalin.");
+        toastMessage("Link kalender share berhasil disalin.");
         return;
       }
     } catch {
@@ -876,33 +930,37 @@ function bindEvents() {
   });
 
   el.btnPaymentStatusRefresh?.addEventListener("click", async () => {
-    try {
-      await refreshDashboardInvoices({ forceServer: true });
-      renderPaymentStatusTable();
-    } catch (err) {
-      setFirebaseStatus(err.message || "Gagal memuat status pembayaran.", "error");
-      alert(err.message);
-    }
+    await withButtonLoading(el.btnPaymentStatusRefresh, "Memuat...", async () => {
+      try {
+        await refreshDashboardInvoices({ forceServer: true });
+        renderPaymentStatusTable();
+      } catch (err) {
+        setFirebaseStatus(err.message || "Gagal memuat status pembayaran.", "error");
+        toastMessage(err.message);
+      }
+    });
   });
 
   el.btnPaymentStatusAutoCancel?.addEventListener("click", async () => {
     if (!state.firebase.ready) {
-      alert("Hubungkan Firebase terlebih dahulu.");
+      toastMessage("Hubungkan Firebase terlebih dahulu.");
       return;
     }
-    try {
-      await refreshDashboardInvoices({ forceServer: true });
-      const changed = await autoCancelOverdueInvoices({ silent: false });
-      if (changed > 0) {
+    await withButtonLoading(el.btnPaymentStatusAutoCancel, "Memproses...", async () => {
+      try {
         await refreshDashboardInvoices({ forceServer: true });
-      } else {
-        renderPaymentStatusTable();
-        renderInvoiceCalendar();
+        const changed = await autoCancelOverdueInvoices({ silent: false });
+        if (changed > 0) {
+          await refreshDashboardInvoices({ forceServer: true });
+        } else {
+          renderPaymentStatusTable();
+          renderInvoiceCalendar();
+        }
+      } catch (err) {
+        setFirebaseStatus(err.message || "Gagal menjalankan auto cancel overdue.", "error");
+        toastMessage(err.message || "Gagal menjalankan auto cancel overdue.");
       }
-    } catch (err) {
-      setFirebaseStatus(err.message || "Gagal menjalankan auto cancel overdue.", "error");
-      alert(err.message || "Gagal menjalankan auto cancel overdue.");
-    }
+    });
   });
 
   el.btnAttendanceInputAddRow?.addEventListener("click", () => {
@@ -927,21 +985,21 @@ function bindEvents() {
 
   el.btnAttendanceInputSaveAll?.addEventListener("click", async () => {
     if (!state.firebase.ready) {
-      alert("Hubungkan Firebase terlebih dahulu.");
+      toastMessage("Hubungkan Firebase terlebih dahulu.");
       return;
     }
     try {
       await saveAllAttendanceEntriesToFirebase();
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal menyimpan attendance ke Firebase.", "error");
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
   el.btnAttendanceInputSeedDummy?.addEventListener("click", () => {
     const baseStudents = (state.students || []).slice(0, 6);
     if (baseStudents.length === 0) {
-      alert("Belum ada data siswa. Tambahkan siswa terlebih dahulu untuk membuat dummy attendance.");
+      toastMessage("Belum ada data siswa. Tambahkan siswa terlebih dahulu untuk membuat dummy attendance.");
       return;
     }
 
@@ -984,7 +1042,7 @@ function bindEvents() {
     renderAttendanceInputSection();
     renderAttendanceOperationsSection();
     if (state.mode === "after") hydrateAfterSessionsForSelectedStudent();
-    alert(`Dummy attendance ditambahkan: ${added} baris.`);
+    toastMessage(`Dummy attendance ditambahkan: ${added} baris.`);
   });
 
   el.attendanceInputTableBody?.addEventListener("click", async (event) => {
@@ -1057,7 +1115,7 @@ function bindEvents() {
     const fullName = String(el.studentFormFullName?.value || "").trim();
     const nickname = String(el.studentFormNickname?.value || "").trim();
     if (!fullName && !nickname) {
-      alert("Nama lengkap atau nama panggilan wajib diisi.");
+      toastMessage("Nama lengkap atau nama panggilan wajib diisi.");
       return;
     }
 
@@ -1087,7 +1145,7 @@ function bindEvents() {
     }
 
     if (isNewStudent && !state.firebase.ready) {
-      alert("Tambah siswa baru wajib tersimpan ke Firebase. Hubungkan Firebase lalu coba lagi.");
+      toastMessage("Tambah siswa baru wajib tersimpan ke Firebase. Hubungkan Firebase lalu coba lagi.");
       return;
     }
 
@@ -1111,7 +1169,7 @@ function bindEvents() {
           setFirebaseStatus(`Data siswa ${refreshed.nickname || refreshed.fullName || refreshed.studentId} berhasil ${actionLabel} dan tersimpan ke Firebase.`, "ok");
         } catch (err) {
           setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error");
-          alert(err.message || "Gagal menyimpan data siswa ke Firebase.");
+          toastMessage(err.message || "Gagal menyimpan data siswa ke Firebase.");
           return;
         }
       } else {
@@ -1127,7 +1185,7 @@ function bindEvents() {
 
   el.btnStudentManageHardDelete?.addEventListener("click", async () => {
     if (!state.firebase.ready) {
-      alert("Hubungkan Firebase terlebih dahulu.");
+      toastMessage("Hubungkan Firebase terlebih dahulu.");
       return;
     }
     renderStudentHardDeleteOptions();
@@ -1151,7 +1209,7 @@ function bindEvents() {
   el.btnStudentHardDeleteArm?.addEventListener("click", () => {
     const studentId = String(el.studentHardDeleteSelect?.value || "").trim();
     if (!studentId) {
-      alert("Pilih siswa yang ingin dihapus permanen.");
+      toastMessage("Pilih siswa yang ingin dihapus permanen.");
       return;
     }
     el.studentHardDeleteConfirmSection?.classList.remove("hidden");
@@ -1161,12 +1219,12 @@ function bindEvents() {
   el.btnStudentHardDeleteConfirm?.addEventListener("click", async () => {
     const studentId = String(el.studentHardDeleteSelect?.value || "").trim();
     if (!studentId) {
-      alert("Pilih siswa terlebih dahulu.");
+      toastMessage("Pilih siswa terlebih dahulu.");
       return;
     }
     const token = String(el.studentHardDeleteToken?.value || "").trim().toUpperCase();
     if (token !== "HAPUS-PERMANEN") {
-      alert("Token konfirmasi salah. Hard delete dibatalkan.");
+      toastMessage("Token konfirmasi salah. Hard delete dibatalkan.");
       return;
     }
 
@@ -1182,7 +1240,7 @@ function bindEvents() {
       el.studentHardDeleteModal?.close();
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal hard delete siswa.", "error");
-      alert(err.message || "Gagal hard delete siswa.");
+      toastMessage(err.message || "Gagal hard delete siswa.");
     }
   });
 
@@ -1222,7 +1280,7 @@ function bindEvents() {
 
   el.btnStudentManageDownloadCsv?.addEventListener("click", () => {
     if (state.students.length === 0) {
-      alert("Belum ada data siswa untuk diunduh.");
+      toastMessage("Belum ada data siswa untuk diunduh.");
       return;
     }
     normalizeStudentsState({ sort: false, syncEditors: true });
@@ -1243,17 +1301,19 @@ function bindEvents() {
 
   el.btnStudentManageSaveFirebase?.addEventListener("click", async () => {
     if (!state.firebase.ready) {
-      alert("Hubungkan Firebase terlebih dahulu.");
+      toastMessage("Hubungkan Firebase terlebih dahulu.");
       return;
     }
-    try {
-      normalizeStudentsState({ sort: false, syncEditors: true });
-      await saveStudentsToFirebase({ applyEditor: false });
-      setFirebaseStatus(`Sinkronisasi siswa selesai: ${state.students.length} baris aktif.`, "ok");
-    } catch (err) {
-      setFirebaseStatus(err.message || "Gagal sinkronisasi siswa ke Firebase.", "error");
-      alert(err.message || "Gagal sinkronisasi siswa ke Firebase.");
-    }
+    await withButtonLoading(el.btnStudentManageSaveFirebase, "Menyimpan...", async () => {
+      try {
+        normalizeStudentsState({ sort: false, syncEditors: true });
+        await saveStudentsToFirebase({ applyEditor: false });
+        setFirebaseStatus(`Sinkronisasi siswa selesai: ${state.students.length} baris aktif.`, "ok");
+      } catch (err) {
+        setFirebaseStatus(err.message || "Gagal sinkronisasi siswa ke Firebase.", "error");
+        toastMessage(err.message || "Gagal sinkronisasi siswa ke Firebase.");
+      }
+    });
   });
 
   el.studentManageTableBody?.addEventListener("click", async (event) => {
@@ -1287,7 +1347,7 @@ function bindEvents() {
           setFirebaseStatus(`Data siswa ${updated.nickname || updated.fullName || updated.studentId} berhasil disimpan ke Firebase.`, "ok");
         } catch (err) {
           setFirebaseStatus(err.message || "Gagal menyimpan data siswa.", "error");
-          alert(err.message || "Gagal menyimpan data siswa ke Firebase.");
+          toastMessage(err.message || "Gagal menyimpan data siswa ke Firebase.");
         }
       } else {
         setFirebaseStatus(`Perubahan siswa ${row.nickname || row.fullName || row.studentId} tersimpan lokal (Firebase belum terhubung).`, "warn");
@@ -1309,7 +1369,7 @@ function bindEvents() {
         await softDeleteStudentRecord(removed);
       } catch (err) {
         setFirebaseStatus(err.message || "Gagal menghapus data siswa.", "error");
-        alert(err.message || "Gagal menghapus data siswa dari Firebase.");
+        toastMessage(err.message || "Gagal menghapus data siswa dari Firebase.");
         return;
       }
     }
@@ -1334,7 +1394,7 @@ function bindEvents() {
     try {
       csv = serializePricingManageRows(state.pricingManageRows);
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
       return;
     }
     if (el.csvEditorPricing) el.csvEditorPricing.value = csv;
@@ -1380,7 +1440,7 @@ function bindEvents() {
     try {
       csv = serializeDiscountManageRows(state.discountManageRows);
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
       return;
     }
     if (el.csvEditorDiscount) el.csvEditorDiscount.value = csv;
@@ -1426,7 +1486,7 @@ function bindEvents() {
     try {
       csv = serializeBankManageRows(state.bankManageRows);
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
       return;
     }
     if (el.csvEditorBank) el.csvEditorBank.value = csv;
@@ -1473,7 +1533,7 @@ function bindEvents() {
     try {
       csv = serializeHolidayManageRows(state.holidayManageRows);
     } catch (err) {
-      alert(err.message);
+      toastMessage(err.message);
       return;
     }
     if (el.csvEditorHoliday) el.csvEditorHoliday.value = csv;
@@ -1513,7 +1573,7 @@ function bindEvents() {
       await loadInvoiceHistory({ direction: "reset" });
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal memuat riwayat invoice.", "error");
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -1522,7 +1582,7 @@ function bindEvents() {
       await loadInvoiceHistory({ direction: "prev" });
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal memuat halaman sebelumnya.", "error");
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -1531,7 +1591,7 @@ function bindEvents() {
       await loadInvoiceHistory({ direction: "next" });
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal memuat halaman berikutnya.", "error");
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -1540,7 +1600,7 @@ function bindEvents() {
       await applyInvoiceHistoryFilterAndReload();
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal menerapkan filter riwayat.", "error");
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -1551,7 +1611,7 @@ function bindEvents() {
       await applyInvoiceHistoryFilterAndReload();
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal menerapkan filter riwayat.", "error");
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -1560,7 +1620,7 @@ function bindEvents() {
       await applyInvoiceHistoryFilterAndReload();
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal mengubah ukuran halaman.", "error");
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -1597,7 +1657,7 @@ function bindEvents() {
         await confirmAndDeleteInvoice(item);
       } catch (err) {
         setFirebaseStatus(err.message || "Gagal menghapus invoice.", "error");
-        alert(err.message || "Gagal menghapus invoice.");
+        toastMessage(err.message || "Gagal menghapus invoice.");
       }
       return;
     }
@@ -1618,7 +1678,7 @@ function bindEvents() {
       renderInvoiceCalendar();
     } catch (err) {
       setFirebaseStatus(err.message || "Gagal menyimpan status pembayaran.", "error");
-      alert(err.message);
+      toastMessage(err.message);
     }
   });
 
@@ -1641,7 +1701,7 @@ function bindEvents() {
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(reminder.message);
-        alert(`Pesan reminder ${reminder.invoiceNo || historyId} berhasil disalin.`);
+        toastMessage(`Pesan reminder ${reminder.invoiceNo || historyId} berhasil disalin.`);
         return;
       }
     } catch {
@@ -1761,12 +1821,14 @@ function bindCsvEditorActions() {
   pairs.forEach(([btn, handler]) => {
     if (!btn) return;
     btn.addEventListener("click", async () => {
-      try {
-        await handler();
-      } catch (err) {
-        setFirebaseStatus(err.message || "Gagal memproses CSV editor.", "error");
-        alert(err.message);
-      }
+      await withButtonLoading(btn, "Memproses...", async () => {
+        try {
+          await handler();
+        } catch (err) {
+          setFirebaseStatus(err.message || "Gagal memproses CSV editor.", "error");
+          toastMessage(err.message);
+        }
+      });
     });
   });
 
@@ -1936,12 +1998,12 @@ async function autoLoadFromCurrentFolder(silent) {
 
   if (loaded.length > 0 && !silent) {
     syncCsvEditorsFromState();
-    alert(`Auto Load selesai. Terbaca: ${loaded.join(", ")}`);
+    toastMessage(`Auto Load selesai. Terbaca: ${loaded.join(", ")}`);
     return;
   }
 
   if (loaded.length === 0 && !silent) {
-    alert("Auto Load gagal membaca file dari folder saat ini. Jika browser memblokir file lokal, gunakan upload banyak file di bawah tombol Auto Load.");
+    toastMessage("Auto Load gagal membaca file dari folder saat ini. Jika browser memblokir file lokal, gunakan upload banyak file di bawah tombol Auto Load.");
   }
 }
 
@@ -2042,13 +2104,13 @@ async function importPackageFiles(files) {
   }
 
   if (loaded.length === 0) {
-    alert("Tidak ada file yang berhasil diproses. Pastikan nama file mengandung kata kunci seperti siswa, tarif, diskon, bank, libur, atau absensi.");
+    toastMessage("Tidak ada file yang berhasil diproses. Pastikan nama file mengandung kata kunci seperti siswa, tarif, diskon, bank, libur, atau absensi.");
     return;
   }
 
   const skippedText = skipped.length > 0 ? `\n\nDilewati: ${skipped.join(", ")}` : "";
   syncCsvEditorsFromState();
-  alert(`Setup cepat selesai.\n${loaded.join("\n")}${skippedText}`);
+  toastMessage(`Setup cepat selesai.\n${loaded.join("\n")}${skippedText}`);
 }
 
 function detectFileKind(fileName) {
@@ -2215,7 +2277,7 @@ function loadMasterStudentsCsv(text) {
     parseMasterStudents(rows).map((student) => normalizeStudentRecord(student, existingByFingerprint.get(studentFingerprint(student)) || ""))
   );
   if (parsed.length === 0) {
-    alert("Data siswa tidak valid. Pastikan ada kolom nama siswa.");
+    toastMessage("Data siswa tidak valid. Pastikan ada kolom nama siswa.");
     return;
   }
 
@@ -2232,7 +2294,7 @@ function loadMasterStudentsCsv(text) {
 function loadAbsensiCsv(text) {
   const parsed = parseCsv(text);
   if (parsed.length < 2) {
-    alert("CSV absensi kosong atau tidak valid.");
+    toastMessage("CSV absensi kosong atau tidak valid.");
     return;
   }
 
@@ -2367,7 +2429,7 @@ function appendAttendanceEntriesFromCsvText(text) {
 function applyPricingCsv(text, notify = true) {
   const map = parseTarifCsv(parseCsv(text));
   if (!hasTarif(map)) {
-    alert("Format tarif tidak valid. Gunakan: jenis_hari,jumlah_peserta,tarif_per_jam");
+    toastMessage("Format tarif tidak valid. Gunakan: jenis_hari,jumlah_peserta,tarif_per_jam");
     return;
   }
 
@@ -2376,13 +2438,13 @@ function applyPricingCsv(text, notify = true) {
   state.sourceTexts.pricing = text;
   recalcSessions();
   renderPricingManagementTable();
-  if (notify) alert("Tarif berhasil dimuat.");
+  if (notify) toastMessage("Tarif berhasil dimuat.");
 }
 
 function applyDiscountCsv(text, notify = true) {
   const list = parseDiscountCsv(parseCsv(text));
   if (list.length === 0) {
-    alert("Format diskon tidak valid. Gunakan: min_durasi,max_durasi,diskon_persen");
+    toastMessage("Format diskon tidak valid. Gunakan: min_durasi,max_durasi,diskon_persen");
     return;
   }
 
@@ -2391,13 +2453,13 @@ function applyDiscountCsv(text, notify = true) {
   state.sourceTexts.discount = text;
   recalcSessions();
   renderDiscountManagementTable();
-  if (notify) alert("Diskon durasi berhasil dimuat.");
+  if (notify) toastMessage("Diskon durasi berhasil dimuat.");
 }
 
 function applyBankRows(rows, notify = true, rawText = "") {
   const parsed = parseBankRows(rows);
   if (parsed.length === 0) {
-    alert("File rekening guru tidak valid.");
+    toastMessage("File rekening guru tidak valid.");
     return;
   }
 
@@ -2407,7 +2469,7 @@ function applyBankRows(rows, notify = true, rawText = "") {
   refreshWeeklyTeacherOptions();
   applyDefaultTeacherToWeekTable();
   renderBankManagementTable();
-  if (notify) alert("Data rekening guru berhasil dimuat.");
+  if (notify) toastMessage("Data rekening guru berhasil dimuat.");
 }
 
 function applyHolidayCsv(text, notify = true) {
@@ -2415,7 +2477,7 @@ function applyHolidayCsv(text, notify = true) {
   const entries = parseHolidayEntries(rows);
   const dates = parseHolidayCsv(rows);
   if (dates.length === 0) {
-    alert("Format hari libur tidak valid. Gunakan kolom tanggal atau isi tanggal di kolom pertama.");
+    toastMessage("Format hari libur tidak valid. Gunakan kolom tanggal atau isi tanggal di kolom pertama.");
     return;
   }
 
@@ -2426,7 +2488,7 @@ function applyHolidayCsv(text, notify = true) {
   parseHolidaySetFromInput();
   recalcSessions();
   renderHolidayManagementTable();
-  if (notify) alert("Hari libur berhasil dimuat.");
+  if (notify) toastMessage("Hari libur berhasil dimuat.");
 }
 
 function parseHolidaySetFromInput() {
@@ -2446,13 +2508,13 @@ function parseHolidaySetFromInput() {
 function generateFrontWeeklySessions() {
   const student = getSelectedStudentName();
   if (!student) {
-    alert("Pilih siswa terlebih dahulu.");
+    toastMessage("Pilih siswa terlebih dahulu.");
     return;
   }
 
   const startDate = parseDateInput(el.frontStartDate.value);
   if (!startDate) {
-    alert("Tanggal awal belum valid.");
+    toastMessage("Tanggal awal belum valid.");
     return;
   }
 
@@ -2460,7 +2522,7 @@ function generateFrontWeeklySessions() {
   const activeDays = Array.from(el.frontWeekTable.querySelectorAll('input[type="checkbox"][data-day]:checked')).map((c) => c.dataset.day);
 
   if (activeDays.length === 0) {
-    alert("Pilih minimal satu hari aktif.");
+    toastMessage("Pilih minimal satu hari aktif.");
     return;
   }
 
@@ -2502,7 +2564,7 @@ function generateFrontWeeklySessions() {
   }
 
   if (sessions.length === 0) {
-    alert("Tidak ada sesi valid yang bisa digenerate. Cek jam mulai/selesai.");
+    toastMessage("Tidak ada sesi valid yang bisa digenerate. Cek jam mulai/selesai.");
     return;
   }
 
@@ -2744,19 +2806,19 @@ function hasDuplicateSession(candidate, ignoreId = "") {
 
 function insertRescheduleSession() {
   if (!Array.isArray(state.sessions) || state.sessions.length === 0) {
-    alert("Belum ada sesi yang bisa dijadwalkan ulang.");
+    toastMessage("Belum ada sesi yang bisa dijadwalkan ulang.");
     return;
   }
   const anchor = state.sessions.find((s) => s.id === state.rescheduleAnchorId) || state.sessions[0];
   if (!anchor) {
-    alert("Pilih satu sesi dulu sebagai acuan reschedule (klik baris sesi).");
+    toastMessage("Pilih satu sesi dulu sebagai acuan reschedule (klik baris sesi).");
     return;
   }
 
   const rawDate = String(el.rescheduleDate?.value || "").trim();
   const nextDate = parseDateInput(rawDate);
   if (!nextDate) {
-    alert("Isi tanggal sesi pengganti terlebih dahulu.");
+    toastMessage("Isi tanggal sesi pengganti terlebih dahulu.");
     return;
   }
 
@@ -2774,7 +2836,7 @@ function insertRescheduleSession() {
   });
 
   if (hasDuplicateSession(cloned)) {
-    alert("Sesi pengganti duplikat: kombinasi tanggal/jam/pengajar/topik sudah ada.");
+    toastMessage("Sesi pengganti duplikat: kombinasi tanggal/jam/pengajar/topik sudah ada.");
     return;
   }
 
@@ -2921,7 +2983,7 @@ function addInvoiceBatchStudent(name, { silent = false } = {}) {
 
   const record = resolveStudentRecordByName(raw);
   if (!record) {
-    if (!silent) alert("Siswa tidak ditemukan di data master. Pilih nama dari daftar siswa.");
+    if (!silent) toastMessage("Siswa tidak ditemukan di data master. Pilih nama dari daftar siswa.");
     return false;
   }
 
@@ -2931,12 +2993,12 @@ function addInvoiceBatchStudent(name, { silent = false } = {}) {
 
   const primaryKey = normalizeName(getSelectedStudentName());
   if (primaryKey && key === primaryKey) {
-    if (!silent) alert("Siswa ini sudah dipilih sebagai siswa utama invoice.");
+    if (!silent) toastMessage("Siswa ini sudah dipilih sebagai siswa utama invoice.");
     return false;
   }
 
   if (state.invoiceBatchStudents.some((item) => normalizeName(item) === key)) {
-    if (!silent) alert("Siswa sudah ada dalam daftar batch.");
+    if (!silent) toastMessage("Siswa sudah ada dalam daftar batch.");
     return false;
   }
 
@@ -3024,7 +3086,7 @@ function resolveStudentRecordByName(name) {
 async function generateInvoice() {
   const student = getSelectedStudentName();
   if (!student) {
-    alert("Pilih siswa terlebih dahulu.");
+    toastMessage("Pilih siswa terlebih dahulu.");
     return;
   }
 
@@ -3043,14 +3105,14 @@ async function generateInvoice() {
   }
 
   if (selected.length === 0) {
-    alert("Tidak ada sesi terpilih untuk ditagihkan.");
+    toastMessage("Tidak ada sesi terpilih untuk ditagihkan.");
     return;
   }
 
   const teachers = getCollaboratedTeachers(selected);
   const bankList = getBankListForInvoice(teachers);
   if (bankList.length === 0) {
-    alert("Data rekening belum tersedia. Isi bank_guru.csv.");
+    toastMessage("Data rekening belum tersedia. Isi bank_guru.csv.");
     return;
   }
 
@@ -3252,7 +3314,7 @@ async function generateInvoice() {
 
   if (invoiceTargets.length > 1) {
     if (!state.firebase.ready) {
-      alert("Batch invoice membutuhkan Firebase agar setiap siswa tersimpan sebagai invoice terpisah.");
+      toastMessage("Batch invoice membutuhkan Firebase agar setiap siswa tersimpan sebagai invoice terpisah.");
     } else {
       const otherTargets = invoiceTargets.filter((name) => normalizeName(name) !== normalizeName(student));
       if (otherTargets.length > 0) {
@@ -3282,7 +3344,7 @@ async function generateInvoice() {
           setFirebaseStatus(`Batch invoice tersimpan: ${invoiceTargets.length} siswa.`, "ok");
         } catch (err) {
           setFirebaseStatus(err.message || "Gagal menyimpan batch invoice.", "error");
-          alert(err.message || "Gagal menyimpan batch invoice.");
+          toastMessage(err.message || "Gagal menyimpan batch invoice.");
         }
       }
     }
@@ -3296,12 +3358,12 @@ async function downloadPng() {
   if (el.btnDownloadPng.disabled) return;
   const sheet = el.preview.querySelector(".invoice-sheet");
   if (!sheet) {
-    alert("Generate invoice terlebih dahulu.");
+    toastMessage("Generate invoice terlebih dahulu.");
     return;
   }
 
   if (typeof window.html2canvas !== "function") {
-    alert("Fitur Download PNG belum siap. Coba refresh halaman saat internet aktif.");
+    toastMessage("Fitur Download PNG belum siap. Coba refresh halaman saat internet aktif.");
     return;
   }
 
@@ -3318,9 +3380,9 @@ async function downloadPng() {
   try {
     const canvasFallback = await captureInvoiceCanvas(sheet, true);
     downloadCanvas(canvasFallback, fileName);
-    alert("PNG dibuat dengan mode kompatibel offline.");
+    toastMessage("PNG dibuat dengan mode kompatibel offline.");
   } catch {
-    alert("Gagal membuat PNG. Coba tutup-buka file index.html lalu generate ulang invoice.");
+    toastMessage("Gagal membuat PNG. Coba tutup-buka file index.html lalu generate ulang invoice.");
   }
 }
 
@@ -4611,7 +4673,7 @@ function getFirebaseConfigFromInputs(silent = false) {
   if (missing.length > 0) {
     if (!silent) {
       setFirebaseStatus("Isi API Key, Auth Domain, Project ID, dan App ID terlebih dahulu.", "warn");
-      alert("Isi API Key, Auth Domain, Project ID, dan App ID Firebase terlebih dahulu.");
+      toastMessage("Isi API Key, Auth Domain, Project ID, dan App ID Firebase terlebih dahulu.");
     }
     return null;
   }
@@ -4910,7 +4972,7 @@ async function loadStudentsFromFirebase({ silent = false, forceServer = false, l
     if (legacyCsvText.trim()) {
       loadMasterStudentsCsv(legacyCsvText);
       await saveStudentsToFirebase({ applyEditor: false, silent: true });
-      if (!silent) alert("Data siswa dimigrasikan dari CSV lama ke koleksi student_details.");
+      if (!silent) toastMessage("Data siswa dimigrasikan dari CSV lama ke koleksi student_details.");
       return true;
     }
     return false;
@@ -5276,13 +5338,13 @@ async function loadSourcesFromFirebase({ silent = false, forceServer = false } =
     const fallbackLoaded = await loadBundledFallbackSources();
     if (fallbackLoaded.length > 0) {
       setFirebaseStatus(`Firebase kosong. Fallback lokal dimuat: ${fallbackLoaded.join(", ")}.`, "ok");
-      if (!silent) alert(`Firebase belum punya source. Fallback lokal dimuat: ${fallbackLoaded.join(", ")}`);
+      if (!silent) toastMessage(`Firebase belum punya source. Fallback lokal dimuat: ${fallbackLoaded.join(", ")}`);
       refreshFirebaseButtons();
       return;
     }
 
     setFirebaseStatus("Belum ada data di shared cloud dan fallback lokal juga tidak terbaca. Simpan data dari sesi utama sekali untuk bootstrap.", "warn");
-    if (!silent) alert("Belum ada data di shared cloud dan fallback lokal tidak terbaca. Buka sesi utama lalu klik Simpan Data ke Firebase sekali.");
+    if (!silent) toastMessage("Belum ada data di shared cloud dan fallback lokal tidak terbaca. Buka sesi utama lalu klik Simpan Data ke Firebase sekali.");
     refreshFirebaseButtons();
     return;
   }
@@ -5329,12 +5391,12 @@ async function loadSourcesFromFirebase({ silent = false, forceServer = false } =
 
   if (loaded.length === 0) {
     setFirebaseStatus("Data Firebase terbaca, tetapi tidak ada source CSV yang valid.", "warn");
-    if (!silent) alert("Data Firebase tidak berisi source CSV yang valid.");
+    if (!silent) toastMessage("Data Firebase tidak berisi source CSV yang valid.");
     return;
   }
 
   setFirebaseStatus(`Data Firebase dimuat: ${loaded.join(", ")}.`, "ok");
-  if (!silent) alert(`Data Firebase dimuat: ${loaded.join(", ")}`);
+  if (!silent) toastMessage(`Data Firebase dimuat: ${loaded.join(", ")}`);
 }
 
 async function saveSourcesToFirebase() {
@@ -5985,7 +6047,7 @@ function renderInvoiceCalendar() {
 
 async function downloadCalendarMonthPng(monthOffset) {
   if (typeof window.html2canvas !== "function") {
-    alert("Fitur Download PNG belum siap. Coba refresh halaman saat internet aktif.");
+    toastMessage("Fitur Download PNG belum siap. Coba refresh halaman saat internet aktif.");
     return;
   }
 
@@ -6027,7 +6089,7 @@ async function downloadCalendarMonthPng(monthOffset) {
     const m = String(monthStart.getMonth() + 1).padStart(2, "0");
     downloadCanvas(canvas, `calendar-${y}-${m}.png`);
   } catch {
-    alert("Gagal membuat PNG kalender bulanan.");
+    toastMessage("Gagal membuat PNG kalender bulanan.");
   } finally {
     host.remove();
   }
@@ -6568,7 +6630,7 @@ function applyPricingFromManagement(notify = true) {
   try {
     csv = serializePricingManageRows(state.pricingManageRows);
   } catch (err) {
-    alert(err.message);
+    toastMessage(err.message);
     return false;
   }
   if (el.csvEditorPricing) el.csvEditorPricing.value = csv;
@@ -6668,7 +6730,7 @@ function applyDiscountFromManagement(notify = true) {
   try {
     csv = serializeDiscountManageRows(state.discountManageRows);
   } catch (err) {
-    alert(err.message);
+    toastMessage(err.message);
     return false;
   }
   if (el.csvEditorDiscount) el.csvEditorDiscount.value = csv;
@@ -6750,7 +6812,7 @@ function applyBankFromManagement(notify = true) {
   try {
     csv = serializeBankManageRows(state.bankManageRows);
   } catch (err) {
-    alert(err.message);
+    toastMessage(err.message);
     return false;
   }
   if (el.csvEditorBank) el.csvEditorBank.value = csv;
@@ -6836,7 +6898,7 @@ function applyHolidayFromManagement(notify = true) {
   try {
     csv = serializeHolidayManageRows(state.holidayManageRows);
   } catch (err) {
-    alert(err.message);
+    toastMessage(err.message);
     return false;
   }
   if (el.csvEditorHoliday) el.csvEditorHoliday.value = csv;
@@ -7096,7 +7158,7 @@ function showInvoiceHistoryPreview(item) {
 async function loadInvoiceForEditing(item) {
   const items = Array.isArray(item.items) ? item.items : [];
   if (items.length === 0) {
-    alert("Invoice ini tidak punya sesi untuk diedit.");
+    toastMessage("Invoice ini tidak punya sesi untuk diedit.");
     return;
   }
 
@@ -7149,7 +7211,7 @@ async function loadInvoiceForEditing(item) {
     .filter(Boolean);
 
   if (editableSessions.length === 0) {
-    alert("Tidak ada data sesi valid untuk diedit.");
+    toastMessage("Tidak ada data sesi valid untuk diedit.");
     return;
   }
 
@@ -7166,12 +7228,12 @@ async function loadInvoiceForEditing(item) {
   };
   renderSessionsTable();
   updateTotal();
-  alert("Invoice dimuat ke editor. Ubah sesi yang diperlukan lalu klik Generate Invoice untuk memperbarui.");
+  toastMessage("Invoice dimuat ke editor. Ubah sesi yang diperlukan lalu klik Generate Invoice untuk memperbarui.");
 }
 
 async function confirmAndDeleteInvoice(item) {
   if (!state.firebase.ready || !state.firebase.db) {
-    alert("Firebase belum terhubung.");
+    toastMessage("Firebase belum terhubung.");
     return;
   }
   const invoiceNo = String(item?.invoiceNo || "invoice");
@@ -7179,7 +7241,7 @@ async function confirmAndDeleteInvoice(item) {
   if (!agree) return;
   const token = window.prompt(`Ketik HAPUS untuk konfirmasi hapus ${invoiceNo}:`, "");
   if (String(token || "").trim().toUpperCase() !== "HAPUS") {
-    alert("Penghapusan dibatalkan.");
+    toastMessage("Penghapusan dibatalkan.");
     return;
   }
 

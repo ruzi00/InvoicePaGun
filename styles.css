@@ -434,6 +434,7 @@ body {
   border-radius: 18px;
   box-shadow: 0 10px 30px rgba(26, 35, 46, 0.08);
   padding: var(--sp-4);
+  min-width: 0;
 }
 
 .panel-kontrol {
@@ -1486,6 +1487,30 @@ h3 {
 
 #studentManageTable {
   min-width: 980px;
+}
+
+@media (min-width: 901px) {
+  #studentManageTable th:first-child,
+  #studentManageTable td:first-child,
+  #paymentStatusTable th:first-child,
+  #paymentStatusTable td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: color-mix(in srgb, var(--card) 90%, #fff 10%);
+    box-shadow: 2px 0 6px rgba(26, 20, 12, 0.08);
+  }
+
+  #studentManageTable th:first-child,
+  #paymentStatusTable th:first-child {
+    z-index: 2;
+    background: #f4e8d2;
+  }
+
+  :root[data-theme="dark"] #studentManageTable th:first-child,
+  :root[data-theme="dark"] #paymentStatusTable th:first-child {
+    background: #2c2417;
+  }
 }
 
 #attendanceInputTable {
@@ -2776,4 +2801,68 @@ body.calendar-share-only .container {
   font-size: 12px;
   color: var(--muted, #6f6558);
   letter-spacing: 0.02em;
+}
+
+.app-toast-stack {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+  max-width: min(420px, calc(100vw - 32px));
+}
+
+.app-toast {
+  pointer-events: auto;
+  background: #2c2417;
+  color: #f7eee0;
+  border: 1px solid #4d4029;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  box-shadow: 0 10px 26px rgba(20, 16, 10, 0.28);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.app-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-toast.ok {
+  background: #16603a;
+  border-color: #1f7a4f;
+  color: #eafff2;
+}
+
+.app-toast.warn {
+  background: #785200;
+  border-color: #a67720;
+  color: #fff6e0;
+}
+
+.app-toast.error {
+  background: #7a2222;
+  border-color: #9f2e2e;
+  color: #ffefef;
+}
+
+@media (max-width: 560px) {
+  .app-toast-stack {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    transform: none;
+    max-width: none;
+  }
 }

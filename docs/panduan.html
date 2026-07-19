@@ -400,7 +400,7 @@
       <p class="tagline">Panduan lengkap penggunaan aplikasi pembuat invoice les otomatis — dari penjadwalan sesi, penghitungan diskon, sampai sinkronisasi Firebase.</p>
     </div>
     <div class="meta">
-      Versi aplikasi: <strong>v1.3.0</strong> (19 Jul 2026)<br>
+      Versi aplikasi: <strong>v1.4.0</strong> (19 Jul 2026)<br>
       Disusun untuk: <strong>Bimbel Pak Gun</strong><br>
       Bahasa aplikasi: <strong>Indonesia</strong>
     </div>
@@ -671,6 +671,13 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
           <table>
             <thead><tr><th>Versi</th><th>Tanggal</th><th>Perubahan</th></tr></thead>
             <tbody>
+              <tr>
+                <td class="mono">v1.4.0</td>
+                <td class="mono">19 Jul 2026</td>
+                <td>
+                  Pesan konfirmasi/error yang sebelumnya memakai kotak dialog bawaan browser (harus diklik "OK" untuk lanjut) sekarang tampil sebagai notifikasi kecil ("toast") di bagian bawah layar yang otomatis hilang — hijau untuk berhasil, kuning untuk peringatan, merah untuk gagal. Konfirmasi hapus permanen (Hard Delete siswa, hapus invoice, hapus absensi) tetap memakai dialog bawaan browser agar tidak mudah terklik tanpa sengaja. Tombol yang memproses ke Firebase (Muat Data Status, Sync Auto Cancel Overdue, Simpan, Generate Invoice, Download PNG, dan semua tombol CSV Cloud Editor) kini menampilkan teks "Memuat.../Menyimpan..." dan nonaktif sementara saat sedang berjalan. Kolom pertama ("No") pada tabel Data Siswa dan Status Pembayaran kini tetap terlihat (sticky) saat tabel di-scroll ke kanan di layar desktop.
+                </td>
+              </tr>
               <tr>
                 <td class="mono">v1.3.0</td>
                 <td class="mono">19 Jul 2026</td>
