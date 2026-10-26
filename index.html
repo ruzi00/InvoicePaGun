@@ -59,6 +59,7 @@
         <button type="button" class="workflow-tab" data-group="data" data-tab="discount" role="tab" aria-selected="false">Diskon</button>
         <button type="button" class="workflow-tab" data-group="data" data-tab="bank" role="tab" aria-selected="false">Bank Guru</button>
         <button type="button" class="workflow-tab" data-group="data" data-tab="holiday" role="tab" aria-selected="false">Hari Libur</button>
+        <button type="button" class="workflow-tab" data-group="data" data-tab="firebase" role="tab" aria-selected="false">Pengaturan Firebase</button>
         <button type="button" class="workflow-tab" data-group="operations" data-tab="attendance_input" role="tab" aria-selected="false">Attendance Input</button>
         <button type="button" class="workflow-tab" data-group="operations" data-tab="attendance" role="tab" aria-selected="false">Attendance Recap</button>
         <button type="button" class="workflow-tab" data-group="operations" data-tab="receivables" role="tab" aria-selected="false">Receivables</button>
@@ -97,7 +98,8 @@
         </div>
       </section>
 
-      <details id="firebaseSyncSection" class="firebase-section">
+      <section id="firebaseSettingsSection" class="mode-section hidden">
+      <details id="firebaseSyncSection" class="firebase-section" open>
         <summary>Firebase Sync</summary>
         <div class="firebase-header">
           <div>
@@ -232,6 +234,7 @@
           </div>
         </details>
       </details>
+      </section>
 
       <section id="billingInvoiceInfoSection">
         <h3>Informasi Invoice</h3>
@@ -899,7 +902,7 @@
     <span id="appVersionInfo" class="app-version"></span>
   </footer>
 
-  <div id="appToastStack" class="app-toast-stack" aria-live="polite"></div>
+  <div id="appToastStack" class="app-toast-stack" role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>

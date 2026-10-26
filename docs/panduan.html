@@ -400,7 +400,7 @@
       <p class="tagline">Panduan lengkap penggunaan aplikasi pembuat invoice les otomatis — dari penjadwalan sesi, penghitungan diskon, sampai sinkronisasi Firebase.</p>
     </div>
     <div class="meta">
-      Versi aplikasi: <strong>v1.6.0</strong> (26 Okt 2026)<br>
+      Versi aplikasi: <strong>v1.7.0</strong> (27 Okt 2026)<br>
       Disusun untuk: <strong>Bimbel Pak Gun</strong><br>
       Bahasa aplikasi: <strong>Indonesia</strong>
     </div>
@@ -642,7 +642,7 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
         <h3>Menghubungkan Firebase</h3>
         <ol class="steps">
           <li>Buat proyek baru di Firebase Console, aktifkan <strong>Anonymous Authentication</strong> dan <strong>Firestore</strong>.</li>
-          <li>Salin konfigurasi Web App (API Key, Auth Domain, Project ID, App ID, Measurement ID) ke panel <strong>Firebase Sync</strong> di aplikasi.</li>
+          <li>Salin konfigurasi Web App (API Key, Auth Domain, Project ID, App ID, Measurement ID) ke tab <strong>Pengaturan Firebase</strong> (grup Data Management) di aplikasi.</li>
           <li>Klik <strong>Hubungkan Firebase</strong>, lalu <strong>Simpan Data ke Firebase</strong>.</li>
           <li>Setelah tersambung, kontrol CSV lokal otomatis tersembunyi (mode cloud-ready); gunakan <strong>Muat Riwayat Invoice</strong> untuk melihat invoice terdahulu.</li>
           <li>Gunakan <strong>CSV Cloud Editor</strong> untuk mengubah setiap sumber CSV langsung dari aplikasi lalu menyimpannya ke Firestore.</li>
@@ -681,6 +681,13 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
           <table>
             <thead><tr><th>Versi</th><th>Tanggal</th><th>Perubahan</th></tr></thead>
             <tbody>
+              <tr>
+                <td class="mono">v1.7.0</td>
+                <td class="mono">27 Okt 2026</td>
+                <td>
+                  <strong>Firebase Sync</strong> pindah dari ikon gear ke tab baru <strong>Pengaturan Firebase</strong> di grup Data Management (setelah Hari Libur); gear kini hanya berisi pengaturan cepat. Tampilan kosong (empty state) kini beraksen ikon. Aksesibilitas keyboard: focus ring jelas saat menekan Tab, tombol <strong>Escape</strong> menutup menu gear, dan tombol panah kiri/kanan (serta Home/End) memindahkan fokus antar tab dan grup menu.
+                </td>
+              </tr>
               <tr>
                 <td class="mono">v1.6.0</td>
                 <td class="mono">26 Okt 2026</td>

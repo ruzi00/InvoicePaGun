@@ -77,7 +77,7 @@ Setup GitHub Pages + Firebase:
 1. Push folder ini ke GitHub.
 2. Aktifkan GitHub Pages dari branch utama atau pakai workflow yang disediakan.
 3. Di Firebase Console, buat project baru dan aktifkan Anonymous Authentication + Firestore.
-4. Salin konfigurasi Web App ke panel Firebase Sync di halaman app.
+4. Salin konfigurasi Web App ke tab Pengaturan Firebase (grup Data Management) di halaman app.
 5. Klik Hubungkan Firebase, lalu Simpan Data ke Firebase.
 6. Saat Firebase sudah siap, kontrol CSV lokal otomatis disembunyikan (cloud-ready mode).
 7. Gunakan tombol "Muat Riwayat Invoice" untuk melihat invoice terdahulu.

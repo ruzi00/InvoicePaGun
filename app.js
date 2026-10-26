@@ -1,5 +1,5 @@
-const APP_VERSION = "1.6.0";
-const APP_VERSION_DATE = "2026-10-26";
+const APP_VERSION = "1.7.0";
+const APP_VERSION_DATE = "2026-10-27";
 const THEME_STORAGE_KEY = "invoice-app-theme";
 
 function svgIcon(paths, viewBox = "0 0 24 24") {
@@ -13,8 +13,16 @@ const ICONS = {
   view: svgIcon('<path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"></path><circle cx="12" cy="12" r="3"></circle>'),
   download: svgIcon('<path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path>'),
   sun: svgIcon('<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>'),
+  inbox: svgIcon('<path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z"></path>'),
+  plug: svgIcon('<path d="M12 22v-5"></path><path d="M9 8V2"></path><path d="M15 8V2"></path><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"></path>'),
+  calendar: svgIcon('<rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path>'),
   moon: svgIcon('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"></path>'),
 };
+
+function emptyStateHtml(text, iconKey = "inbox") {
+  const icon = ICONS[iconKey] || ICONS.inbox;
+  return `<div class="empty-state">${icon}<span>${escapeHtml(text)}</span></div>`;
+}
 
 function showAppToast(message, kind = "info") {
   const stack = document.getElementById("appToastStack");
@@ -146,6 +154,7 @@ const TAB_GROUP_MAP = {
   discount: "data",
   bank: "data",
   holiday: "data",
+  firebase: "data",
   attendance_input: "operations",
   attendance: "operations",
   receivables: "operations",
@@ -154,7 +163,7 @@ const TAB_GROUP_MAP = {
 
 const GROUP_TABS = {
   invoice: ["front", "after", "calendar", "status"],
-  data: ["students", "pricing", "discount", "bank", "holiday"],
+  data: ["students", "pricing", "discount", "bank", "holiday", "firebase"],
   operations: ["attendance_input", "attendance", "receivables", "reminders"],
 };
 
@@ -249,6 +258,7 @@ const el = {
   cloudReadyNotice: document.getElementById("cloudReadyNotice"),
   autoLoadSection: document.getElementById("autoLoadSection"),
   firebaseSyncSection: document.getElementById("firebaseSyncSection"),
+  firebaseSettingsSection: document.getElementById("firebaseSettingsSection"),
   localSourceControls: document.getElementById("localSourceControls"),
   firebaseCsvEditor: document.getElementById("firebaseCsvEditor"),
   packageFiles: document.getElementById("packageFiles"),
@@ -487,6 +497,7 @@ const TAB_SECTION_MAP = {
   discount: el.discountManagementSection,
   bank: el.bankManagementSection,
   holiday: el.holidayManagementSection,
+  firebase: el.firebaseSettingsSection,
   attendance_input: el.attendanceInputOperationsSection,
   attendance: el.attendanceOperationsSection,
   receivables: el.receivablesOperationsSection,
@@ -579,6 +590,33 @@ function bindEvents() {
   el.mobileNavToggle?.addEventListener("click", () => {
     const isOpen = document.body.classList.contains("mobile-workflow-open");
     setMobileWorkflowMenuOpen(!isOpen);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const menu = document.getElementById("settingsMenu");
+    if (!menu || !menu.open) return;
+    if (document.querySelector("dialog[open]")) return;
+    menu.open = false;
+    menu.querySelector("summary")?.focus();
+  });
+
+  [".workflow-groups", ".workflow-tabs"].forEach((selector) => {
+    const container = document.querySelector(selector);
+    container?.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const items = Array.from(container.querySelectorAll("button")).filter((btn) => !btn.classList.contains("hidden"));
+      const index = items.indexOf(document.activeElement);
+      if (index < 0 || items.length === 0) return;
+      let next = index;
+      if (event.key === "ArrowRight") next = (index + 1) % items.length;
+      if (event.key === "ArrowLeft") next = (index - 1 + items.length) % items.length;
+      if (event.key === "Home") next = 0;
+      if (event.key === "End") next = items.length - 1;
+      event.preventDefault();
+      items[next].focus();
+    });
   });
 
   window.addEventListener("resize", () => {
@@ -1723,7 +1761,6 @@ function moveSettingsIntoMenu() {
     el.runtimeNotice,
     el.cloudReadyNotice,
     el.autoLoadSection,
-    el.firebaseSyncSection,
   ].filter(Boolean);
 
   settingBlocks.forEach((node) => {
@@ -2185,6 +2222,7 @@ async function setActiveTab(nextTab, { force = false, group = "" } = {}) {
   el.discountManagementSection?.classList.toggle("hidden", tab !== "discount");
   el.bankManagementSection?.classList.toggle("hidden", tab !== "bank");
   el.holidayManagementSection?.classList.toggle("hidden", tab !== "holiday");
+  el.firebaseSettingsSection?.classList.toggle("hidden", tab !== "firebase");
   el.attendanceInputOperationsSection?.classList.toggle("hidden", tab !== "attendance_input");
   el.attendanceOperationsSection?.classList.toggle("hidden", tab !== "attendance");
   el.receivablesOperationsSection?.classList.toggle("hidden", tab !== "receivables");
@@ -2229,6 +2267,11 @@ async function setActiveTab(nextTab, { force = false, group = "" } = {}) {
 
   if (tab === "holiday") {
     renderHolidayManagementTable();
+    refreshFirebaseButtons();
+    return;
+  }
+
+  if (tab === "firebase") {
     refreshFirebaseButtons();
     return;
   }
@@ -2898,7 +2941,7 @@ function insertRescheduleSession() {
 function renderSessionsTable(emptyMsg = "Belum ada sesi. Muat data terlebih dahulu.") {
   if (state.sessions.length === 0) {
     state.rescheduleAnchorId = "";
-    el.tableBody.innerHTML = `<tr><td colspan="12" class="empty">${escapeHtml(emptyMsg)}</td></tr>`;
+    el.tableBody.innerHTML = `<tr><td colspan="12" class="empty">${emptyStateHtml(emptyMsg, "calendar")}</td></tr>`;
     return;
   }
 
@@ -2990,7 +3033,7 @@ function renderInvoiceBatchSelectedList() {
 
   if (!Array.isArray(state.invoiceBatchStudents) || state.invoiceBatchStudents.length === 0) {
     el.invoiceBatchSelectedList.classList.add("empty");
-    el.invoiceBatchSelectedList.textContent = "Belum ada siswa tambahan.";
+    el.invoiceBatchSelectedList.innerHTML = emptyStateHtml("Belum ada siswa tambahan.");
     syncInvoiceBatchStudentsField();
     return;
   }
@@ -4689,7 +4732,7 @@ function isFileProtocol() {
 }
 
 function clearPreview() {
-  el.preview.innerHTML = '<div class="placeholder">Pratinjau invoice akan muncul di sini.</div>';
+  el.preview.innerHTML = `<div class="placeholder">${emptyStateHtml("Pratinjau invoice akan muncul di sini.", "inbox")}</div>`;
   el.btnDownloadPng.disabled = true;
   if (el.btnPreviewPng) el.btnPreviewPng.disabled = true;
 }
@@ -4772,7 +4815,6 @@ function setCloudReadyMode(ready) {
   document.body.classList.toggle("cloud-ready", Boolean(ready));
   if (ready) {
     if (el.localSourceControls) el.localSourceControls.open = false;
-    if (el.firebaseSyncSection) el.firebaseSyncSection.open = false;
     if (el.firebaseCsvEditor) el.firebaseCsvEditor.open = false;
   }
   if (!el.cloudReadyNotice) return;
@@ -6175,13 +6217,13 @@ function renderPaymentStatusTable() {
 
   if (!state.firebase.ready) {
     el.paymentStatusSummary.textContent = "Hubungkan Firebase untuk memuat data.";
-    el.paymentStatusTableBody.innerHTML = '<tr><td colspan="7" class="empty">Firebase belum terhubung.</td></tr>';
+    el.paymentStatusTableBody.innerHTML = `<tr><td colspan="7" class="empty">${emptyStateHtml("Firebase belum terhubung.", "plug")}</td></tr>`;
     return;
   }
 
   if (state.dashboardInvoices.length === 0) {
     el.paymentStatusSummary.textContent = "Belum ada invoice di cloud.";
-    el.paymentStatusTableBody.innerHTML = '<tr><td colspan="7" class="empty">Belum ada data invoice.</td></tr>';
+    el.paymentStatusTableBody.innerHTML = `<tr><td colspan="7" class="empty">${emptyStateHtml("Belum ada data invoice.", "inbox")}</td></tr>`;
     return;
   }
 
@@ -6253,7 +6295,7 @@ function renderAttendanceInputSection() {
   state.attendanceEntries = rows;
 
   if (rows.length === 0) {
-    el.attendanceInputTableBody.innerHTML = '<tr><td colspan="13" class="empty">Belum ada data attendance input.</td></tr>';
+    el.attendanceInputTableBody.innerHTML = `<tr><td colspan="13" class="empty">${emptyStateHtml("Belum ada data attendance input.", "inbox")}</td></tr>`;
     return;
   }
 
@@ -6408,7 +6450,7 @@ function renderAttendanceOperationsSection() {
 
   if (!el.attendanceOpsTableBody) return;
   if (view.items.length === 0) {
-    el.attendanceOpsTableBody.innerHTML = '<tr><td colspan="4" class="empty">Belum ada data absensi yang bisa diringkas.</td></tr>';
+    el.attendanceOpsTableBody.innerHTML = `<tr><td colspan="4" class="empty">${emptyStateHtml("Belum ada data absensi yang bisa diringkas.", "inbox")}</td></tr>`;
     return;
   }
 
@@ -6471,11 +6513,11 @@ function renderReceivablesOperationsSection() {
 
   if (!el.receivablesOpsTableBody) return;
   if (!state.firebase.ready) {
-    el.receivablesOpsTableBody.innerHTML = '<tr><td colspan="6" class="empty">Hubungkan Firebase untuk memuat piutang.</td></tr>';
+    el.receivablesOpsTableBody.innerHTML = `<tr><td colspan="6" class="empty">${emptyStateHtml("Hubungkan Firebase untuk memuat piutang.", "plug")}</td></tr>`;
     return;
   }
   if (items.length === 0) {
-    el.receivablesOpsTableBody.innerHTML = '<tr><td colspan="6" class="empty">Tidak ada invoice issued yang masih terbuka.</td></tr>';
+    el.receivablesOpsTableBody.innerHTML = `<tr><td colspan="6" class="empty">${emptyStateHtml("Tidak ada invoice issued yang masih terbuka.", "inbox")}</td></tr>`;
     return;
   }
 
@@ -6535,11 +6577,11 @@ function renderRemindersOperationsSection() {
 
   if (!el.remindersOpsTableBody) return;
   if (!state.firebase.ready) {
-    el.remindersOpsTableBody.innerHTML = '<tr><td colspan="5" class="empty">Hubungkan Firebase untuk memuat reminder.</td></tr>';
+    el.remindersOpsTableBody.innerHTML = `<tr><td colspan="5" class="empty">${emptyStateHtml("Hubungkan Firebase untuk memuat reminder.", "plug")}</td></tr>`;
     return;
   }
   if (items.length === 0) {
-    el.remindersOpsTableBody.innerHTML = '<tr><td colspan="5" class="empty">Tidak ada invoice issued yang perlu di-follow-up.</td></tr>';
+    el.remindersOpsTableBody.innerHTML = `<tr><td colspan="5" class="empty">${emptyStateHtml("Tidak ada invoice issued yang perlu di-follow-up.", "inbox")}</td></tr>`;
     return;
   }
 
@@ -6609,7 +6651,7 @@ function renderStudentManagementTable() {
     const message = state.students.length === 0
       ? "Belum ada data siswa."
       : (hasGradeFilter || hasNameFilter || hasSchoolFilter ? "Tidak ada siswa yang cocok dengan filter pencarian." : "Tidak ada siswa untuk ditampilkan.");
-    el.studentManageTableBody.innerHTML = `<tr><td colspan="7" class="empty">${message}</td></tr>`;
+    el.studentManageTableBody.innerHTML = `<tr><td colspan="7" class="empty">${emptyStateHtml(message)}</td></tr>`;
     return;
   }
 
@@ -6725,7 +6767,7 @@ function applyPricingFromManagement(notify = true) {
 function renderPricingManagementTable() {
   if (!el.pricingManageTableBody) return;
   if (!state.pricingManageRows.length) {
-    el.pricingManageTableBody.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data tarif.</td></tr>';
+    el.pricingManageTableBody.innerHTML = `<tr><td colspan="5" class="empty">${emptyStateHtml("Belum ada data tarif.", "inbox")}</td></tr>`;
     return;
   }
 
@@ -6826,7 +6868,7 @@ function applyDiscountFromManagement(notify = true) {
 function renderDiscountManagementTable() {
   if (!el.discountManageTableBody) return;
   if (!state.discountManageRows.length) {
-    el.discountManageTableBody.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data diskon.</td></tr>';
+    el.discountManageTableBody.innerHTML = `<tr><td colspan="5" class="empty">${emptyStateHtml("Belum ada data diskon.", "inbox")}</td></tr>`;
     return;
   }
 
@@ -6908,7 +6950,7 @@ function applyBankFromManagement(notify = true) {
 function renderBankManagementTable() {
   if (!el.bankManageTableBody) return;
   if (!state.bankManageRows.length) {
-    el.bankManageTableBody.innerHTML = '<tr><td colspan="7" class="empty">Belum ada data bank guru.</td></tr>';
+    el.bankManageTableBody.innerHTML = `<tr><td colspan="7" class="empty">${emptyStateHtml("Belum ada data bank guru.", "inbox")}</td></tr>`;
     return;
   }
 
@@ -6994,7 +7036,7 @@ function applyHolidayFromManagement(notify = true) {
 function renderHolidayManagementTable() {
   if (!el.holidayManageTableBody) return;
   if (!state.holidayManageRows.length) {
-    el.holidayManageTableBody.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data hari libur.</td></tr>';
+    el.holidayManageTableBody.innerHTML = `<tr><td colspan="5" class="empty">${emptyStateHtml("Belum ada data hari libur.", "inbox")}</td></tr>`;
     return;
   }
 
@@ -7171,7 +7213,7 @@ async function updateInvoicePaymentStatus(historyId, status, note = "") {
 function renderInvoiceHistoryTable() {
   if (!el.invoiceHistoryTableBody) return;
   if (state.invoiceHistory.length === 0) {
-    el.invoiceHistoryTableBody.innerHTML = '<tr><td colspan="7" class="empty">Belum ada riwayat invoice.</td></tr>';
+    el.invoiceHistoryTableBody.innerHTML = `<tr><td colspan="7" class="empty">${emptyStateHtml("Belum ada riwayat invoice.", "inbox")}</td></tr>`;
     return;
   }
 
