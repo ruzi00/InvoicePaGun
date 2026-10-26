@@ -400,7 +400,7 @@
       <p class="tagline">Panduan lengkap penggunaan aplikasi pembuat invoice les otomatis — dari penjadwalan sesi, penghitungan diskon, sampai sinkronisasi Firebase.</p>
     </div>
     <div class="meta">
-      Versi aplikasi: <strong>v1.5.1</strong> (19 Jul 2026)<br>
+      Versi aplikasi: <strong>v1.6.0</strong> (26 Okt 2026)<br>
       Disusun untuk: <strong>Bimbel Pak Gun</strong><br>
       Bahasa aplikasi: <strong>Indonesia</strong>
     </div>
@@ -415,6 +415,7 @@
         <li><a href="#front">Mode Payment in Front</a></li>
         <li><a href="#after">Mode Payment After</a></li>
         <li><a href="#diskon">Diskon &amp; Extra Diskon</a></li>
+        <li><a href="#kelas-offline">Kelas Offline</a></li>
         <li><a href="#kalender">Kalender &amp; Status</a></li>
         <li><a href="#siswa">Data Siswa</a></li>
         <li><a href="#operasional">Absensi, Piutang &amp; Pengingat</a></li>
@@ -549,6 +550,15 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
         </div>
       </section>
 
+      <section class="chapter" id="kelas-offline">
+        <div class="chapter-head"><span class="chapter-num">05b</span><h2>Kelas Offline</h2></div>
+        <p class="chapter-sub">Kelas tatap muka memakai tarif per jam tersendiri, terpisah dari tarif weekdays/sabtu/minggu.</p>
+
+        <p>Tarif Kelas Offline (per jam, untuk satu grup): <strong>1 siswa Rp150.000</strong>, <strong>2 siswa Rp100.000</strong>, <strong>3 siswa Rp80.000</strong>. Bila peserta lebih dari 3, aplikasi memakai tarif 3 peserta dan menampilkan pemberitahuan.</p>
+        <p>Cara memakai: pilih <span class="field-tag">Jenis Kelas</span> = <strong>Offline</strong> pada baris hari (Payment in Front), pada tabel sesi, atau pada tabel Input Absensi (Payment After). Mengganti Jenis Kelas atau jumlah peserta di tabel sesi langsung menghitung ulang tarif dan total. Sesi offline ditandai label "Offline" pada invoice.</p>
+        <p>Diskon durasi <strong>tidak berlaku</strong> untuk sesi offline (Extra Diskon tetap berlaku untuk seluruh tagihan). Data dan invoice lama otomatis dianggap <strong>Reguler</strong>. Tarif offline dapat diubah di tab Tarif dengan jenis hari <code>offline</code>.</p>
+      </section>
+
       <section class="chapter" id="kalender">
         <div class="chapter-head"><span class="chapter-num">06</span><h2>Kalender &amp; Status Pembayaran</h2></div>
         <p class="chapter-sub">Memantau jadwal dan status tagihan lintas pengajar dalam satu tampilan.</p>
@@ -671,6 +681,13 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
           <table>
             <thead><tr><th>Versi</th><th>Tanggal</th><th>Perubahan</th></tr></thead>
             <tbody>
+              <tr>
+                <td class="mono">v1.6.0</td>
+                <td class="mono">26 Okt 2026</td>
+                <td>
+                  Fitur baru <strong>Kelas Offline</strong> dengan tarif tersendiri: 1 siswa Rp150.000/jam, 2 siswa Rp100.000/jam, 3 siswa Rp80.000/jam (per jam untuk satu grup). Tersedia pilihan <strong>Jenis Kelas</strong> (Reguler/Offline) di tabel hari Payment in Front, tabel sesi, dan tabel Input Absensi; invoice menampilkan label "Offline" di sebelah jumlah peserta. Sesi offline tidak mendapat diskon durasi. Tarif offline bisa diatur di tab Tarif dengan jenis hari <code>offline</code>.
+                </td>
+              </tr>
               <tr>
                 <td class="mono">v1.5.1</td>
                 <td class="mono">19 Jul 2026</td>

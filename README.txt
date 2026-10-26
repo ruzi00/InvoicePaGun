@@ -45,6 +45,14 @@ jenis_hari,jumlah_peserta,tarif_per_jam
 senin-jumat,1,80000
 sabtu,1,90000
 minggu,1,100000
+offline,1,150000
+offline,2,100000
+offline,3,80000
+
+Catatan: jenis_hari yang dikenali: senin-jumat, sabtu, minggu, offline.
+Baris "offline" dipakai untuk Kelas Offline (per jam, per grup): 1 siswa 150.000,
+2 siswa 100.000, 3 siswa 80.000. Lebih dari 3 peserta memakai tarif 3 peserta.
+Sesi Kelas Offline tidak mendapat diskon durasi.
 
 2) diskon_durasi.csv
 min_durasi,max_durasi,diskon_persen

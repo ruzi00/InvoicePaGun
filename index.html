@@ -305,18 +305,19 @@
                 <th>Hari</th>
                 <th>Pengajar</th>
                 <th>Jumlah Peserta</th>
+                <th>Jenis Kelas</th>
                 <th>Jam Mulai</th>
                 <th>Jam Selesai</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td><input type="checkbox" data-day="Senin" checked /></td><td>Senin</td><td><select data-teacher="Senin" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Senin" /></td><td><input type="time" step="900" data-start="Senin" value="19:30" /></td><td><input type="time" step="900" data-end="Senin" value="21:00" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Selasa" /></td><td>Selasa</td><td><select data-teacher="Selasa" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Selasa" /></td><td><input type="time" step="900" data-start="Selasa" value="19:30" /></td><td><input type="time" step="900" data-end="Selasa" value="21:00" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Rabu" /></td><td>Rabu</td><td><select data-teacher="Rabu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Rabu" /></td><td><input type="time" step="900" data-start="Rabu" value="19:30" /></td><td><input type="time" step="900" data-end="Rabu" value="21:00" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Kamis" /></td><td>Kamis</td><td><select data-teacher="Kamis" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Kamis" /></td><td><input type="time" step="900" data-start="Kamis" value="19:30" /></td><td><input type="time" step="900" data-end="Kamis" value="21:00" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Jumat" /></td><td>Jumat</td><td><select data-teacher="Jumat" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Jumat" /></td><td><input type="time" step="900" data-start="Jumat" value="19:30" /></td><td><input type="time" step="900" data-end="Jumat" value="21:00" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Sabtu" /></td><td>Sabtu</td><td><select data-teacher="Sabtu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Sabtu" /></td><td><input type="time" step="900" data-start="Sabtu" value="09:00" /></td><td><input type="time" step="900" data-end="Sabtu" value="10:30" /></td></tr>
-              <tr><td><input type="checkbox" data-day="Minggu" /></td><td>Minggu</td><td><select data-teacher="Minggu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Minggu" /></td><td><input type="time" step="900" data-start="Minggu" value="09:00" /></td><td><input type="time" step="900" data-end="Minggu" value="10:30" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Senin" checked /></td><td>Senin</td><td><select data-teacher="Senin" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Senin" /></td><td><select data-kelas="Senin" class="kelas-week" aria-label="Jenis Kelas"><option value="reguler">Reguler</option><option value="offline">Offline</option></select></td><td><input type="time" step="900" data-start="Senin" value="19:30" /></td><td><input type="time" step="900" data-end="Senin" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Selasa" /></td><td>Selasa</td><td><select data-teacher="Selasa" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Selasa" /></td><td><select data-kelas="Selasa" class="kelas-week" aria-label="Jenis Kelas"><option value="reguler">Reguler</option><option value="offline">Offline</option></select></td><td><input type="time" step="900" data-start="Selasa" value="19:30" /></td><td><input type="time" step="900" data-end="Selasa" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Rabu" /></td><td>Rabu</td><td><select data-teacher="Rabu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Rabu" /></td><td><select data-kelas="Rabu" class="kelas-week" aria-label="Jenis Kelas"><option value="reguler">Reguler</option><option value="offline">Offline</option></select></td><td><input type="time" step="900" data-start="Rabu" value="19:30" /></td><td><input type="time" step="900" data-end="Rabu" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Kamis" /></td><td>Kamis</td><td><select data-teacher="Kamis" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Kamis" /></td><td><select data-kelas="Kamis" class="kelas-week" aria-label="Jenis Kelas"><option value="reguler">Reguler</option><option value="offline">Offline</option></select></td><td><input type="time" step="900" data-start="Kamis" value="19:30" /></td><td><input type="time" step="900" data-end="Kamis" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Jumat" /></td><td>Jumat</td><td><select data-teacher="Jumat" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Jumat" /></td><td><select data-kelas="Jumat" class="kelas-week" aria-label="Jenis Kelas"><option value="reguler">Reguler</option><option value="offline">Offline</option></select></td><td><input type="time" step="900" data-start="Jumat" value="19:30" /></td><td><input type="time" step="900" data-end="Jumat" value="21:00" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Sabtu" /></td><td>Sabtu</td><td><select data-teacher="Sabtu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Sabtu" /></td><td><select data-kelas="Sabtu" class="kelas-week" aria-label="Jenis Kelas"><option value="reguler">Reguler</option><option value="offline">Offline</option></select></td><td><input type="time" step="900" data-start="Sabtu" value="09:00" /></td><td><input type="time" step="900" data-end="Sabtu" value="10:30" /></td></tr>
+              <tr><td><input type="checkbox" data-day="Minggu" /></td><td>Minggu</td><td><select data-teacher="Minggu" class="teacher-week"></select></td><td><input type="number" min="1" value="1" data-peserta="Minggu" /></td><td><select data-kelas="Minggu" class="kelas-week" aria-label="Jenis Kelas"><option value="reguler">Reguler</option><option value="offline">Offline</option></select></td><td><input type="time" step="900" data-start="Minggu" value="09:00" /></td><td><input type="time" step="900" data-end="Minggu" value="10:30" /></td></tr>
             </tbody>
           </table>
         </div>
@@ -524,7 +525,7 @@
 
       <section id="pricingManagementSection" class="mode-section hidden">
         <h3>Manajemen Tarif</h3>
-        <p class="sub">Kelola tabel tarif berdasarkan jenis hari dan jumlah peserta.</p>
+        <p class="sub">Kelola tabel tarif berdasarkan jenis hari (weekdays, sabtu, minggu, offline) dan jumlah peserta. Jenis hari "offline" dipakai untuk Kelas Offline.</p>
         <div class="toolbar">
           <button id="btnPricingManageAddRow" type="button" class="btn sekund">Tambah Baris</button>
           <button id="btnPricingManageApply" type="button" class="btn">Apply ke App</button>
@@ -708,6 +709,7 @@
                 <th>Jam Selesai</th>
                 <th>Pengajar</th>
                 <th>Peserta</th>
+                <th>Jenis Kelas</th>
                 <th>Topik</th>
                 <th>Catatan</th>
                 <th>Attendance ID</th>
@@ -715,7 +717,7 @@
               </tr>
             </thead>
             <tbody id="attendanceInputTableBody">
-              <tr><td colspan="12" class="empty">Belum ada data attendance input.</td></tr>
+              <tr><td colspan="13" class="empty">Belum ada data attendance input.</td></tr>
             </tbody>
           </table>
         </div>
@@ -809,12 +811,13 @@
               <th>Durasi</th>
               <th>Tarif/Jam</th>
               <th>Total Jumlah Peserta</th>
+              <th>Jenis Kelas</th>
               <th>Subtotal</th>
               <th>Catatan</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="11" class="empty">Belum ada sesi. Muat data terlebih dahulu.</td></tr>
+            <tr><td colspan="12" class="empty">Belum ada sesi. Muat data terlebih dahulu.</td></tr>
           </tbody>
         </table>
       </div>

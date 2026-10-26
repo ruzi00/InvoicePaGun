@@ -2633,8 +2633,9 @@ body.calendar-share-only .container {
   #frontWeekTable td:nth-child(2)::before { content: "Hari"; }
   #frontWeekTable td:nth-child(3)::before { content: "Pengajar"; }
   #frontWeekTable td:nth-child(4)::before { content: "Jumlah Peserta"; }
-  #frontWeekTable td:nth-child(5)::before { content: "Jam Mulai"; }
-  #frontWeekTable td:nth-child(6)::before { content: "Jam Selesai"; }
+  #frontWeekTable td:nth-child(5)::before { content: "Jenis Kelas"; }
+  #frontWeekTable td:nth-child(6)::before { content: "Jam Mulai"; }
+  #frontWeekTable td:nth-child(7)::before { content: "Jam Selesai"; }
 
   #sessionsTable td:nth-child(1)::before { content: "Pilih"; }
   #sessionsTable td:nth-child(2)::before { content: "Hari"; }
@@ -2645,8 +2646,9 @@ body.calendar-share-only .container {
   #sessionsTable td:nth-child(7)::before { content: "Durasi"; }
   #sessionsTable td:nth-child(8)::before { content: "Tarif/Jam"; }
   #sessionsTable td:nth-child(9)::before { content: "Jumlah Peserta"; }
-  #sessionsTable td:nth-child(10)::before { content: "Subtotal"; }
-  #sessionsTable td:nth-child(11)::before { content: "Catatan"; }
+  #sessionsTable td:nth-child(10)::before { content: "Jenis Kelas"; }
+  #sessionsTable td:nth-child(11)::before { content: "Subtotal"; }
+  #sessionsTable td:nth-child(12)::before { content: "Catatan"; }
 
   #studentManageTable td:nth-child(1)::before { content: "No"; }
   #studentManageTable td:nth-child(2)::before { content: "Nama Panggilan"; }
@@ -2703,10 +2705,11 @@ body.calendar-share-only .container {
   #attendanceInputTable td:nth-child(6)::before { content: "Jam Selesai"; }
   #attendanceInputTable td:nth-child(7)::before { content: "Pengajar"; }
   #attendanceInputTable td:nth-child(8)::before { content: "Peserta"; }
-  #attendanceInputTable td:nth-child(9)::before { content: "Topik"; }
-  #attendanceInputTable td:nth-child(10)::before { content: "Catatan"; }
-  #attendanceInputTable td:nth-child(11)::before { content: "Attendance ID"; }
-  #attendanceInputTable td:nth-child(12)::before { content: "Aksi"; }
+  #attendanceInputTable td:nth-child(9)::before { content: "Jenis Kelas"; }
+  #attendanceInputTable td:nth-child(10)::before { content: "Topik"; }
+  #attendanceInputTable td:nth-child(11)::before { content: "Catatan"; }
+  #attendanceInputTable td:nth-child(12)::before { content: "Attendance ID"; }
+  #attendanceInputTable td:nth-child(13)::before { content: "Aksi"; }
 
   #receivablesOpsTable td:nth-child(1)::before { content: "No Invoice"; }
   #receivablesOpsTable td:nth-child(2)::before { content: "Siswa"; }
@@ -2906,4 +2909,38 @@ body.calendar-share-only .container {
     transform: none;
     max-width: none;
   }
+}
+
+/* Kelas Offline: pill + select jenis kelas */
+.badge-offline {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--warn-border, #e0b45c);
+  background: var(--warn-bg, #fdf0d3);
+  color: var(--warn-text, #7a4a00);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.5;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.invoice-sheet .badge-offline,
+:root[data-theme="dark"] .invoice-sheet .badge-offline {
+  border: 1px solid #d9a441;
+  background: #fdf0d3;
+  color: #7a4a00;
+}
+
+:root[data-theme="dark"] .badge-offline {
+  border-color: #8a6a2a;
+  background: #3a2c10;
+  color: #f2d08a;
+}
+
+.kelas-input,
+.kelas-week {
+  min-width: 100px;
 }

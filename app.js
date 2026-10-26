@@ -1,5 +1,5 @@
-const APP_VERSION = "1.5.1";
-const APP_VERSION_DATE = "2026-07-19";
+const APP_VERSION = "1.6.0";
+const APP_VERSION_DATE = "2026-10-26";
 const THEME_STORAGE_KEY = "invoice-app-theme";
 
 function svgIcon(paths, viewBox = "0 0 24 24") {
@@ -89,6 +89,8 @@ function initializeTheme() {
 }
 const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const FIREBASE_CONFIG_STORAGE_KEY = "invoice-firebase-config";
+// Tarif bawaan Kelas Offline (per jam, per grup): jumlah peserta -> tarif.
+const DEFAULT_OFFLINE_TARIF = { 1: 150000, 2: 100000, 3: 80000 };
 const DEFAULT_TEACHER_STORAGE_KEY = "invoice-default-teacher";
 const FIREBASE_SOURCE_COLLECTION = "invoice_sources";
 const FIREBASE_STUDENT_COLLECTION = "student_details";
@@ -182,6 +184,7 @@ const state = {
     weekdays: {},
     saturday: {},
     sunday: {},
+    offline: {},
   },
   diskonDurasi: [],
   bankGuru: [],
@@ -1060,6 +1063,7 @@ function bindEvents() {
       row.jamSelesai = readField("jamSelesai");
       row.pengajar = readField("pengajar") || "-";
       row.pesertaCount = Math.max(1, Number.parseInt(readField("pesertaCount") || "1", 10) || 1);
+      row.kelasOffline = readField("kelasOffline") === "offline";
       row.topik = readField("topik") || "-";
       row.catatan = readField("catatan");
 
@@ -2330,6 +2334,7 @@ function buildAttendanceEntriesFromCsvText(text) {
   const idxDurasi = findHeaderIndex(headers, ["durasi"]);
   const idxPengajar = findHeaderIndex(headers, ["pengajar", "guru"]);
   const idxPeserta = findHeaderIndex(headers, ["jumlah peserta", "total peserta", "peserta"]);
+  const idxKelasOffline = findKelasOfflineHeaderIndex(headers);
   const idxTopik = findHeaderIndex(headers, ["topik", "mata pelajaran", "subject", "mapel"]);
   const idxCatatan = findHeaderIndex(headers, ["catatan", "keterangan", "notes"]);
   const idxStatus = findHeaderIndex(headers, ["status", "kehadiran"]);
@@ -2367,6 +2372,7 @@ function buildAttendanceEntriesFromCsvText(text) {
         jamSelesai: times.end,
         pengajar: String(idxPengajar >= 0 ? row[idxPengajar] || "" : "").trim() || "-",
         pesertaCount: Math.max(1, parseIntFromText(idxPeserta >= 0 ? row[idxPeserta] || "1" : "1") || 1),
+        kelasOffline: parseKelasOfflineValue(idxKelasOffline >= 0 ? row[idxKelasOffline] : ""),
         topik: String(idxTopik >= 0 ? row[idxTopik] || "" : "").trim() || "-",
         catatan: String(idxCatatan >= 0 ? row[idxCatatan] || "" : "").trim(),
       }));
@@ -2394,6 +2400,7 @@ function buildAttendanceEntriesFromCsvText(text) {
           jamSelesai: times.end,
           pengajar: String(idxPengajar >= 0 ? row[idxPengajar] || "" : "").trim() || "-",
           pesertaCount: Math.max(1, parseIntFromText(idxPeserta >= 0 ? row[idxPeserta] || "1" : "1") || 1),
+          kelasOffline: parseKelasOfflineValue(idxKelasOffline >= 0 ? row[idxKelasOffline] : ""),
           topik: String(idxTopik >= 0 ? row[idxTopik] || "" : "").trim() || "-",
           catatan: String(idxCatatan >= 0 ? row[idxCatatan] || "" : "").trim(),
         }));
@@ -2432,6 +2439,9 @@ function applyPricingCsv(text, notify = true) {
     toastMessage("Format tarif tidak valid. Gunakan: jenis_hari,jumlah_peserta,tarif_per_jam");
     return;
   }
+
+  // Data lama tanpa baris offline: pakai tarif bawaan (teks sumber tidak diubah).
+  if (Object.keys(map.offline || {}).length === 0) map.offline = { ...DEFAULT_OFFLINE_TARIF };
 
   state.tarif = map;
   state.pricingManageRows = tarifMapToManageRows(map);
@@ -2527,6 +2537,7 @@ function generateFrontWeeklySessions() {
   }
 
   const sessions = [];
+  let offlineCapped = false;
   for (let week = 0; week < totalWeeks; week += 1) {
     for (let i = 0; i < 7; i += 1) {
       const date = addDays(startDate, week * 7 + i);
@@ -2545,8 +2556,11 @@ function generateFrontWeeklySessions() {
         Number.parseInt(el.frontWeekTable.querySelector(`input[data-peserta="${hari}"]`)?.value || "1", 10)
       );
 
+      const kelasOffline = el.frontWeekTable.querySelector(`select[data-kelas="${hari}"]`)?.value === "offline";
+
       const durasi = calculateDuration(jamMulai, jamSelesai);
       if (durasi <= 0) continue;
+      if (kelasOffline && pesertaCount > 3) offlineCapped = true;
 
       sessions.push(
         buildSession({
@@ -2556,6 +2570,7 @@ function generateFrontWeeklySessions() {
           jamSelesai,
           pengajar,
           pesertaCount,
+          kelasOffline,
           catatan: "",
           source: "front",
         })
@@ -2571,6 +2586,7 @@ function generateFrontWeeklySessions() {
   state.sessions = sessions;
   renderSessionsTable();
   updateTotal();
+  if (offlineCapped) toastMessage("Tarif offline untuk lebih dari 3 peserta memakai tarif 3 peserta.");
 }
 
 function buildAfterSessionsFromAttendanceEntries(studentName) {
@@ -2603,6 +2619,7 @@ function buildAfterSessionsFromAttendanceEntries(studentName) {
         jamSelesai,
         pengajar: String(entry.pengajar || "-").trim() || "-",
         pesertaCount: Math.max(1, Number.parseInt(String(entry.pesertaCount || "1"), 10) || 1),
+        kelasOffline: entry.kelasOffline === true,
         durasiOverride,
         topik: String(entry.topik || "-").trim() || "-",
         catatan: String(entry.catatan || "").trim(),
@@ -2733,9 +2750,9 @@ function updateAfterInvoiceDateOptions(sourceSessions = null) {
   applyInvoiceDateFromAttendanceDate(preferred);
 }
 
-function buildSession({ date, hari, jamMulai, jamSelesai, pengajar, pesertaCount, durasiOverride, topik, catatan, source }) {
+function buildSession({ date, hari, jamMulai, jamSelesai, pengajar, pesertaCount, durasiOverride, topik, catatan, source, kelasOffline = false }) {
   const durasi = Number.isFinite(durasiOverride) ? durasiOverride : calculateDuration(jamMulai, jamSelesai);
-  const tarifPerJam = pickTarif(hari, pesertaCount, date);
+  const tarifPerJam = pickTarif(hari, pesertaCount, date, !!kelasOffline);
   const subtotal = tarifPerJam * durasi;
 
   return {
@@ -2749,11 +2766,37 @@ function buildSession({ date, hari, jamMulai, jamSelesai, pengajar, pesertaCount
     pengajar,
     topik: topik || "-",
     pesertaCount,
+    kelasOffline: !!kelasOffline,
     durasi,
     tarifPerJam,
     subtotal,
     catatan: catatan ?? "",
   };
+}
+
+function buildOfflineBadgeHtml(isOffline) {
+  return isOffline ? ' <span class="badge-offline">Offline</span>' : "";
+}
+
+function repriceSession(session) {
+  session.kelasOffline = !!session.kelasOffline;
+  session.tarifPerJam = pickTarif(session.hari, session.pesertaCount, session.tanggal, session.kelasOffline);
+  session.subtotal = session.tarifPerJam * session.durasi;
+  return session;
+}
+
+function maybeNotifyOfflineCap(session) {
+  const count = Number(session?.pesertaCount || 1);
+  const capped = !!session?.kelasOffline && count > 3;
+  const alreadyNotified = session?._offlineCapNotifiedCount === count;
+  if (session) session._offlineCapNotifiedCount = capped ? count : 0;
+  if (capped && !alreadyNotified) {
+    toastMessage("Tarif offline untuk lebih dari 3 peserta memakai tarif 3 peserta.");
+  }
+}
+
+function isDiscountableSession(s) {
+  return Number(s?.pesertaCount || 1) > 1 && !s?.kelasOffline;
 }
 
 function recalcSessions() {
@@ -2766,6 +2809,7 @@ function recalcSessions() {
       pengajar: s.pengajar,
       topik: s.topik,
       pesertaCount: s.pesertaCount,
+      kelasOffline: s.kelasOffline === true,
       durasiOverride: s.durasi,
       catatan: s.catatan,
       source: s.source,
@@ -2830,6 +2874,7 @@ function insertRescheduleSession() {
     jamSelesai: anchor.jamSelesai,
     pengajar: anchor.pengajar,
     pesertaCount: anchor.pesertaCount,
+    kelasOffline: anchor.kelasOffline === true,
     topik: anchor.topik,
     catatan: anchor.catatan,
     source: anchor.source || state.mode,
@@ -2853,7 +2898,7 @@ function insertRescheduleSession() {
 function renderSessionsTable(emptyMsg = "Belum ada sesi. Muat data terlebih dahulu.") {
   if (state.sessions.length === 0) {
     state.rescheduleAnchorId = "";
-    el.tableBody.innerHTML = `<tr><td colspan="11" class="empty">${escapeHtml(emptyMsg)}</td></tr>`;
+    el.tableBody.innerHTML = `<tr><td colspan="12" class="empty">${escapeHtml(emptyMsg)}</td></tr>`;
     return;
   }
 
@@ -2874,6 +2919,7 @@ function renderSessionsTable(emptyMsg = "Belum ada sesi. Muat data terlebih dahu
         <td>${s.durasi.toFixed(2)} jam</td>
         <td>${formatRupiah(s.tarifPerJam)}</td>
         <td><input type="number" min="1" class="participant-input" value="${s.pesertaCount}" /></td>
+        <td><select class="kelas-input" aria-label="Jenis Kelas"><option value="reguler" ${s.kelasOffline ? "" : "selected"}>Reguler</option><option value="offline" ${s.kelasOffline ? "selected" : ""}>Offline</option></select></td>
         <td>${formatRupiah(s.subtotal)}</td>
         <td><textarea class="catatan" placeholder="Catatan khusus...">${escapeHtml(s.catatan || "")}</textarea></td>
       </tr>
@@ -2889,6 +2935,7 @@ function renderSessionsTable(emptyMsg = "Belum ada sesi. Muat data terlebih dahu
     const teacherInput = row.querySelector(".teacher-input");
     const topicInput = row.querySelector(".topic-input");
     const participantInput = row.querySelector(".participant-input");
+    const kelasInput = row.querySelector(".kelas-input");
     const catatan = row.querySelector(".catatan");
     row.addEventListener("click", (event) => {
       if (event.target.closest("input,select,textarea,button,label")) return;
@@ -2908,10 +2955,17 @@ function renderSessionsTable(emptyMsg = "Belum ada sesi. Muat data terlebih dahu
     participantInput.addEventListener("input", () => {
       const next = Math.max(1, Number.parseInt(participantInput.value || "1", 10) || 1);
       session.pesertaCount = next;
-      session.tarifPerJam = pickTarif(session.hari, next, session.tanggal);
-      session.subtotal = session.tarifPerJam * session.durasi;
+      repriceSession(session);
       renderSessionsTable();
       updateTotal();
+      maybeNotifyOfflineCap(session);
+    });
+    kelasInput.addEventListener("change", () => {
+      session.kelasOffline = kelasInput.value === "offline";
+      repriceSession(session);
+      renderSessionsTable();
+      updateTotal();
+      maybeNotifyOfflineCap(session);
     });
     catatan.addEventListener("input", () => {
       session.catatan = catatan.value;
@@ -3140,7 +3194,7 @@ async function generateInvoice() {
         <td>${escapeHtml(s.topik || "-")}</td>
         <td>${s.durasi.toFixed(2)}</td>
         <td>${formatRupiah(s.tarifPerJam)}</td>
-        <td>${s.pesertaCount}</td>
+        <td>${s.pesertaCount}${buildOfflineBadgeHtml(s.kelasOffline)}</td>
         <td>${formatRupiah(s.subtotal)}</td>
         <td>${escapeHtml(s.catatan || "-")}</td>
       </tr>
@@ -3300,6 +3354,7 @@ async function generateInvoice() {
       durasi: s.durasi,
       tarifPerJam: s.tarifPerJam,
       pesertaCount: s.pesertaCount,
+      kelasOffline: !!s.kelasOffline,
       subtotal: s.subtotal,
       catatan: s.catatan,
     })),
@@ -3446,6 +3501,7 @@ function buildAfterSessionsFromSimpleCsv(headers, rows, studentName) {
   const idxSelesai = findHeaderIndex(headers, ["jam_selesai", "jam selesai"]);
   const idxPengajar = findHeaderIndex(headers, ["pengajar", "guru"]);
   const idxPeserta = findHeaderIndex(headers, ["jumlah peserta", "total peserta", "peserta"]);
+  const idxKelasOffline = findKelasOfflineHeaderIndex(headers);
   const idxTopik = findHeaderIndex(headers, ["topik", "mata pelajaran", "subject", "mapel"]);
   const idxCatatan = findHeaderIndex(headers, ["catatan", "keterangan", "notes"]);
 
@@ -3477,6 +3533,7 @@ function buildAfterSessionsFromSimpleCsv(headers, rows, studentName) {
         jamSelesai,
         pengajar: String(idxPengajar >= 0 ? row[idxPengajar] || "" : "").trim() || "-",
         pesertaCount: peserta,
+        kelasOffline: parseKelasOfflineValue(idxKelasOffline >= 0 ? row[idxKelasOffline] : ""),
         durasiOverride,
         topik: String(idxTopik >= 0 ? row[idxTopik] || "" : "").trim() || "-",
         catatan: String(idxCatatan >= 0 ? row[idxCatatan] || "" : "").trim(),
@@ -3627,7 +3684,7 @@ function calculateTeacherPortions(rows, totals = {}) {
     current.sessions += 1;
     current.duration += Number(row?.durasi || 0);
     current.gross += Number(row?.subtotal || 0);
-    if (Number(row?.pesertaCount || 1) > 1) {
+    if (isDiscountableSession(row)) {
       current.discountableGross += Number(row?.subtotal || 0);
     }
     grouped.set(teacher, current);
@@ -3705,7 +3762,7 @@ function renderTeacherPortionRows(portions) {
 function calculateInvoiceTotals(selectedSessions, { customDiscountPercent = 0, customDiscountReason = "" } = {}) {
   const baseTotal = selectedSessions.reduce((sum, s) => sum + s.subtotal, 0);
   const totalDurasi = selectedSessions.reduce((sum, s) => sum + s.durasi, 0);
-  const nonPrivateSessions = selectedSessions.filter((s) => Number(s?.pesertaCount || 1) > 1);
+  const nonPrivateSessions = selectedSessions.filter((s) => isDiscountableSession(s));
   const nonPrivateDurasi = nonPrivateSessions.reduce((sum, s) => sum + Number(s?.durasi || 0), 0);
   const discountableBaseTotal = nonPrivateSessions.reduce((sum, s) => sum + Number(s?.subtotal || 0), 0);
   const diskonPersen = nonPrivateDurasi > 0 ? pickDiskonByDurasi(nonPrivateDurasi) : 0;
@@ -3832,9 +3889,15 @@ function normalizeAttendanceEntry(entry = {}, fallbackId = "") {
     jamSelesai: String(entry.jamSelesai || "").trim(),
     pengajar: String(entry.pengajar || "-").trim() || "-",
     pesertaCount: Math.max(1, Number.parseInt(String(entry.pesertaCount || "1"), 10) || 1),
+    kelasOffline: parseKelasOfflineValue(entry.kelasOffline),
     topik: String(entry.topik || "-").trim() || "-",
     catatan: String(entry.catatan || "").trim(),
   };
+}
+
+function parseKelasOfflineValue(value) {
+  if (value === true) return true;
+  return /^(true|offline)$/i.test(String(value ?? "").trim());
 }
 
 function sortAttendanceEntries(entries = []) {
@@ -4074,7 +4137,7 @@ function getStudentDisplayName(studentName, detail = null) {
 }
 
 function parseTarifCsv(rows) {
-  const map = { weekdays: {}, saturday: {}, sunday: {} };
+  const map = { weekdays: {}, saturday: {}, sunday: {}, offline: {} };
   if (!rows || rows.length === 0) return map;
 
   let start = 0;
@@ -4090,8 +4153,9 @@ function parseTarifCsv(rows) {
     if (!day || !Number.isFinite(peserta) || peserta <= 0 || !Number.isFinite(tarif) || tarif <= 0) continue;
 
     let key = "weekdays";
-    if (day.includes("sabtu")) key = "saturday";
-    if (day.includes("minggu")) key = "sunday";
+    if (day.includes("offline")) key = "offline";
+    else if (day.includes("sabtu")) key = "saturday";
+    else if (day.includes("minggu")) key = "sunday";
     map[key][peserta] = tarif;
   }
 
@@ -4229,10 +4293,12 @@ function isHolidayLikeDate(date) {
   return isPublicHoliday(date) || isWeekendDate(date);
 }
 
-function pickTarif(hari, pesertaCount, date) {
+function pickTarif(hari, pesertaCount, date, kelasOffline = false) {
   let key = "weekdays";
 
-  if (isPublicHoliday(date)) {
+  if (kelasOffline) {
+    key = "offline";
+  } else if (isPublicHoliday(date)) {
     key = "sunday";
   } else {
     const h = normalizeName(hari);
@@ -4240,7 +4306,8 @@ function pickTarif(hari, pesertaCount, date) {
     if (h.includes("minggu")) key = "sunday";
   }
 
-  const map = state.tarif[key] || {};
+  let map = state.tarif[key] || {};
+  if (kelasOffline && Object.keys(map).length === 0) map = DEFAULT_OFFLINE_TARIF;
   const direct = map[pesertaCount];
   if (direct) return direct;
 
@@ -4364,6 +4431,11 @@ function parseMonth(name) {
     nov: 10, november: 10, dec: 11, december: 11, des: 11,
   };
   return m[String(name || "").toLowerCase()] ?? -1;
+}
+
+function findKelasOfflineHeaderIndex(headers) {
+  const wants = ["jenis kelas", "offline"];
+  return headers.findIndex((h) => wants.includes(String(h || "").trim().toLowerCase()));
 }
 
 function findHeaderIndex(headers, candidates) {
@@ -5173,6 +5245,7 @@ async function loadAttendanceEntriesFromFirebase({ forceServer = false } = {}) {
       jamSelesai: String(data.jamSelesai || "").trim(),
       pengajar: String(data.pengajar || "-").trim() || "-",
       pesertaCount: Math.max(1, Number.parseInt(String(data.pesertaCount || "1"), 10) || 1),
+      kelasOffline: parseKelasOfflineValue(data.kelasOffline),
       topik: String(data.topik || "-").trim() || "-",
       catatan: String(data.catatan || "").trim(),
     }));
@@ -5207,6 +5280,7 @@ async function saveAttendanceEntryToFirebase(entry) {
       jamSelesai: next.jamSelesai,
       pengajar: next.pengajar,
       pesertaCount: next.pesertaCount,
+      kelasOffline: !!next.kelasOffline,
       topik: next.topik,
       catatan: next.catatan,
       deletedAt: "",
@@ -5270,6 +5344,7 @@ async function saveAllAttendanceEntriesToFirebase() {
         jamSelesai: item.jamSelesai,
         pengajar: item.pengajar,
         pesertaCount: item.pesertaCount,
+        kelasOffline: !!item.kelasOffline,
         topik: item.topik,
         catatan: item.catatan,
         deletedAt: "",
@@ -6178,7 +6253,7 @@ function renderAttendanceInputSection() {
   state.attendanceEntries = rows;
 
   if (rows.length === 0) {
-    el.attendanceInputTableBody.innerHTML = '<tr><td colspan="12" class="empty">Belum ada data attendance input.</td></tr>';
+    el.attendanceInputTableBody.innerHTML = '<tr><td colspan="13" class="empty">Belum ada data attendance input.</td></tr>';
     return;
   }
 
@@ -6199,6 +6274,12 @@ function renderAttendanceInputSection() {
         <td><input type="time" data-row="${index}" data-field="jamSelesai" value="${escapeHtml(String(row.jamSelesai || ""))}" /></td>
         <td><input type="text" data-row="${index}" data-field="pengajar" value="${escapeHtml(String(row.pengajar || ""))}" /></td>
         <td><input type="number" min="1" data-row="${index}" data-field="pesertaCount" value="${escapeHtml(String(row.pesertaCount || 1))}" /></td>
+        <td>
+          <select data-row="${index}" data-field="kelasOffline" aria-label="Jenis Kelas">
+            <option value="reguler" ${row.kelasOffline ? "" : "selected"}>Reguler</option>
+            <option value="offline" ${row.kelasOffline ? "selected" : ""}>Offline</option>
+          </select>
+        </td>
         <td><input type="text" data-row="${index}" data-field="topik" value="${escapeHtml(String(row.topik || ""))}" /></td>
         <td><input type="text" data-row="${index}" data-field="catatan" value="${escapeHtml(String(row.catatan || ""))}" /></td>
         <td><code>${escapeHtml(String(row.attendanceId || "-"))}</code></td>
@@ -6572,6 +6653,7 @@ function tarifMapToManageRows(map) {
   appendRows("weekdays", "weekdays");
   appendRows("saturday", "sabtu");
   appendRows("sunday", "minggu");
+  appendRows("offline", "offline");
   return out;
 }
 
@@ -6580,6 +6662,7 @@ function normalizeTarifDayLabel(text) {
   if (["weekdays", "weekday", "weekdays", "senin-jumat", "senin sampai jumat", "hari kerja"].includes(value)) return "weekdays";
   if (["sabtu", "saturday"].includes(value)) return "sabtu";
   if (["minggu", "sunday"].includes(value)) return "minggu";
+  if (["offline", "kelas offline"].includes(value)) return "offline";
   return "";
 }
 
@@ -6594,7 +6677,7 @@ function validatePricingManageRows(rows) {
     const tarif = Number.parseInt(String(row.tarif_per_jam || "").trim(), 10);
 
     if (!day) {
-      return { ok: false, message: `Baris ${index + 1}: jenis hari harus weekdays, sabtu, atau minggu.` };
+      return { ok: false, message: `Baris ${index + 1}: jenis hari harus weekdays, sabtu, minggu, atau offline.` };
     }
     if (!Number.isInteger(peserta) || peserta <= 0) {
       return { ok: false, message: `Baris ${index + 1}: jumlah peserta harus bilangan bulat positif.` };
@@ -6655,6 +6738,7 @@ function renderPricingManagementTable() {
             <option value="weekdays" ${normalizeTarifDayLabel(row.jenis_hari || "") === "weekdays" ? "selected" : ""}>weekdays</option>
             <option value="sabtu" ${normalizeTarifDayLabel(row.jenis_hari || "") === "sabtu" ? "selected" : ""}>sabtu</option>
             <option value="minggu" ${normalizeTarifDayLabel(row.jenis_hari || "") === "minggu" ? "selected" : ""}>minggu</option>
+            <option value="offline" ${normalizeTarifDayLabel(row.jenis_hari || "") === "offline" ? "selected" : ""}>offline</option>
           </select>
         </td>
         <td><input type="number" min="1" data-row="${index}" data-field="jumlah_peserta" value="${escapeHtml(row.jumlah_peserta || "")}" /></td>
@@ -7128,7 +7212,7 @@ function showInvoiceHistoryPreview(item) {
       (row) =>
         `<li>${escapeHtml(row.tanggal || "-")} | ${escapeHtml(row.hari || "-")} | ${escapeHtml(row.pengajar || "-")} | ${escapeHtml(
           row.topik || "-"
-        )} | ${formatRupiah(Number(row.subtotal || 0))}</li>`
+        )} | ${formatRupiah(Number(row.subtotal || 0))}${buildOfflineBadgeHtml(row.kelasOffline === true)}</li>`
     )
     .join("");
   const teacherPortions = Array.isArray(item.teacherPortions)
@@ -7202,6 +7286,7 @@ async function loadInvoiceForEditing(item) {
         jamSelesai: String(s.jamSelesai || "-"),
         pengajar: String(s.pengajar || "-").trim() || "-",
         pesertaCount: Math.max(1, Number.parseInt(String(s.pesertaCount || "1"), 10) || 1),
+        kelasOffline: s.kelasOffline === true,
         durasiOverride: Number(s.durasi || 0),
         topik: String(s.topik || "-").trim() || "-",
         catatan: String(s.catatan || ""),
@@ -7301,7 +7386,7 @@ function redownloadInvoiceFromHistory(item) {
         <td>${escapeHtml(topik)}</td>
         <td>${durasi.toFixed(2)}</td>
         <td>${formatRupiah(tarifPerJam)}</td>
-        <td>${pesertaCount}</td>
+        <td>${pesertaCount}${buildOfflineBadgeHtml(s.kelasOffline === true)}</td>
         <td>${formatRupiah(subtotal)}</td>
         <td>${escapeHtml(catatan)}</td>
       </tr>
