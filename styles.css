@@ -739,9 +739,26 @@ textarea {
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
+.settings-menu > summary svg {
+  transition: transform 260ms ease;
+}
+
+.settings-menu > summary:hover svg {
+  transform: rotate(45deg);
+}
+
 .settings-menu > summary:hover {
-  transform: translateY(-1px) rotate(18deg);
+  transform: translateY(-1px);
   box-shadow: 0 5px 12px rgba(36, 32, 22, 0.16);
+}
+
+.settings-menu[open] > summary svg {
+  transform: rotate(90deg);
+}
+
+.settings-menu[open] > summary {
+  border-color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .theme-toggle {
@@ -772,7 +789,10 @@ textarea {
 }
 
 .settings-menu-content {
-  margin-top: 10px;
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
   width: min(560px, calc(100vw - 48px));
   max-height: min(78vh, 860px);
   overflow: auto;
@@ -2280,7 +2300,7 @@ body.calendar-share-only .container {
   }
 
   .settings-menu-content {
-    width: min(560px, calc(100vw - 24px));
+    width: min(560px, calc(100vw - 44px));
     max-height: 72vh;
   }
 

@@ -1,4 +1,4 @@
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.8.1";
 const APP_VERSION_DATE = "2026-10-27";
 const THEME_STORAGE_KEY = "invoice-app-theme";
 
@@ -627,6 +627,12 @@ function bindEvents() {
     if (document.querySelector("dialog[open]")) return;
     menu.open = false;
     menu.querySelector("summary")?.focus();
+  });
+
+  document.addEventListener("click", (event) => {
+    const menu = document.getElementById("settingsMenu");
+    if (!menu || !menu.open || menu.contains(event.target)) return;
+    menu.open = false;
   });
 
   [".workflow-groups", ".workflow-tabs"].forEach((selector) => {
