@@ -1,4 +1,4 @@
-const APP_VERSION = "1.8.2";
+const APP_VERSION = "1.8.3";
 const APP_VERSION_DATE = "2026-10-27";
 const THEME_STORAGE_KEY = "invoice-app-theme";
 
