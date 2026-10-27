@@ -885,6 +885,7 @@ textarea {
 
 .invoice-calendar-weekly {
   width: 100%;
+  overflow-x: auto;
 }
 
 .calendar-legend {

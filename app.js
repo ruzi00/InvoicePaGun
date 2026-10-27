@@ -1,4 +1,4 @@
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.8.0";
 const APP_VERSION_DATE = "2026-10-27";
 const THEME_STORAGE_KEY = "invoice-app-theme";
 
@@ -513,6 +513,33 @@ function playTabEnterAnimation(target) {
 
 initialize();
 
+// Input/select/textarea di dalam tabel dirender dinamis tanpa <label>; beri aria-label dari header kolomnya.
+function labelTableControls(root = document) {
+  root.querySelectorAll("td input:not([type=hidden]), td select, td textarea").forEach((control) => {
+    if (control.getAttribute("aria-label") || control.title || (control.labels && control.labels.length)) return;
+    const cell = control.closest("td");
+    const table = cell && cell.closest("table");
+    if (!table) return;
+    const header = table.querySelectorAll("thead th")[cell.cellIndex];
+    const text = header ? header.textContent.trim() : "";
+    if (text) control.setAttribute("aria-label", text);
+  });
+}
+
+function initializeTableControlLabels() {
+  let pending = false;
+  const run = () => {
+    pending = false;
+    labelTableControls();
+  };
+  new MutationObserver(() => {
+    if (pending) return;
+    pending = true;
+    setTimeout(run, 120);
+  }).observe(document.body, { childList: true, subtree: true });
+  run();
+}
+
 function renderAppVersionInfo() {
   const target = document.getElementById("appVersionInfo");
   if (!target) return;
@@ -523,6 +550,7 @@ function renderAppVersionInfo() {
 function initialize() {
   initializeTheme();
   renderAppVersionInfo();
+  initializeTableControlLabels();
   const today = new Date();
   el.invoiceDate.value = toLocalDateTimeInputValue(today);
   el.frontStartDate.value = toLocalDateInputValue(today);
