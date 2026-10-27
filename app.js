@@ -1,4 +1,4 @@
-const APP_VERSION = "1.8.3";
+const APP_VERSION = "1.9.0";
 const APP_VERSION_DATE = "2026-10-27";
 const THEME_STORAGE_KEY = "invoice-app-theme";
 
@@ -122,6 +122,23 @@ const STUDENT_CSV_HEADERS = [
   "Riwayat Les",
 ];
 const FIREBASE_SHARED_OWNER_UID = "bimbelpakgun-shared";
+const FIREBASE_USAGE_STORAGE_KEY = "invoice-firebase-usage";
+const FIREBASE_STORAGE_ESTIMATE_KEY = "invoice-firebase-storage";
+const FIREBASE_USAGE_COLLECTIONS = [
+  { name: "invoice_records", label: "Invoice" },
+  { name: "student_details", label: "Data siswa" },
+  { name: "attendance_records", label: "Absensi" },
+  { name: "invoice_sources", label: "Sumber CSV" },
+  { name: "dev_notes", label: "Catatan pengembangan" },
+];
+// Kuota gratis paket Spark Firestore (https://firebase.google.com/docs/firestore/quotas).
+const FIREBASE_SPARK_LIMITS = {
+  storageBytes: 1024 * 1024 * 1024,
+  reads: 50000,
+  writes: 20000,
+  deletes: 20000,
+};
+const firebaseUsageRuntime = { data: null, saveTimer: 0, renderTimer: 0, batchOps: new WeakMap() };
 const DEFAULT_FIREBASE_CONFIG = {
   apiKey: "AIzaSyATOra_DTbyKzS-YY7KyRqBWLmeGPqReKY",
   authDomain: "bimbelpakgun.firebaseapp.com",
@@ -551,6 +568,7 @@ function initialize() {
   initializeTheme();
   renderAppVersionInfo();
   initializeTableControlLabels();
+  initializeFirebaseUsagePanel();
   const today = new Date();
   el.invoiceDate.value = toLocalDateTimeInputValue(today);
   el.frontStartDate.value = toLocalDateInputValue(today);
@@ -7599,4 +7617,318 @@ function serializeRowsToCsv(rows) {
         .join(",")
     )
     .join("\n");
+}
+
+// ---- Pemakaian & Batas Firebase ----
+
+function getPacificDateKey() {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function getFirebaseUsage() {
+  const today = getPacificDateKey();
+  const current = firebaseUsageRuntime.data;
+  if (current && current.date === today) return current;
+  let stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem(FIREBASE_USAGE_STORAGE_KEY) || "null");
+  } catch {
+    stored = null;
+  }
+  const fresh = { date: today, reads: 0, writes: 0, deletes: 0, warned: {} };
+  if (stored && stored.date === today) {
+    fresh.reads = Number(stored.reads) || 0;
+    fresh.writes = Number(stored.writes) || 0;
+    fresh.deletes = Number(stored.deletes) || 0;
+    fresh.warned = stored.warned && typeof stored.warned === "object" ? stored.warned : {};
+  }
+  firebaseUsageRuntime.data = fresh;
+  return fresh;
+}
+
+function recordFirebaseUsage(kind, count) {
+  if (!count) return;
+  const usage = getFirebaseUsage();
+  usage[kind] += count;
+  const pct = (usage[kind] / FIREBASE_SPARK_LIMITS[kind]) * 100;
+  if (pct >= 80 && !usage.warned[kind]) {
+    usage.warned[kind] = true;
+    const label = { reads: "baca", writes: "tulis", deletes: "hapus" }[kind];
+    toastMessage(`Kuota ${label} Firebase hari ini sudah ${Math.floor(pct)}% (di browser ini). Cek tab Pengaturan Firebase.`);
+  }
+  clearTimeout(firebaseUsageRuntime.saveTimer);
+  firebaseUsageRuntime.saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(FIREBASE_USAGE_STORAGE_KEY, JSON.stringify(getFirebaseUsage()));
+    } catch {
+      // localStorage bisa tidak tersedia (mode privat); hitungan tetap jalan di memori.
+    }
+  }, 400);
+  clearTimeout(firebaseUsageRuntime.renderTimer);
+  firebaseUsageRuntime.renderTimer = setTimeout(renderFirebaseUsagePanel, 250);
+}
+
+// Membungkus metode Firestore compat agar setiap baca/tulis/hapus tercatat ke kuota harian.
+function installFirestoreUsageTracking() {
+  if (typeof firebase === "undefined" || !firebase.firestore) return;
+  const fs = firebase.firestore;
+  if (fs.__usageTracked) return;
+  fs.__usageTracked = true;
+
+  const wrap = (proto, method, after) => {
+    const original = proto && proto[method];
+    if (typeof original !== "function") return;
+    proto[method] = function (...args) {
+      const result = original.apply(this, args);
+      return after ? after.call(this, result, args) : result;
+    };
+  };
+  const countSnapshot = (snap) => {
+    if (!snap || (snap.metadata && snap.metadata.fromCache)) return snap;
+    recordFirebaseUsage("reads", typeof snap.size === "number" ? Math.max(1, snap.size) : 1);
+    return snap;
+  };
+
+  wrap(fs.Query && fs.Query.prototype, "get", (promise) => promise.then(countSnapshot));
+  wrap(fs.DocumentReference && fs.DocumentReference.prototype, "get", (promise) => promise.then(countSnapshot));
+  wrap(fs.DocumentReference && fs.DocumentReference.prototype, "set", (promise) =>
+    promise.then((r) => {
+      recordFirebaseUsage("writes", 1);
+      return r;
+    })
+  );
+  wrap(fs.DocumentReference && fs.DocumentReference.prototype, "update", (promise) =>
+    promise.then((r) => {
+      recordFirebaseUsage("writes", 1);
+      return r;
+    })
+  );
+  wrap(fs.DocumentReference && fs.DocumentReference.prototype, "delete", (promise) =>
+    promise.then((r) => {
+      recordFirebaseUsage("deletes", 1);
+      return r;
+    })
+  );
+
+  const noteBatchOp = (batch, kind) => {
+    const ops = firebaseUsageRuntime.batchOps.get(batch) || { writes: 0, deletes: 0 };
+    ops[kind] += 1;
+    firebaseUsageRuntime.batchOps.set(batch, ops);
+  };
+  const batchProto = fs.WriteBatch && fs.WriteBatch.prototype;
+  wrap(batchProto, "set", function (result) {
+    noteBatchOp(this, "writes");
+    return result;
+  });
+  wrap(batchProto, "update", function (result) {
+    noteBatchOp(this, "writes");
+    return result;
+  });
+  wrap(batchProto, "delete", function (result) {
+    noteBatchOp(this, "deletes");
+    return result;
+  });
+  wrap(batchProto, "commit", function (promise) {
+    return promise.then((r) => {
+      const ops = firebaseUsageRuntime.batchOps.get(this);
+      if (ops) {
+        recordFirebaseUsage("writes", ops.writes);
+        recordFirebaseUsage("deletes", ops.deletes);
+        firebaseUsageRuntime.batchOps.delete(this);
+      }
+      return r;
+    });
+  });
+}
+
+function utf8Bytes(text) {
+  const value = String(text);
+  return typeof TextEncoder === "function" ? new TextEncoder().encode(value).length : value.length;
+}
+
+function isFirestoreTimestamp(value) {
+  return value && typeof value === "object" && (typeof value.toDate === "function" || typeof value.seconds === "number");
+}
+
+// Ukuran nilai menurut https://firebase.google.com/docs/firestore/storage-size
+function firestoreValueBytes(value) {
+  if (value === null || value === undefined) return 1;
+  if (typeof value === "boolean") return 1;
+  if (typeof value === "number") return 8;
+  if (typeof value === "string") return utf8Bytes(value) + 1;
+  if (Array.isArray(value)) return value.reduce((sum, item) => sum + firestoreValueBytes(item), 0);
+  if (isFirestoreTimestamp(value)) return 8;
+  if (typeof value === "object") {
+    return Object.entries(value).reduce((sum, [key, item]) => sum + utf8Bytes(key) + 1 + firestoreValueBytes(item), 0);
+  }
+  return 8;
+}
+
+function firestoreDocBytes(collection, docId, data) {
+  const nameBytes = utf8Bytes(collection) + 1 + utf8Bytes(docId) + 1 + 16;
+  const fieldBytes = Object.entries(data || {}).reduce((sum, [key, item]) => sum + utf8Bytes(key) + 1 + firestoreValueBytes(item), 0);
+  const dataBytes = nameBytes + fieldBytes + 32;
+
+  // Indeks otomatis: tiap field (termasuk sub-field map) punya entri naik dan turun; elemen array satu entri.
+  let indexBytes = 0;
+  const pathBytes = (path) => path.reduce((sum, part) => sum + utf8Bytes(part) + 1, 0);
+  const walk = (value, path) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item && typeof item === "object" && !isFirestoreTimestamp(item)) return;
+        indexBytes += nameBytes + pathBytes(path) + firestoreValueBytes(item) + 32;
+      });
+      return;
+    }
+    if (value && typeof value === "object" && !isFirestoreTimestamp(value)) {
+      Object.entries(value).forEach(([key, item]) => walk(item, [...path, key]));
+      return;
+    }
+    if (typeof value === "string" && utf8Bytes(value) > 1500) return;
+    indexBytes += 2 * (nameBytes + pathBytes(path) + firestoreValueBytes(value) + 32);
+  };
+  Object.entries(data || {}).forEach(([key, item]) => walk(item, [key]));
+  return { dataBytes, indexBytes };
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value < 1024) return `${value} B`;
+  const decimal = (n, digits) => n.toFixed(digits).replace(".", ",");
+  if (value < 1024 * 1024) return `${decimal(value / 1024, 1)} KB`;
+  if (value < 1024 * 1024 * 1024) return `${decimal(value / 1024 / 1024, 2)} MB`;
+  return `${decimal(value / 1024 / 1024 / 1024, 2)} GB`;
+}
+
+function formatPercent(used, limit) {
+  const pct = limit > 0 ? (used / limit) * 100 : 0;
+  if (pct === 0) return "0%";
+  return pct < 0.01 ? "<0,01%" : `${pct < 10 ? pct.toFixed(2) : pct.toFixed(1)}%`.replace(".", ",");
+}
+
+function usageMeterHtml(label, used, limit, usedText, limitText) {
+  const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+  const level = pct >= 90 ? "danger" : pct >= 70 ? "warn" : "ok";
+  return `
+    <div class="usage-meter-row">
+      <div class="usage-meter-label"><span>${escapeHtml(label)}</span><strong>${escapeHtml(usedText)} / ${escapeHtml(limitText)} (${formatPercent(used, limit)})</strong></div>
+      <div class="usage-meter" role="progressbar" aria-label="${escapeHtml(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}">
+        <div class="usage-meter-fill ${level}" style="width:${Math.max(pct, used > 0 ? 1 : 0).toFixed(2)}%"></div>
+      </div>
+    </div>`;
+}
+
+function loadStorageEstimate() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FIREBASE_STORAGE_ESTIMATE_KEY) || "null");
+    return parsed && Array.isArray(parsed.rows) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function renderFirebaseUsagePanel() {
+  const meters = document.getElementById("fbUsageMeters");
+  if (!meters) return;
+  const usage = getFirebaseUsage();
+  const nf = (n) => Number(n).toLocaleString("id-ID");
+  meters.innerHTML = [
+    usageMeterHtml("Baca dokumen", usage.reads, FIREBASE_SPARK_LIMITS.reads, nf(usage.reads), nf(FIREBASE_SPARK_LIMITS.reads)),
+    usageMeterHtml("Tulis dokumen", usage.writes, FIREBASE_SPARK_LIMITS.writes, nf(usage.writes), nf(FIREBASE_SPARK_LIMITS.writes)),
+    usageMeterHtml("Hapus dokumen", usage.deletes, FIREBASE_SPARK_LIMITS.deletes, nf(usage.deletes), nf(FIREBASE_SPARK_LIMITS.deletes)),
+  ].join("");
+  const hint = document.getElementById("fbUsageHint");
+  const savedEstimate = loadStorageEstimate();
+  if (hint) {
+    const docsPerLoad = savedEstimate
+      ? savedEstimate.rows.filter((row) => row.name !== "dev_notes").reduce((sum, row) => sum + row.docs, 0)
+      : 0;
+    hint.textContent = docsPerLoad
+      ? `Setiap kali aplikasi dibuka, sekitar ${nf(docsPerLoad)} dokumen dibaca. Kuota baca harian cukup untuk kira-kira ${nf(Math.floor(FIREBASE_SPARK_LIMITS.reads / docsPerLoad))} kali buka aplikasi per hari (belum termasuk tombol muat ulang).`
+      : "Klik \"Hitung Penyimpanan\" sekali untuk melihat perkiraan berapa kali aplikasi bisa dibuka per hari.";
+  }
+  const dayLabel = document.getElementById("fbUsageDay");
+  if (dayLabel) dayLabel.textContent = `Hari kuota: ${usage.date} (waktu Pasifik)`;
+
+  const estimate = loadStorageEstimate();
+  const storageMeter = document.getElementById("fbStorageMeter");
+  const rowsTarget = document.getElementById("fbStorageRows");
+  const updated = document.getElementById("fbStorageUpdated");
+  if (estimate && storageMeter && rowsTarget) {
+    storageMeter.innerHTML = usageMeterHtml(
+      "Total penyimpanan",
+      estimate.totalBytes,
+      FIREBASE_SPARK_LIMITS.storageBytes,
+      formatBytes(estimate.totalBytes),
+      formatBytes(FIREBASE_SPARK_LIMITS.storageBytes)
+    );
+    rowsTarget.innerHTML =
+      estimate.rows
+        .map(
+          (row) =>
+            `<tr><td>${escapeHtml(row.label)}</td><td>${nf(row.docs)}</td><td>${formatBytes(row.dataBytes)}</td><td>${formatBytes(row.indexBytes)}</td><td><strong>${formatBytes(row.dataBytes + row.indexBytes)}</strong></td></tr>`
+        )
+        .join("") +
+      `<tr class="usage-total"><td>Total</td><td>${nf(estimate.rows.reduce((s, r) => s + r.docs, 0))}</td><td>${formatBytes(estimate.rows.reduce((s, r) => s + r.dataBytes, 0))}</td><td>${formatBytes(estimate.rows.reduce((s, r) => s + r.indexBytes, 0))}</td><td><strong>${formatBytes(estimate.totalBytes)}</strong></td></tr>`;
+    if (updated) updated.textContent = `Terakhir dihitung: ${formatTanggalWaktu(new Date(estimate.at))}`;
+  }
+
+  const link = document.getElementById("lnkFbConsoleUsage");
+  const projectId = state.firebase.config?.projectId || document.getElementById("firebaseProjectId")?.value.trim();
+  if (link) {
+    link.href = projectId
+      ? `https://console.firebase.google.com/project/${encodeURIComponent(projectId)}/usage`
+      : "https://console.firebase.google.com/";
+  }
+}
+
+async function countFirebaseStorage() {
+  if (!state.firebase.ready || !state.firebase.db) {
+    toastMessage("Hubungkan Firebase dulu sebelum menghitung penyimpanan.");
+    return;
+  }
+  const ownerUid = getFirebaseWriteOwnerUid();
+  const rows = [];
+  for (const collection of FIREBASE_USAGE_COLLECTIONS) {
+    const snapshot = await firestoreGet(state.firebase.db.collection(collection.name).where("ownerUid", "==", ownerUid), {
+      forceServer: true,
+    });
+    let dataBytes = 0;
+    let indexBytes = 0;
+    snapshot.forEach((doc) => {
+      const sizes = firestoreDocBytes(collection.name, doc.id, doc.data());
+      dataBytes += sizes.dataBytes;
+      indexBytes += sizes.indexBytes;
+    });
+    rows.push({ name: collection.name, label: collection.label, docs: snapshot.size, dataBytes, indexBytes });
+  }
+  const totalBytes = rows.reduce((sum, row) => sum + row.dataBytes + row.indexBytes, 0);
+  const estimate = { at: Date.now(), rows, totalBytes };
+  try {
+    localStorage.setItem(FIREBASE_STORAGE_ESTIMATE_KEY, JSON.stringify(estimate));
+  } catch {
+    // tetap tampil untuk sesi ini lewat render di bawah
+  }
+  renderFirebaseUsagePanel();
+  const pct = (totalBytes / FIREBASE_SPARK_LIMITS.storageBytes) * 100;
+  toastMessage(`Penyimpanan terpakai sekitar ${formatBytes(totalBytes)} (${formatPercent(totalBytes, FIREBASE_SPARK_LIMITS.storageBytes)} dari 1 GB)${pct >= 70 ? " — mulai tinggi!" : ""}`);
+}
+
+function initializeFirebaseUsagePanel() {
+  installFirestoreUsageTracking();
+  renderFirebaseUsagePanel();
+  document.getElementById("btnFbCountStorage")?.addEventListener("click", (event) => {
+    withButtonLoading(event.currentTarget, "Menghitung...", countFirebaseStorage).catch((err) => {
+      toastMessage(`Gagal menghitung penyimpanan: ${err.message || err}`);
+    });
+  });
 }

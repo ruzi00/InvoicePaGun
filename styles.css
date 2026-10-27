@@ -2746,6 +2746,16 @@ body.calendar-share-only .container {
   #attendanceInputTable td:nth-child(5)::before { content: "Jam Mulai"; }
   #attendanceInputTable td:nth-child(6)::before { content: "Jam Selesai"; }
   #attendanceInputTable td:nth-child(7)::before { content: "Pengajar"; }
+
+  #fbStorageTable td:nth-child(1)::before { content: "Koleksi"; }
+  #fbStorageTable td:nth-child(2)::before { content: "Dokumen"; }
+  #fbStorageTable td:nth-child(3)::before { content: "Data"; }
+  #fbStorageTable td:nth-child(4)::before { content: "Indeks"; }
+  #fbStorageTable td:nth-child(5)::before { content: "Total"; }
+  #fbStorageTable td.usage-empty::before { content: none; }
+
+  #fbLimitsTable td:nth-child(1)::before { content: "Yang dibatasi"; }
+  #fbLimitsTable td:nth-child(2)::before { content: "Batas gratis"; }
   #attendanceInputTable td:nth-child(8)::before { content: "Peserta"; }
   #attendanceInputTable td:nth-child(9)::before { content: "Jenis Kelas"; }
   #attendanceInputTable td:nth-child(10)::before { content: "Topik"; }
@@ -3040,4 +3050,128 @@ textarea:focus-visible,
 .batch-student-selected .empty-state svg {
   width: 18px;
   height: 18px;
+}
+
+/* Pemakaian & Batas Firebase */
+.usage-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-1);
+  padding: var(--sp-4);
+}
+
+.usage-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.usage-card h4 {
+  margin: 0 0 var(--sp-2);
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.usage-updated {
+  font-size: 0.82rem;
+  color: var(--muted-2);
+}
+
+.usage-note {
+  margin: var(--sp-3) 0 0;
+  font-size: 0.84rem;
+}
+
+.usage-meter-row {
+  margin-bottom: var(--sp-3);
+}
+
+.usage-meter-label {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--sp-1) var(--sp-3);
+  margin-bottom: var(--sp-1);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.usage-meter-label strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-meter {
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.usage-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ok);
+  transition: width 360ms ease;
+}
+
+.usage-meter-fill.warn {
+  background: #d9a03a;
+}
+
+.usage-meter-fill.danger {
+  background: #cf4a3a;
+}
+
+.usage-table td,
+.usage-table th {
+  white-space: nowrap;
+}
+
+.usage-table td.usage-empty {
+  white-space: normal;
+  color: var(--muted-2);
+}
+
+.usage-table tr.usage-total td {
+  background: var(--surface-2);
+  font-weight: 700;
+}
+
+.usage-card .toolbar {
+  margin-top: var(--sp-3);
+}
+
+.usage-card a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+:root[data-theme="dark"] .usage-card {
+  border-color: #4d4029;
+  background: #201a14;
+}
+
+:root[data-theme="dark"] .usage-meter {
+  border-color: #4d4029;
+  background: #17120d;
+}
+
+:root[data-theme="dark"] .usage-meter-label strong,
+:root[data-theme="dark"] .usage-card h4 {
+  color: #f0e4c8;
+}
+
+:root[data-theme="dark"] .usage-table tr.usage-total td {
+  background: #2c2417;
+  color: #f0e4c8;
+}
+
+:root[data-theme="dark"] .usage-updated,
+:root[data-theme="dark"] .usage-table td.usage-empty {
+  color: #b9a98a;
 }

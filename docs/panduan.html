@@ -400,7 +400,7 @@
       <p class="tagline">Panduan lengkap penggunaan aplikasi pembuat invoice les otomatis — dari penjadwalan sesi, penghitungan diskon, sampai sinkronisasi Firebase.</p>
     </div>
     <div class="meta">
-      Versi aplikasi: <strong>v1.8.3</strong> (27 Okt 2026)<br>
+      Versi aplikasi: <strong>v1.9.0</strong> (27 Okt 2026)<br>
       Disusun untuk: <strong>Bimbel Pak Gun</strong><br>
       Bahasa aplikasi: <strong>Indonesia</strong>
     </div>
@@ -661,6 +661,17 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
           </table>
         </div>
 
+        <h3>Memantau Pemakaian &amp; Batas Firebase</h3>
+        <p>Tab <strong>Pengaturan Firebase</strong> memiliki panel <strong>Pemakaian &amp; Batas Firebase</strong> agar Anda tahu seberapa dekat data dengan kuota paket gratis (Spark).</p>
+        <ul>
+          <li><strong>Penyimpanan (perkiraan):</strong> klik <em>Hitung Penyimpanan</em> untuk melihat jumlah dokumen dan ukuran per koleksi (data + indeks) dibanding batas 1 GB. Menghitung membaca semua dokumen sekali (sekitar beberapa ratus baca). Hasil terakhir tersimpan di browser dan ditampilkan lagi saat dibuka.</li>
+          <li><strong>Pemakaian hari ini:</strong> hitungan baca, tulis, dan hapus dokumen yang dilakukan <em>browser ini</em> terhadap batas harian (50.000 baca, 20.000 tulis, 20.000 hapus). Muncul pemberitahuan saat salah satunya mencapai 80%. Kuota direset tiap hari tengah malam waktu Pasifik (sekitar pukul 14.00 WIB).</li>
+          <li><strong>Warna bar:</strong> hijau di bawah 70%, kuning 70–90%, merah di atas 90%.</li>
+        </ul>
+        <div class="note">
+          <p>Angka di panel adalah perkiraan. Aktivitas dari perangkat atau orang lain tidak ikut terhitung di hari-ini, dan ukuran penyimpanan dihitung dari rumus resmi Firestore sehingga bisa sedikit berbeda dari Firebase Console. Untuk angka resmi, klik <em>Buka Firebase Console</em> lalu lihat halaman Usage.</p>
+        </div>
+
         <h3>Publikasi ke GitHub Pages</h3>
         <ol class="steps">
           <li>Push folder proyek ke GitHub.</li>
@@ -681,6 +692,13 @@ Trias,Utama,Mandiri,1122334455,Trias A</div>
           <table>
             <thead><tr><th>Versi</th><th>Tanggal</th><th>Perubahan</th></tr></thead>
             <tbody>
+              <tr>
+                <td class="mono">v1.9.0</td>
+                <td class="mono">27 Okt 2026</td>
+                <td>
+                  Panel baru <strong>Pemakaian &amp; Batas Firebase</strong> di tab Pengaturan Firebase: perkiraan penyimpanan per koleksi dibanding batas 1 GB (tombol Hitung Penyimpanan), penghitung baca/tulis/hapus harian terhadap kuota paket Spark dengan pemberitahuan di 80%, tabel batas paket gratis, dan tautan ke Firebase Console.
+                </td>
+              </tr>
               <tr>
                 <td class="mono">v1.8.3</td>
                 <td class="mono">27 Okt 2026</td>

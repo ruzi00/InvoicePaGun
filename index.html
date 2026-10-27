@@ -234,6 +234,57 @@
           </div>
         </details>
       </details>
+
+      <details id="firebaseUsageSection" class="firebase-section" open>
+        <summary>Pemakaian &amp; Batas Firebase</summary>
+        <p class="sub">Pantau kuota paket gratis (Spark) Firestore supaya tidak kaget saat data bertambah. Angka di sini <strong>perkiraan</strong>; angka resmi ada di Firebase Console.</p>
+
+        <div class="usage-card">
+          <div class="usage-card-head">
+            <h4>Penyimpanan (perkiraan)</h4>
+            <span id="fbStorageUpdated" class="usage-updated">Belum dihitung</span>
+          </div>
+          <div id="fbStorageMeter"></div>
+          <div class="table-wrap">
+            <table id="fbStorageTable" class="usage-table">
+              <thead><tr><th>Koleksi</th><th>Dokumen</th><th>Data</th><th>Indeks</th><th>Total</th></tr></thead>
+              <tbody id="fbStorageRows"><tr><td colspan="5" class="usage-empty">Klik "Hitung Penyimpanan" untuk melihat ukuran data Anda.</td></tr></tbody>
+            </table>
+          </div>
+          <div class="toolbar compact">
+            <button id="btnFbCountStorage" type="button" class="btn utama">Hitung Penyimpanan</button>
+            <a id="lnkFbConsoleUsage" class="btn" href="https://console.firebase.google.com/" target="_blank" rel="noopener">Buka Firebase Console</a>
+          </div>
+          <p class="sub usage-note">Menghitung berarti membaca semua dokumen sekali (sekitar beberapa ratus baca, dihitung ke kuota harian). Ukuran dihitung dari rumus resmi Firestore, jadi bisa beda sedikit dari Console.</p>
+        </div>
+
+        <div class="usage-card">
+          <div class="usage-card-head">
+            <h4>Pemakaian hari ini (dari browser ini)</h4>
+            <span id="fbUsageDay" class="usage-updated"></span>
+          </div>
+          <div id="fbUsageMeters"></div>
+          <p id="fbUsageHint" class="sub usage-note"></p>
+          <p class="sub usage-note">Hanya menghitung aktivitas di browser ini. Perangkat atau orang lain menambah pemakaian sendiri-sendiri, dan kuota direset tiap hari sekitar pukul 14.00 WIB (tengah malam waktu Pasifik).</p>
+        </div>
+
+        <div class="usage-card">
+          <h4>Batas paket gratis (Spark)</h4>
+          <div class="table-wrap">
+            <table id="fbLimitsTable" class="usage-table">
+              <thead><tr><th>Yang dibatasi</th><th>Batas gratis</th></tr></thead>
+              <tbody>
+                <tr><td>Baca dokumen</td><td>50.000 per hari</td></tr>
+                <tr><td>Tulis dokumen</td><td>20.000 per hari</td></tr>
+                <tr><td>Hapus dokumen</td><td>20.000 per hari</td></tr>
+                <tr><td>Penyimpanan</td><td>1 GiB total</td></tr>
+                <tr><td>Data keluar (egress)</td><td>10 GiB per bulan</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="sub usage-note">Jika kuota harian habis, Firestore menolak baca/tulis sampai direset. Paket Blaze (bayar sesuai pemakaian) tetap memberi kuota gratis yang sama.</p>
+        </div>
+      </details>
       </section>
 
       <section id="billingInvoiceInfoSection">
