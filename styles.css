@@ -185,7 +185,7 @@ body {
 }
 
 :root[data-theme="dark"] .header-actions .settings-menu > summary,
-:root[data-theme="dark"] .theme-toggle {
+:root[data-theme="dark"] .header-actions .theme-toggle {
   border-color: #4d4029;
   background: linear-gradient(180deg, #2c2417, #201a14);
   color: #e8c46b;
@@ -771,6 +771,15 @@ textarea {
   background: linear-gradient(180deg, #fff8ea, #f3e4c9);
   color: var(--muted-2);
   transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+/* .icon-btn (defined later) otherwise shrinks this to 34px and overrides its look */
+.header-actions .theme-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid #c6b18a;
+  background: linear-gradient(180deg, #fff8ea, #f3e4c9);
 }
 
 .theme-toggle:hover {
